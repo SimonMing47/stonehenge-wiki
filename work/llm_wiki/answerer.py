@@ -170,7 +170,13 @@ class QuestionAnswerer:
             return make_standard_response(question.id, title, question.level, "paths", paths)
         snippets = []
         for record in records:
-            snippets.extend(relevant_snippets(record, title, allow_password=self.guard.is_env_path(record.rel_path)))
+            snippets.extend(
+                relevant_snippets(
+                    record,
+                    title,
+                    allow_password=self.guard.has_password_intent(title) and self.guard.is_env_path(record.rel_path),
+                )
+            )
         if not snippets:
             snippets = [record.rel_path for record in records]
         return make_standard_response(question.id, title, question.level, "list", snippets[:8])

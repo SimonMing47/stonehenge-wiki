@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
@@ -9,7 +10,7 @@ from xml.etree import ElementTree as ET
 from .models import CommentRecord, DocumentRecord
 from .office_bridge import LEGACY_TO_MODERN, convert_office
 
-SUPPORTED_EXTENSIONS = {
+COUNT_EXTENSIONS = {
     "doc",
     "docx",
     "ppt",
@@ -23,6 +24,7 @@ SUPPORTED_EXTENSIONS = {
     "md",
     "js",
 }
+SUPPORTED_EXTENSIONS = COUNT_EXTENSIONS | {"pdf"}
 
 TEXT_EXTENSIONS = {"xml", "java", "py", "html", "md", "js", "txt", "csv", "json", "yaml", "yml"}
 
@@ -58,6 +60,8 @@ def extract_text_and_office_comments(
         return extract_pptx(path, rel_path)
     if suffix == "xlsx":
         return extract_xlsx(path, rel_path)
+    if suffix == "pdf":
+        return extract_pdf(path), []
     if suffix in LEGACY_TO_MODERN:
         converted = extract_legacy_office(path, suffix, rel_path)
         if converted is not None:
@@ -65,6 +69,30 @@ def extract_text_and_office_comments(
     if suffix in TEXT_EXTENSIONS:
         return read_text_best_effort(path), []
     return extract_binary_strings(path), []
+
+
+def extract_pdf(path: Path) -> str:
+    pdftotext = shutil_which("pdftotext")
+    if pdftotext:
+        try:
+            result = subprocess.run(
+                [pdftotext, "-layout", str(path), "-"],
+                text=True,
+                capture_output=True,
+                timeout=20,
+                check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout
+        except Exception:
+            pass
+    return extract_binary_strings(path)
+
+
+def shutil_which(name: str) -> str | None:
+    from shutil import which
+
+    return which(name)
 
 
 def extract_legacy_office(path: Path, suffix: str, rel_path: str) -> tuple[str, list[CommentRecord]] | None:

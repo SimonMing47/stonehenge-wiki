@@ -4,7 +4,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from .extractors import SUPPORTED_EXTENSIONS, extract_document
+from .extractors import COUNT_EXTENSIONS, extract_document
 from .models import CommentRecord, DocumentRecord
 
 STOPWORDS = {
@@ -64,8 +64,8 @@ class WikiIndex:
         return result
 
     def file_counts(self, exts: list[str] | None = None) -> dict[str, int]:
-        requested = exts or sorted(SUPPORTED_EXTENSIONS)
-        counter = Counter(record.suffix for record in self.records if record.suffix in SUPPORTED_EXTENSIONS)
+        requested = exts or sorted(COUNT_EXTENSIONS)
+        counter = Counter(record.suffix for record in self.records)
         return {ext: counter.get(ext, 0) for ext in requested}
 
     def find_records_mentioned(self, text: str) -> list[DocumentRecord]:
@@ -126,4 +126,3 @@ def query_terms(query: str) -> list[str]:
         seen.add(cleaned)
         terms.append(cleaned)
     return terms[:80]
-

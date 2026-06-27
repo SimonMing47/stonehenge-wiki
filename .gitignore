@@ -1,5 +1,12 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+work/.venv/
 llm-wiki/.state/
-
+llm-wiki/output/fixed/
+llm-wiki/output/screenshots/
+llm-wiki/output/group-*-answer.md
+llm-wiki/wiki/index.md
+llm-wiki/wiki/log.md
+llm-wiki/wiki/sources/
+llm-wiki/wiki/topics/
