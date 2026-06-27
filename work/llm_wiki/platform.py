@@ -9,6 +9,7 @@ from .answerer import QuestionAnswerer
 from .cli_io import load_questions, output_path_for_question_file, resolve_question_files, write_result_log
 from .config import PlatformConfig, load_config
 from .indexer import WikiIndex
+from .llm import LLMClient
 from .models import Question
 from .security import PermissionGuard
 from .store import SQLiteStore
@@ -21,7 +22,8 @@ class LLMWikiPlatform:
         self.wiki_root = self.config.wiki_root
         self.index = WikiIndex(self.wiki_root).build()
         self.guard = PermissionGuard(self.wiki_root)
-        self.answerer = QuestionAnswerer(self.index, self.guard)
+        self.llm_client = LLMClient(self.config.llm) if self.config.llm.enabled else None
+        self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
         self.store = SQLiteStore(self.config.database_path)
         if self.config.persist_index:
             self.store.save_index(self.index)
@@ -36,7 +38,7 @@ class LLMWikiPlatform:
 
     def rebuild_index(self) -> dict[str, Any]:
         self.index.build()
-        self.answerer = QuestionAnswerer(self.index, self.guard)
+        self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
         if self.config.persist_index:
             self.store.save_index(self.index)
         result = self.health()
@@ -138,6 +140,12 @@ class LLMWikiPlatform:
             "compiled_wiki": str(self.wiki_root / "wiki"),
             "files": len(self.index.records),
             "comments": len(self.index.comments),
+            "llm": {
+                "enabled": self.config.llm.enabled,
+                "ready": bool(self.llm_client and self.llm_client.ready),
+                "provider": self.config.llm.provider,
+                "model": self.config.llm.model,
+            },
             "store": self.store.stats(),
         }
 

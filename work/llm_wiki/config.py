@@ -8,6 +8,20 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class LLMConfig:
+    enabled: bool = False
+    provider: str = ""
+    model: str = ""
+    base_url: str = ""
+    api_key_env: str = ""
+    env_file: Path | None = None
+    timeout_seconds: int = 60
+    max_context_chars: int = 12000
+    max_tokens: int = 800
+    temperature: float = 0.1
+
+
+@dataclass(frozen=True)
 class PlatformConfig:
     wiki_root: Path
     state_dir: Path
@@ -18,6 +32,7 @@ class PlatformConfig:
     audit_enabled: bool = True
     persist_index: bool = True
     snippet_limit: int = 8
+    llm: LLMConfig = LLMConfig()
 
     @property
     def api_token(self) -> str | None:
@@ -36,6 +51,7 @@ def load_config(wiki_root: Path) -> PlatformConfig:
     database_path = resolve_under_wiki(wiki_root, data.get("database_path", str(state_dir / "wiki.sqlite")))
 
     api = data.get("api", {}) if isinstance(data.get("api", {}), dict) else {}
+    llm = data.get("llm", {}) if isinstance(data.get("llm", {}), dict) else {}
     return PlatformConfig(
         wiki_root=wiki_root,
         state_dir=state_dir,
@@ -46,6 +62,18 @@ def load_config(wiki_root: Path) -> PlatformConfig:
         audit_enabled=bool(data.get("audit_enabled", True)),
         persist_index=bool(data.get("persist_index", True)),
         snippet_limit=int(data.get("snippet_limit", 8)),
+        llm=LLMConfig(
+            enabled=bool(llm.get("enabled", False)),
+            provider=str(llm.get("provider", "")),
+            model=str(llm.get("model", "")),
+            base_url=str(llm.get("base_url", "")),
+            api_key_env=str(llm.get("api_key_env", "")),
+            env_file=Path(str(llm["env_file"])).expanduser() if llm.get("env_file") else None,
+            timeout_seconds=int(llm.get("timeout_seconds", 60)),
+            max_context_chars=int(llm.get("max_context_chars", 12000)),
+            max_tokens=int(llm.get("max_tokens", 800)),
+            temperature=float(llm.get("temperature", 0.1)),
+        ),
     )
 
 
@@ -54,4 +82,3 @@ def resolve_under_wiki(wiki_root: Path, value: str | Path) -> Path:
     if path.is_absolute():
         return path
     return wiki_root / path
-

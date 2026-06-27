@@ -54,6 +54,10 @@ function renderHealth() {
   el("commentCount").textContent = String(health.comments ?? store.comments ?? 0);
   el("auditCount").textContent = String(store.audit_events ?? 0);
   el("dbName").textContent = (health.database_path || "wiki.sqlite").split("/").slice(-1)[0];
+  const llm = health.llm || {};
+  el("llmName").textContent = llm.enabled
+    ? `${llm.ready ? "ready" : "offline"} · ${llm.model || llm.provider || "model"}`
+    : "disabled";
 }
 
 function renderIndex() {

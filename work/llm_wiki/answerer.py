@@ -7,6 +7,7 @@ from .execution import run_code_file
 from .extractors import SUPPORTED_EXTENSIONS
 from .formatting import make_standard_response
 from .indexer import WikiIndex, query_terms
+from .llm import LLMClient
 from .models import CommentRecord, DocumentRecord, Question
 from .repair import repair_document
 from .security import PermissionGuard
@@ -23,9 +24,10 @@ EXT_ALIASES = {
 
 
 class QuestionAnswerer:
-    def __init__(self, index: WikiIndex, guard: PermissionGuard):
+    def __init__(self, index: WikiIndex, guard: PermissionGuard, llm_client: LLMClient | None = None):
         self.index = index
         self.guard = guard
+        self.llm_client = llm_client
 
     def answer(self, question: Question) -> dict:
         blocked, _ = self.guard.check_question(question.title)
@@ -179,6 +181,20 @@ class QuestionAnswerer:
             )
         if not snippets:
             snippets = [record.rel_path for record in records]
+        if self.llm_client and not self.guard.has_password_intent(title):
+            llm_answer = self.llm_client.answer(title, records, snippets)
+            if llm_answer:
+                return make_standard_response(
+                    question.id,
+                    title,
+                    question.level,
+                    "list",
+                    [
+                        llm_answer.text,
+                        f"llm:{llm_answer.provider}/{llm_answer.model}",
+                        "sources:" + ", ".join(llm_answer.sources),
+                    ],
+                )
         return make_standard_response(question.id, title, question.level, "list", snippets[:8])
 
 

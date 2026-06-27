@@ -8,6 +8,17 @@
     "host": "127.0.0.1",
     "port": 8765,
     "token_env": "LLM_WIKI_API_TOKEN"
+  },
+  "llm": {
+    "enabled": true,
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "base_url": "https://api.deepseek.com/v1",
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "env_file": "~/.hermes/.env",
+    "timeout_seconds": 120,
+    "max_context_chars": 16000,
+    "max_tokens": 900,
+    "temperature": 0.1
   }
 }
-

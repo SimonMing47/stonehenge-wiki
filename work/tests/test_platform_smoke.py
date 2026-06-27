@@ -9,8 +9,13 @@ import zipfile
 from pathlib import Path
 
 from llm_wiki.extractors import extract_docx
+from llm_wiki.answerer import QuestionAnswerer
+from llm_wiki.llm import LLMAnswer
+from llm_wiki.indexer import WikiIndex
+from llm_wiki.models import Question
 from llm_wiki.office_bridge import convert_office, has_soffice
 from llm_wiki.platform import LLMWikiPlatform
+from llm_wiki.security import PermissionGuard
 from llm_wiki.server import build_server
 
 
@@ -129,6 +134,28 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(health["status"], "ok")
             self.assertIn(lint["status"], {"ok", "error"})
 
+    def test_knowledge_answers_use_llm_without_sending_password_queries(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-llm-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            docs = wiki / "docs" / "02_环境信息"
+            docs.mkdir(parents=True)
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "gauss.md").write_text(
+                "连接命令: gsql -h gaussdb.demo.local -p 8000 -U wiki_reader -d knowledge\n"
+                "数据库密码: env-secret\n",
+                encoding="utf-8",
+            )
+
+            llm = FakeLLMClient()
+            answerer = QuestionAnswerer(WikiIndex(wiki).build(), PermissionGuard(wiki), llm)
+            normal = answerer.answer(Question("q1", "如何在控制台连接高斯数据库", "中等"))
+            secret = answerer.answer(Question("q2", "数据库密码是什么", "困难"))
+
+            self.assertIn("llm:fake/fake-model", normal["answer"]["datas"])
+            self.assertEqual(llm.calls, ["如何在控制台连接高斯数据库"])
+            self.assertIn("数据库密码: env-secret", "\n".join(secret["answer"]["datas"]))
+
     @unittest.skipUnless(has_soffice(), "LibreOffice/soffice is not installed")
     def test_legacy_doc_repair_via_libreoffice_bridge(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-legacy-test-") as tmp:
@@ -204,6 +231,23 @@ def escape_xml(text: str) -> str:
 def http_get(url: str) -> str:
     with urllib.request.urlopen(url, timeout=5) as response:
         return response.read().decode("utf-8")
+
+
+class FakeLLMClient:
+    provider = "fake"
+    model = "fake-model"
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def answer(self, question, records, snippets):
+        self.calls.append(question)
+        return LLMAnswer(
+            text="LLM synthesized answer",
+            provider=self.provider,
+            model=self.model,
+            sources=[record.rel_path for record in records],
+        )
 
 
 if __name__ == "__main__":
