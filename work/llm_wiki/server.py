@@ -50,6 +50,8 @@ class PlatformHandler(BaseHTTPRequestHandler):
         if parsed.path == "/audit":
             limit = int(parse_qs(parsed.query).get("limit", ["50"])[0])
             return self.write_json({"events": self.llm_wiki_platform.audit_events(limit)})
+        if parsed.path == "/wiki/lint":
+            return self.write_json(self.llm_wiki_platform.lint_wiki())
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
@@ -64,6 +66,8 @@ class PlatformHandler(BaseHTTPRequestHandler):
             return self.write_json(self.llm_wiki_platform.ask(title, q_id=q_id, level=level))
         if parsed.path == "/reindex":
             return self.write_json(self.llm_wiki_platform.rebuild_index())
+        if parsed.path == "/wiki/compile":
+            return self.write_json(self.llm_wiki_platform.compile_wiki())
         if parsed.path == "/groups/run":
             groups = body.get("groups")
             if isinstance(groups, str):

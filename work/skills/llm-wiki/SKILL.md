@@ -45,6 +45,13 @@ For audit review:
 python3 work/main.py --audit-log --audit-limit 20
 ```
 
+To compile and validate the persistent Markdown wiki layer:
+
+```bash
+python3 work/main.py --compile-wiki
+python3 work/main.py --lint-wiki
+```
+
 ## Safety Rules
 
 Always let the CLI perform safety checks before reading, executing, or repairing target content. It loads `llm-wiki/Permission.json`, blocks denied commands/files/write targets, blocks system/root/keychain password requests, restricts ordinary password retrieval to `docs/02_环境信息`, and returns the required JSON error object for high-risk requests.

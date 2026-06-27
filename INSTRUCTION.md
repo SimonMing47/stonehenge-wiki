@@ -38,6 +38,7 @@ result/
 
 - `LLMWikiPlatform` 统一承载索引、安全、问答、修复、审计和任务运行。
 - `SQLiteStore` 将可重建索引、批注表、审计事件、任务运行记录持久化到 `llm-wiki/.state/wiki.sqlite`。
+- `wiki/` 是参考 Karpathy LLM Wiki 思路新增的编译型 Markdown 知识层：`docs/` 保留原始来源，`wiki/` 保存可维护知识页，`AGENTS.md` 定义 schema。
 - CLI、Codex skill、HTTP API、浏览器控制台共用同一套平台核心，避免规则分叉。
 - API 可通过环境变量 `LLM_WIKI_API_TOKEN` 开启 `X-LLM-WIKI-TOKEN` 鉴权。
 
@@ -85,6 +86,18 @@ python3 work/main.py --reindex
 python3 work/main.py --audit-log --audit-limit 20
 ```
 
+编译 Markdown wiki：
+
+```bash
+python3 work/main.py --compile-wiki
+```
+
+检查 Markdown wiki：
+
+```bash
+python3 work/main.py --lint-wiki
+```
+
 启动 HTTP API：
 
 ```bash
@@ -124,9 +137,11 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `GET /`：浏览器控制台
 - `GET /index`：文件、批注和持久化状态
 - `GET /audit?limit=50`：审计事件
+- `GET /wiki/lint`：检查编译型 Markdown wiki
 - `POST /ask`：单问，JSON body 示例 `{"id":"api-1","title":"统计 docx 文件数量","level":"简单"}`
 - `POST /groups/run`：运行题组，JSON body 示例 `{"groups":["group-1"]}`
 - `POST /reindex`：重建索引
+- `POST /wiki/compile`：将 `docs/` 编译为 `wiki/` Markdown 知识层
 
 如果设置了 `LLM_WIKI_API_TOKEN`，控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 

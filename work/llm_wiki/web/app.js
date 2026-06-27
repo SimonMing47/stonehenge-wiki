@@ -173,6 +173,32 @@ async function reindex() {
   }
 }
 
+async function compileWiki() {
+  setBusy("compileWikiBtn", true);
+  try {
+    const result = await api("/wiki/compile", { method: "POST", body: "{}" });
+    el("answerOutput").textContent = JSON.stringify(result, null, 2);
+    await refreshAll();
+  } catch (error) {
+    el("answerOutput").textContent = JSON.stringify({ error: error.message }, null, 2);
+  } finally {
+    setBusy("compileWikiBtn", false);
+  }
+}
+
+async function lintWiki() {
+  setBusy("lintWikiBtn", true);
+  try {
+    const result = await api("/wiki/lint");
+    el("answerOutput").textContent = JSON.stringify(result, null, 2);
+    await refreshAll();
+  } catch (error) {
+    el("answerOutput").textContent = JSON.stringify({ error: error.message }, null, 2);
+  } finally {
+    setBusy("lintWikiBtn", false);
+  }
+}
+
 function setApiState(online, detail = "") {
   const node = el("apiState");
   node.classList.toggle("online", online);
@@ -196,6 +222,8 @@ el("refreshBtn").addEventListener("click", refreshAll);
 el("askBtn").addEventListener("click", askQuestion);
 el("runGroupBtn").addEventListener("click", runGroup);
 el("reindexBtn").addEventListener("click", reindex);
+el("compileWikiBtn").addEventListener("click", compileWiki);
+el("lintWikiBtn").addEventListener("click", lintWiki);
 el("saveTokenBtn").addEventListener("click", () => {
   localStorage.setItem("llmWikiApiToken", el("tokenInput").value.trim());
   refreshAll();

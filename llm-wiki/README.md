@@ -20,6 +20,22 @@ llm-wiki/.state/wiki.sqlite
 
 该数据库包含可重建索引、批注元数据、审计事件和任务记录；不应手工编辑，也不需要提交到 Git。
 
+## 编译型 Wiki
+
+`AGENTS.md` 定义 wiki schema。运行：
+
+```bash
+python3 work/main.py --compile-wiki
+python3 work/main.py --lint-wiki
+```
+
+平台会从 `docs/` 编译生成：
+
+- `wiki/index.md`
+- `wiki/sources/*.md`
+- `wiki/topics/*.md`
+- `wiki/log.md`
+
 ## 批注/TODO
 
 结构化批注兼容中英文冒号、大小写和不规则空格：

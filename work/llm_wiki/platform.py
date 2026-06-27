@@ -12,6 +12,7 @@ from .indexer import WikiIndex
 from .models import Question
 from .security import PermissionGuard
 from .store import SQLiteStore
+from .wiki_compiler import WikiCompiler
 
 
 class LLMWikiPlatform:
@@ -25,6 +26,10 @@ class LLMWikiPlatform:
         if self.config.persist_index:
             self.store.save_index(self.index)
 
+    @property
+    def compiler(self) -> WikiCompiler:
+        return WikiCompiler(self.wiki_root, self.index)
+
     @classmethod
     def from_wiki_root(cls, wiki_root: Path) -> "LLMWikiPlatform":
         return cls(wiki_root)
@@ -36,6 +41,31 @@ class LLMWikiPlatform:
             self.store.save_index(self.index)
         result = self.health()
         self.store.record_job("reindex", "ok", {"wiki_root": str(self.wiki_root)}, result)
+        return result
+
+    def compile_wiki(self) -> dict[str, Any]:
+        result = self.compiler.compile()
+        self.store.record_job("wiki_compile", "ok", {"wiki_root": str(self.wiki_root)}, result)
+        self.audit(
+            event_type="wiki.compile",
+            request_id=new_request_id(),
+            subject="wiki",
+            status="ok",
+            payload=result,
+        )
+        return result
+
+    def lint_wiki(self) -> dict[str, Any]:
+        result = self.compiler.lint()
+        self.store.record_job("wiki_lint", result["status"], {"wiki_root": str(self.wiki_root)}, result)
+        self.audit(
+            event_type="wiki.lint",
+            request_id=new_request_id(),
+            subject="wiki",
+            status=result["status"],
+            blocked=result["status"] == "error",
+            payload=result,
+        )
         return result
 
     def answer_question(self, question: Question, request_id: str | None = None) -> dict[str, Any]:
@@ -105,6 +135,7 @@ class LLMWikiPlatform:
             "status": "ok",
             "wiki_root": str(self.wiki_root),
             "database_path": str(self.config.database_path),
+            "compiled_wiki": str(self.wiki_root / "wiki"),
             "files": len(self.index.records),
             "comments": len(self.index.comments),
             "store": self.store.stats(),
@@ -125,4 +156,3 @@ class LLMWikiPlatform:
 
 def new_request_id() -> str:
     return uuid.uuid4().hex
-

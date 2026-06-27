@@ -17,6 +17,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ask", help="Answer one ad-hoc question and print JSON to stdout")
     parser.add_argument("--dump-index", action="store_true", help="Print indexed paths/comments as JSON")
     parser.add_argument("--reindex", action="store_true", help="Rebuild and persist the wiki index")
+    parser.add_argument("--compile-wiki", action="store_true", help="Compile docs into the Markdown wiki layer")
+    parser.add_argument("--lint-wiki", action="store_true", help="Validate the compiled Markdown wiki layer")
     parser.add_argument("--audit-log", action="store_true", help="Print recent audit events")
     parser.add_argument("--audit-limit", type=int, default=50, help="Audit event count for --audit-log")
     parser.add_argument("--serve", action="store_true", help="Start the HTTP API service")
@@ -37,6 +39,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.reindex:
         print_json(platform.rebuild_index())
+        return 0
+
+    if args.compile_wiki:
+        print_json(platform.compile_wiki())
+        return 0
+
+    if args.lint_wiki:
+        print_json(platform.lint_wiki())
         return 0
 
     if args.dump_index:
@@ -111,4 +121,3 @@ def run_self_test() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

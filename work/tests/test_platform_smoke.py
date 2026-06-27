@@ -69,6 +69,36 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(health["store"]["comments"], 1)
             self.assertGreaterEqual(health["store"]["audit_events"], 4)
 
+    def test_compile_and_lint_markdown_wiki_layer(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-compile-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            docs = wiki / "docs" / "04_常用命令"
+            docs.mkdir(parents=True)
+            (wiki / "question").mkdir(parents=True)
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "gauss.md").write_text(
+                "高斯数据库连接命令：gsql -h 127.0.0.1 -p 8000 -U app\n"
+                "# TODO: 补充只读账号,to:张三,end_date:20260101\n",
+                encoding="utf-8",
+            )
+
+            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            compiled = platform.compile_wiki()
+            lint = platform.lint_wiki()
+
+            self.assertEqual(compiled["source_pages"], 1)
+            self.assertEqual(lint["status"], "ok")
+            self.assertTrue((wiki / "wiki" / "index.md").exists())
+            self.assertTrue((wiki / "wiki" / "log.md").exists())
+            source_pages = list((wiki / "wiki" / "sources").glob("*.md"))
+            self.assertEqual(len(source_pages), 1)
+            source_text = source_pages[0].read_text(encoding="utf-8")
+            self.assertIn("source_path:", source_text)
+            self.assertIn("Comments And TODOs", source_text)
+
     def test_http_console_assets_and_health(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-web-test-") as tmp:
             root = Path(tmp)
@@ -88,6 +118,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 index_html = http_get(base + "/")
                 app_js = http_get(base + "/assets/app.js")
                 health = json.loads(http_get(base + "/health"))
+                lint = json.loads(http_get(base + "/wiki/lint"))
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -96,6 +127,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("LLM Wiki Control Plane", index_html)
             self.assertIn("refreshAll", app_js)
             self.assertEqual(health["status"], "ok")
+            self.assertIn(lint["status"], {"ok", "error"})
 
     @unittest.skipUnless(has_soffice(), "LibreOffice/soffice is not installed")
     def test_legacy_doc_repair_via_libreoffice_bridge(self) -> None:
