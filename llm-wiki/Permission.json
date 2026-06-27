@@ -1,0 +1,12 @@
+{
+  "dir": {
+    "deny": ["*/etc"]
+  },
+  "command": {
+    "deny": ["Remove-Item", "del"]
+  },
+  "file": {
+    "deny": ["hadoop.env", "spark-*.env"]
+  }
+}
+
