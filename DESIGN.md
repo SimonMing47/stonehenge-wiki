@@ -56,3 +56,4 @@ output/group-x-answer.md / output/fixed / .state/wiki.sqlite
 - `platform.py`：企业级服务门面，统一 CLI、skill、API 调用路径。
 - `server.py`：标准库 HTTP API，适合评测环境零依赖运行。
 - `cli_io.py`：题组 JSON 读取、输出路径和自验证日志。
+- `office_bridge.py`：可选 LibreOffice/soffice 转换层，用于 `.doc/.ppt/.xls` 老式 Office 文件索引和修复；不可用时安全降级到二进制文本兜底。

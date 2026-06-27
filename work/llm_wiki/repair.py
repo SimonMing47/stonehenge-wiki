@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import re
 import shutil
+import tempfile
 import zipfile
 from pathlib import Path
 
 from .models import CommentRecord, DocumentRecord
+from .office_bridge import LEGACY_TO_MODERN, convert_office
 
 REPLACE_RE = re.compile(r"(?:把|将)?(?P<old>[^，,。；;\s]{1,80})(?:改成|改为|替换为)(?P<new>[^，,。；;\s]{1,80})")
 
@@ -28,6 +30,8 @@ def repair_document(record: DocumentRecord, wiki_root: Path, comments: list[Comm
         target_path.write_text(text, encoding="utf-8")
     elif suffix in {"docx", "pptx", "xlsx"}:
         replace_in_zip_xml(record.full_path, target_path, replacements)
+    elif suffix in LEGACY_TO_MODERN and repair_legacy_office(record.full_path, target_path, suffix, replacements):
+        pass
     else:
         shutil.copy2(record.full_path, target_path)
     return source_rel, target_rel
@@ -71,3 +75,24 @@ def replace_in_zip_xml(source: Path, target: Path, replacements: list[tuple[str,
                     text = text.replace(old, new)
                 data = text.encode("utf-8")
             zout.writestr(item, data)
+
+
+def repair_legacy_office(
+    source: Path,
+    target: Path,
+    source_suffix: str,
+    replacements: list[tuple[str, str]],
+) -> bool:
+    modern_ext = LEGACY_TO_MODERN[source_suffix]
+    with tempfile.TemporaryDirectory(prefix="llm-wiki-office-repair-") as tmp:
+        tmp_dir = Path(tmp)
+        converted = convert_office(source, modern_ext, tmp_dir / "modern")
+        if not converted:
+            return False
+        repaired_modern = tmp_dir / f"repaired.{modern_ext}"
+        replace_in_zip_xml(converted, repaired_modern, replacements)
+        converted_back = convert_office(repaired_modern, source_suffix, tmp_dir / "legacy")
+        if not converted_back:
+            return False
+        shutil.copy2(converted_back, target)
+        return True

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .indexer import WikiIndex
 from .models import CommentRecord, DocumentRecord
@@ -16,10 +17,15 @@ class SQLiteStore:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
-    def connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
         con = sqlite3.connect(self.database_path)
         con.row_factory = sqlite3.Row
-        return con
+        try:
+            yield con
+            con.commit()
+        finally:
+            con.close()
 
     def _init_schema(self) -> None:
         with self.connect() as con:

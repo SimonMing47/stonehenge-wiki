@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import re
+import tempfile
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from .models import CommentRecord, DocumentRecord
+from .office_bridge import LEGACY_TO_MODERN, convert_office
 
 SUPPORTED_EXTENSIONS = {
     "doc",
@@ -56,9 +58,21 @@ def extract_text_and_office_comments(
         return extract_pptx(path, rel_path)
     if suffix == "xlsx":
         return extract_xlsx(path, rel_path)
+    if suffix in LEGACY_TO_MODERN:
+        converted = extract_legacy_office(path, suffix, rel_path)
+        if converted is not None:
+            return converted
     if suffix in TEXT_EXTENSIONS:
         return read_text_best_effort(path), []
     return extract_binary_strings(path), []
+
+
+def extract_legacy_office(path: Path, suffix: str, rel_path: str) -> tuple[str, list[CommentRecord]] | None:
+    with tempfile.TemporaryDirectory(prefix="llm-wiki-office-") as tmp:
+        converted = convert_office(path, LEGACY_TO_MODERN[suffix], Path(tmp))
+        if not converted:
+            return None
+        return extract_text_and_office_comments(converted, converted.suffix.lower().lstrip("."), rel_path)
 
 
 def read_text_best_effort(path: Path) -> str:
@@ -203,10 +217,14 @@ def xml_text(data: bytes) -> str:
 
 def extract_inline_comments(rel_path: str, text: str, suffix: str) -> list[CommentRecord]:
     comments: list[CommentRecord] = []
+    for match in STRUCTURED_TODO_RE.finditer(text):
+        comments.append(make_comment(rel_path, match.group(0), "code"))
     for block in BLOCK_COMMENT_RE.finditer(text):
         comments.append(make_comment(rel_path, block.group(0), "code"))
     for line_no, line in enumerate(text.splitlines(), start=1):
         low = line.lower()
+        if STRUCTURED_TODO_RE.search(line):
+            continue
         if "todo" in low or re.search(r"^\s*(#|//|--)", line):
             if "todo" in low or "需要" in line or "待" in line:
                 comments.append(make_comment(rel_path, line, "code", line=line_no))
@@ -278,4 +296,3 @@ def infer_tags(rel_path: str, text: str) -> set[str]:
 
 def _attr(name: str) -> str:
     return f"{{http://schemas.openxmlformats.org/wordprocessingml/2006/main}}{name}"
-

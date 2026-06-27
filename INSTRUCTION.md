@@ -5,12 +5,15 @@
 - Python 3.11.0
 - 必需依赖：无
 - 推荐依赖：`openpyxl`，用于更完整地读取 Excel 单元格批注并生成透视表/透视图文件
+- 推荐外部程序：LibreOffice / `soffice`，用于 `.doc/.ppt/.xls` 老式 Office 文件转换、索引和修复
 
 安装推荐依赖：
 
 ```bash
 python3 -m pip install openpyxl
 ```
+
+安装 LibreOffice 后，确保命令行可访问 `soffice` 或 `libreoffice`。
 
 ## 目录
 
