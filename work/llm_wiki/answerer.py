@@ -182,7 +182,10 @@ class QuestionAnswerer:
         if not snippets:
             snippets = [record.rel_path for record in records]
         if self.llm_client and not self.guard.has_password_intent(title):
-            llm_answer = self.llm_client.answer(title, records, snippets)
+            try:
+                llm_answer = self.llm_client.answer(title, records, snippets)
+            except Exception:
+                llm_answer = None
             if llm_answer:
                 return make_standard_response(
                     question.id,

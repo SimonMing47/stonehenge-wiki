@@ -10,7 +10,7 @@ from pathlib import Path
 
 from llm_wiki.extractors import extract_docx
 from llm_wiki.answerer import QuestionAnswerer
-from llm_wiki.llm import LLMAnswer
+from llm_wiki.llm import LLMAnswer, build_context
 from llm_wiki.indexer import WikiIndex
 from llm_wiki.models import Question
 from llm_wiki.office_bridge import convert_office, has_soffice
@@ -156,6 +156,45 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(llm.calls, ["如何在控制台连接高斯数据库"])
             self.assertIn("数据库密码: env-secret", "\n".join(secret["answer"]["datas"]))
 
+    def test_llm_context_redacts_secret_values(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-redact-test-") as tmp:
+            root = Path(tmp)
+            record = make_document_record(
+                root,
+                "docs/02_环境信息/gauss.md",
+                "连接命令: gsql -h gaussdb.demo.local -U wiki_reader\n数据库密码: env-secret\nAPI_KEY=abc123\n",
+            )
+            context = build_context(
+                [record],
+                ["docs/02_环境信息/gauss.md: password=snippet-secret"],
+                max_chars=4000,
+            )
+
+            self.assertIn("gsql -h gaussdb.demo.local", context)
+            self.assertIn("[REDACTED]", context)
+            self.assertNotIn("env-secret", context)
+            self.assertNotIn("abc123", context)
+            self.assertNotIn("snippet-secret", context)
+
+    def test_llm_failure_falls_back_to_deterministic_snippets(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-fallback-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            docs = wiki / "docs" / "04_常用命令"
+            docs.mkdir(parents=True)
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "database.md").write_text(
+                "sqlite-select: SELECT * FROM documents WHERE topic = 'rag';\n",
+                encoding="utf-8",
+            )
+
+            answerer = QuestionAnswerer(WikiIndex(wiki).build(), PermissionGuard(wiki), FailingLLMClient())
+            answer = answerer.answer(Question("q1", "SQLite SELECT 命令是什么", "中等"))
+
+            text = "\n".join(answer["answer"]["datas"])
+            self.assertIn("SELECT * FROM documents", text)
+            self.assertNotIn("llm:", text)
+
     @unittest.skipUnless(has_soffice(), "LibreOffice/soffice is not installed")
     def test_legacy_doc_repair_via_libreoffice_bridge(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-legacy-test-") as tmp:
@@ -233,6 +272,15 @@ def http_get(url: str) -> str:
         return response.read().decode("utf-8")
 
 
+def make_document_record(root: Path, rel_path: str, text: str):
+    from llm_wiki.models import DocumentRecord
+
+    full_path = root / rel_path
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+    full_path.write_text(text, encoding="utf-8")
+    return DocumentRecord(full_path, rel_path, full_path.suffix.lstrip("."), text)
+
+
 class FakeLLMClient:
     provider = "fake"
     model = "fake-model"
@@ -248,6 +296,11 @@ class FakeLLMClient:
             model=self.model,
             sources=[record.rel_path for record in records],
         )
+
+
+class FailingLLMClient:
+    def answer(self, question, records, snippets):
+        raise RuntimeError("simulated llm outage")
 
 
 if __name__ == "__main__":

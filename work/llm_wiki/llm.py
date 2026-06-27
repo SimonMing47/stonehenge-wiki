@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
 from .config import LLMConfig
 from .models import DocumentRecord
+
+SECRET_LINE_RE = re.compile(
+    r"(?i)(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|密钥|秘钥|密码|口令)"
+)
+SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?i)(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|密钥|秘钥|密码|口令)"
+    r"(\s*[:=：]\s*)([^\s,;，；]+)"
+)
 
 
 @dataclass(frozen=True)
@@ -63,12 +72,15 @@ class LLMClient:
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens,
         }
-        data = self.post_json("/chat/completions", payload)
+        try:
+            data = self.post_json("/chat/completions", payload)
+        except Exception:
+            return None
         choices = data.get("choices", [])
         if not choices:
             return None
         message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
-        text = str(message.get("content", "")).strip()
+        text = redact_sensitive_text(str(message.get("content", "")).strip())
         if not text:
             return None
         return LLMAnswer(
@@ -96,6 +108,8 @@ class LLMClient:
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="ignore")[:500]
             raise RuntimeError(f"LLM request failed: HTTP {exc.code} {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"LLM request failed: {exc.reason}") from exc
 
 
 def read_env_file(path) -> dict[str, str]:
@@ -120,10 +134,25 @@ def build_context(records: list[DocumentRecord], snippets: list[str], max_chars:
     parts: list[str] = []
     if snippets:
         parts.append("## 命中片段")
-        parts.extend(f"- {snippet}" for snippet in snippets[:12])
+        parts.extend(f"- {redact_sensitive_text(snippet)}" for snippet in snippets[:12])
     parts.append("## 来源摘要")
     for record in records[:8]:
-        excerpt = "\n".join(line.strip() for line in record.text.splitlines() if line.strip())[:1500]
+        excerpt = "\n".join(redact_sensitive_text(line.strip()) for line in record.text.splitlines() if line.strip())[
+            :1500
+        ]
         parts.append(f"### {record.rel_path}\n{excerpt}")
     context = "\n".join(parts)
     return context[:max_chars]
+
+
+def redact_sensitive_text(text: str) -> str:
+    if not text:
+        return text
+    redacted_lines: list[str] = []
+    for line in text.splitlines():
+        if SECRET_LINE_RE.search(line):
+            line = SECRET_ASSIGNMENT_RE.sub(r"\1\2[REDACTED]", line)
+            if not SECRET_ASSIGNMENT_RE.search(line) and "[REDACTED]" not in line:
+                line = "[REDACTED]"
+        redacted_lines.append(line)
+    return "\n".join(redacted_lines)
