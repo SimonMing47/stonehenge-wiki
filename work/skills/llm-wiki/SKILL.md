@@ -7,7 +7,7 @@ description: Run the repository-local LLM-wiki system for deterministic document
 
 ## Workflow
 
-Use the CLI as the source of truth. From the repository root:
+Use the platform CLI as the source of truth. From the repository root:
 
 ```bash
 python3 work/main.py --group group-1
@@ -31,13 +31,25 @@ For an index inspection:
 python3 work/main.py --dump-index
 ```
 
+For an API service:
+
+```bash
+python3 work/main.py --serve
+```
+
+For audit review:
+
+```bash
+python3 work/main.py --audit-log --audit-limit 20
+```
+
 ## Safety Rules
 
 Always let the CLI perform safety checks before reading, executing, or repairing target content. It loads `llm-wiki/Permission.json`, blocks denied commands/files/write targets, blocks system/root/keychain password requests, restricts ordinary password retrieval to `docs/02_环境信息`, and returns the required JSON error object for high-risk requests.
 
 ## Outputs
 
-Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. Successful runs append a short self-validation line to `result/output.md`.
+Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
 
 ## Helper Script
 

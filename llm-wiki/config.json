@@ -1,0 +1,13 @@
+{
+  "state_dir": ".state",
+  "database_path": ".state/wiki.sqlite",
+  "audit_enabled": true,
+  "persist_index": true,
+  "snippet_limit": 8,
+  "api": {
+    "host": "127.0.0.1",
+    "port": 8765,
+    "token_env": "LLM_WIKI_API_TOKEN"
+  }
+}
+

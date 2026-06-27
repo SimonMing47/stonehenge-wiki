@@ -19,28 +19,23 @@
 - Dify knowledge base docs: https://docs.dify.ai/en/guides/knowledge-base
 - AnythingLLM docs: https://docs.anythingllm.com/
 
-## 落地架构
+## 企业级落地架构
 
 ```text
-question/group-x.md
+CLI / Skill / HTTP API
         |
         v
-安全网关 PermissionGuard
+LLMWikiPlatform
+        |
+        +--> PlatformConfig: config.json + 环境变量
+        +--> PermissionGuard: Permission.json + 高危意图拦截
+        +--> WikiIndex: 动态文档索引
+        +--> QuestionAnswerer: 严格格式回答
+        +--> SQLiteStore: files/comments/audit_events/job_runs
+        +--> Repair/Execution: 受控修复与受限代码运行
         |
         v
-动态文件索引 WikiIndex
-        |
-        +--> Office/代码/TODO 批注解析
-        +--> 文件类型统计
-        +--> 关键词/标签检索
-        +--> 受限代码运行
-        +--> 批注修复落盘
-        |
-        v
-Answer 格式化工厂
-        |
-        v
-output/group-x-answer.md
+output/group-x-answer.md / output/fixed / .state/wiki.sqlite
 ```
 
 ## 关键设计
@@ -50,5 +45,14 @@ output/group-x-answer.md
 - 批注解析兼容 `todo/to/end_date` 的大小写、中英文冒号和不规则分隔。
 - 所有答案统一走 `make_standard_response`，避免各业务分支输出格式漂移。
 - 代码执行只支持安全子集：Python 先 AST 检查，再隔离临时目录短超时运行；JS/Java 也做危险 API 静态阻断。
-- Skill 不重新实现逻辑，只调用 CLI，确保 CLI 与 skill 输出一致。
+- Skill 和 HTTP API 不重新实现逻辑，只调用平台服务，确保所有入口的安全、审计和格式一致。
+- SQLite 只保存可重建索引、批注元数据、审计事件和任务运行记录，不复制原始文档正文，降低敏感内容扩散风险。
+- API 支持可选 token 鉴权：设置 `LLM_WIKI_API_TOKEN` 后，请求需携带 `X-LLM-WIKI-TOKEN`。
 
+## 平台模块
+
+- `config.py`：加载 `llm-wiki/config.json`，控制状态目录、数据库、API 和审计。
+- `store.py`：SQLite 持久化层，保存索引快照、批注表、审计事件和任务运行结果。
+- `platform.py`：企业级服务门面，统一 CLI、skill、API 调用路径。
+- `server.py`：标准库 HTTP API，适合评测环境零依赖运行。
+- `cli_io.py`：题组 JSON 读取、输出路径和自验证日志。

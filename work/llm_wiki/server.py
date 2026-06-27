@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+import json
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, urlparse
+
+from .platform import LLMWikiPlatform
+
+
+def serve(wiki_root: Path, host: str | None = None, port: int | None = None) -> None:
+    platform = LLMWikiPlatform.from_wiki_root(wiki_root)
+    server_host = host or platform.config.api_host
+    server_port = port or platform.config.api_port
+
+    class Handler(PlatformHandler):
+        llm_wiki_platform = platform
+
+    httpd = ThreadingHTTPServer((server_host, server_port), Handler)
+    print(f"LLM Wiki API listening on http://{server_host}:{server_port}")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("LLM Wiki API stopped")
+    finally:
+        httpd.server_close()
+
+
+class PlatformHandler(BaseHTTPRequestHandler):
+    llm_wiki_platform: LLMWikiPlatform
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/health":
+            return self.write_json(self.llm_wiki_platform.health())
+        if not self.authorized():
+            return self.write_json({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+        if parsed.path == "/index":
+            return self.write_json(self.llm_wiki_platform.dump_index())
+        if parsed.path == "/audit":
+            limit = int(parse_qs(parsed.query).get("limit", ["50"])[0])
+            return self.write_json({"events": self.llm_wiki_platform.audit_events(limit)})
+        return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if not self.authorized():
+            return self.write_json({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+        body = self.read_json()
+        if parsed.path == "/ask":
+            title = str(body.get("title", ""))
+            q_id = str(body.get("id", "api-1"))
+            level = str(body.get("level", ""))
+            return self.write_json(self.llm_wiki_platform.ask(title, q_id=q_id, level=level))
+        if parsed.path == "/reindex":
+            return self.write_json(self.llm_wiki_platform.rebuild_index())
+        if parsed.path == "/groups/run":
+            groups = body.get("groups")
+            if isinstance(groups, str):
+                groups = [groups]
+            results = self.llm_wiki_platform.run_groups(groups=groups)
+            return self.write_json({"results": without_answers(results)})
+        return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+
+    def authorized(self) -> bool:
+        token = self.llm_wiki_platform.config.api_token
+        if not token:
+            return True
+        return self.headers.get("X-LLM-WIKI-TOKEN") == token
+
+    def read_json(self) -> dict[str, Any]:
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if not length:
+            return {}
+        raw = self.rfile.read(length).decode("utf-8")
+        return json.loads(raw or "{}")
+
+    def write_json(self, data: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
+        payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        return
+
+
+def without_answers(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{key: value for key, value in result.items() if key != "answers"} for result in results]
