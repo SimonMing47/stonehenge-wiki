@@ -38,7 +38,7 @@ result/
 
 - `LLMWikiPlatform` 统一承载索引、安全、问答、修复、审计和任务运行。
 - `SQLiteStore` 将可重建索引、批注表、审计事件、任务运行记录持久化到 `llm-wiki/.state/wiki.sqlite`。
-- CLI、Codex skill、HTTP API 共用同一套平台核心，避免规则分叉。
+- CLI、Codex skill、HTTP API、浏览器控制台共用同一套平台核心，避免规则分叉。
 - API 可通过环境变量 `LLM_WIKI_API_TOKEN` 开启 `X-LLM-WIKI-TOKEN` 鉴权。
 
 ## CLI 入口
@@ -91,6 +91,12 @@ python3 work/main.py --audit-log --audit-limit 20
 python3 work/main.py --serve
 ```
 
+启动后打开控制台：
+
+```text
+http://127.0.0.1:8765/
+```
+
 启动指定端口：
 
 ```bash
@@ -115,11 +121,14 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 默认监听 `127.0.0.1:8765`。
 
 - `GET /health`：健康检查和索引统计
+- `GET /`：浏览器控制台
 - `GET /index`：文件、批注和持久化状态
 - `GET /audit?limit=50`：审计事件
 - `POST /ask`：单问，JSON body 示例 `{"id":"api-1","title":"统计 docx 文件数量","level":"简单"}`
 - `POST /groups/run`：运行题组，JSON body 示例 `{"groups":["group-1"]}`
 - `POST /reindex`：重建索引
+
+如果设置了 `LLM_WIKI_API_TOKEN`，控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 

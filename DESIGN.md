@@ -22,7 +22,7 @@
 ## 企业级落地架构
 
 ```text
-CLI / Skill / HTTP API
+CLI / Skill / HTTP API / Web Console
         |
         v
 LLMWikiPlatform
@@ -57,3 +57,4 @@ output/group-x-answer.md / output/fixed / .state/wiki.sqlite
 - `server.py`：标准库 HTTP API，适合评测环境零依赖运行。
 - `cli_io.py`：题组 JSON 读取、输出路径和自验证日志。
 - `office_bridge.py`：可选 LibreOffice/soffice 转换层，用于 `.doc/.ppt/.xls` 老式 Office 文件索引和修复；不可用时安全降级到二进制文本兜底。
+- `web/`：零依赖浏览器控制台，提供健康状态、查询、题组运行、文件/批注库存和审计视图。

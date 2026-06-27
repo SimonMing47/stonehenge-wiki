@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -14,11 +15,7 @@ def serve(wiki_root: Path, host: str | None = None, port: int | None = None) -> 
     platform = LLMWikiPlatform.from_wiki_root(wiki_root)
     server_host = host or platform.config.api_host
     server_port = port or platform.config.api_port
-
-    class Handler(PlatformHandler):
-        llm_wiki_platform = platform
-
-    httpd = ThreadingHTTPServer((server_host, server_port), Handler)
+    httpd = build_server(platform, server_host, server_port)
     print(f"LLM Wiki API listening on http://{server_host}:{server_port}")
     try:
         httpd.serve_forever()
@@ -28,11 +25,22 @@ def serve(wiki_root: Path, host: str | None = None, port: int | None = None) -> 
         httpd.server_close()
 
 
+def build_server(platform: LLMWikiPlatform, host: str, port: int) -> ThreadingHTTPServer:
+    class Handler(PlatformHandler):
+        llm_wiki_platform = platform
+
+    return ThreadingHTTPServer((host, port), Handler)
+
+
 class PlatformHandler(BaseHTTPRequestHandler):
     llm_wiki_platform: LLMWikiPlatform
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path in {"/", "/console"}:
+            return self.write_static("index.html")
+        if parsed.path.startswith("/assets/"):
+            return self.write_static(parsed.path.removeprefix("/assets/"))
         if parsed.path == "/health":
             return self.write_json(self.llm_wiki_platform.health())
         if not self.authorized():
@@ -81,6 +89,20 @@ class PlatformHandler(BaseHTTPRequestHandler):
         payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def write_static(self, rel_name: str) -> None:
+        static_root = Path(__file__).resolve().parent / "web"
+        target = (static_root / rel_name).resolve()
+        if not target.is_file() or static_root.resolve() not in target.parents:
+            return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+        payload = target.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)

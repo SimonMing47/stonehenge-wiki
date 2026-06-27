@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Wiki Console</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail" aria-label="Primary">
+        <div class="brand">
+          <span class="mark" aria-hidden="true">LW</span>
+          <span>
+            <strong>LLM Wiki</strong>
+            <small>Enterprise Console</small>
+          </span>
+        </div>
+        <nav class="nav">
+          <a href="#query">Query</a>
+          <a href="#inventory">Inventory</a>
+          <a href="#audit">Audit</a>
+        </nav>
+        <div class="rail-foot">
+          <span id="apiState" class="state-dot">Offline</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Knowledge Operations</p>
+            <h1>LLM Wiki Control Plane</h1>
+          </div>
+          <div class="toolbar">
+            <input id="tokenInput" type="password" placeholder="API token" aria-label="API token" />
+            <button id="saveTokenBtn" type="button">Save</button>
+            <button id="refreshBtn" type="button">Refresh</button>
+            <button id="reindexBtn" type="button" class="primary">Reindex</button>
+          </div>
+        </header>
+
+        <section class="metrics" aria-label="Platform status">
+          <div>
+            <span>Files</span>
+            <strong id="fileCount">0</strong>
+          </div>
+          <div>
+            <span>Comments</span>
+            <strong id="commentCount">0</strong>
+          </div>
+          <div>
+            <span>Audit Events</span>
+            <strong id="auditCount">0</strong>
+          </div>
+          <div>
+            <span>Database</span>
+            <strong id="dbName">wiki.sqlite</strong>
+          </div>
+        </section>
+
+        <section id="query" class="surface query-grid">
+          <div class="query-pane">
+            <div class="section-head">
+              <h2>Ask</h2>
+              <span id="queryStatus">Ready</span>
+            </div>
+            <textarea id="questionInput" rows="5" placeholder="统计 docx 文件数量"></textarea>
+            <div class="row-actions">
+              <input id="questionId" value="console-1" aria-label="Question id" />
+              <select id="questionLevel" aria-label="Question level">
+                <option>简单</option>
+                <option>中等</option>
+                <option>困难</option>
+              </select>
+              <button id="askBtn" type="button" class="primary">Ask</button>
+            </div>
+          </div>
+          <pre id="answerOutput" class="output" aria-label="Answer output">{}</pre>
+        </section>
+
+        <section class="surface run-row">
+          <div>
+            <h2>Question Groups</h2>
+            <p class="muted">question/group-*.md</p>
+          </div>
+          <div class="row-actions compact">
+            <input id="groupInput" placeholder="group-1" aria-label="Group name" />
+            <button id="runGroupBtn" type="button">Run Group</button>
+          </div>
+        </section>
+
+        <section id="inventory" class="split">
+          <div class="surface">
+            <div class="section-head">
+              <h2>Files</h2>
+              <span id="fileScope">0 indexed</span>
+            </div>
+            <div id="fileList" class="table-list"></div>
+          </div>
+          <div class="surface">
+            <div class="section-head">
+              <h2>Comments</h2>
+              <span id="commentScope">0 found</span>
+            </div>
+            <div id="commentList" class="table-list"></div>
+          </div>
+        </section>
+
+        <section id="audit" class="surface">
+          <div class="section-head">
+            <h2>Audit</h2>
+            <span>latest events</span>
+          </div>
+          <div id="auditList" class="audit-list"></div>
+        </section>
+      </main>
+    </div>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

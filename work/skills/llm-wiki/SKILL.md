@@ -37,6 +37,8 @@ For an API service:
 python3 work/main.py --serve
 ```
 
+Then open `http://127.0.0.1:8765/` for the browser console.
+
 For audit review:
 
 ```bash

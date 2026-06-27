@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import threading
 import tempfile
 import unittest
+import urllib.request
 import zipfile
 from pathlib import Path
 
 from llm_wiki.extractors import extract_docx
 from llm_wiki.office_bridge import convert_office, has_soffice
 from llm_wiki.platform import LLMWikiPlatform
+from llm_wiki.server import build_server
 
 
 class PlatformSmokeTest(unittest.TestCase):
@@ -65,6 +68,34 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(health["store"]["files"], 1)
             self.assertEqual(health["store"]["comments"], 1)
             self.assertGreaterEqual(health["store"]["audit_events"], 4)
+
+    def test_http_console_assets_and_health(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-web-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            (wiki / "docs").mkdir(parents=True)
+            (wiki / "question").mkdir()
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+
+            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            httpd = build_server(platform, "127.0.0.1", 0)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                index_html = http_get(base + "/")
+                app_js = http_get(base + "/assets/app.js")
+                health = json.loads(http_get(base + "/health"))
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+                thread.join(timeout=5)
+
+            self.assertIn("LLM Wiki Control Plane", index_html)
+            self.assertIn("refreshAll", app_js)
+            self.assertEqual(health["status"], "ok")
 
     @unittest.skipUnless(has_soffice(), "LibreOffice/soffice is not installed")
     def test_legacy_doc_repair_via_libreoffice_bridge(self) -> None:
@@ -136,6 +167,11 @@ def make_minimal_docx(path: Path, text: str) -> None:
 
 def escape_xml(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def http_get(url: str) -> str:
+    with urllib.request.urlopen(url, timeout=5) as response:
+        return response.read().decode("utf-8")
 
 
 if __name__ == "__main__":
