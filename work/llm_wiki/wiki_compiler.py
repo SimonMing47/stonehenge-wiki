@@ -88,7 +88,7 @@ class WikiCompiler:
                 "",
                 f"- Source count: {len(records)}",
                 "",
-                "## Sources",
+                "## Raw",
                 "",
             ]
             for record in sorted(records, key=lambda item: item.rel_path):
@@ -157,7 +157,7 @@ class WikiCompiler:
             lines.append(f"- [[topics/{path.name}|{path.stem}]]")
         if not topic_pages:
             lines.append("- No topics generated.")
-        lines.extend(["", "## Sources", ""])
+        lines.extend(["", "## Raw", ""])
         for record in sorted(self.index.records, key=lambda item: item.rel_path):
             page = self.source_page_path(record).name
             lines.append(f"- [[sources/{page}|{record.rel_path}]]")
