@@ -29,6 +29,7 @@ class PlatformConfig:
     api_host: str = "127.0.0.1"
     api_port: int = 8765
     api_token_env: str = "LLM_WIKI_API_TOKEN"
+    api_read_token_env: str = "LLM_WIKI_READ_TOKEN"
     audit_enabled: bool = True
     persist_index: bool = True
     snippet_limit: int = 8
@@ -38,6 +39,15 @@ class PlatformConfig:
     def api_token(self) -> str | None:
         token = os.environ.get(self.api_token_env, "").strip()
         return token or None
+
+    @property
+    def api_read_token(self) -> str | None:
+        token = os.environ.get(self.api_read_token_env, "").strip()
+        return token or None
+
+    @property
+    def auth_enabled(self) -> bool:
+        return bool(self.api_token or self.api_read_token)
 
 
 def load_config(wiki_root: Path) -> PlatformConfig:
@@ -59,6 +69,7 @@ def load_config(wiki_root: Path) -> PlatformConfig:
         api_host=str(api.get("host", data.get("api_host", "127.0.0.1"))),
         api_port=int(api.get("port", data.get("api_port", 8765))),
         api_token_env=str(api.get("token_env", data.get("api_token_env", "LLM_WIKI_API_TOKEN"))),
+        api_read_token_env=str(api.get("read_token_env", data.get("api_read_token_env", "LLM_WIKI_READ_TOKEN"))),
         audit_enabled=bool(data.get("audit_enabled", True)),
         persist_index=bool(data.get("persist_index", True)),
         snippet_limit=int(data.get("snippet_limit", 8)),

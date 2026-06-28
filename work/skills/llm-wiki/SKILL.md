@@ -66,7 +66,7 @@ python3 work/main.py --lint-wiki
 
 ## Safety Rules
 
-Always let the CLI perform safety checks before reading, executing, or repairing target content. It loads `llm-wiki/Permission.json`, blocks denied commands/files/write targets, blocks system/root/keychain password requests, restricts ordinary password retrieval to `docs/02_环境信息`, and returns the required JSON error object for high-risk requests.
+Always let the CLI perform safety checks before reading, executing, or repairing target content. It loads `llm-wiki/Permission.json`, blocks denied commands/files/write targets, blocks system/root/keychain password requests, restricts ordinary password retrieval to `docs/02_环境信息`, and returns the required JSON error object for high-risk requests. For HTTP calls, `LLM_WIKI_READ_TOKEN` is read-only and `LLM_WIKI_API_TOKEN` is the admin token for imports, reindexing, compilation, group runs, and PPT generation.
 
 ## Outputs
 

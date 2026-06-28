@@ -58,6 +58,8 @@ function renderHealth() {
   el("llmName").textContent = llm.enabled
     ? `${llm.ready ? "ready" : "offline"} · ${llm.model || llm.provider || "model"}`
     : "disabled";
+  const auth = health.auth || {};
+  el("authName").textContent = auth.enabled ? "token scopes" : "open";
 }
 
 function renderIndex() {

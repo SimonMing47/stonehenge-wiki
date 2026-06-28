@@ -52,7 +52,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - 代码执行只支持安全子集：Python 先 AST 检查，再隔离临时目录短超时运行；JS/Java 也做危险 API 静态阻断。
 - Skill 和 HTTP API 不重新实现逻辑，只调用平台服务，确保所有入口的安全、审计和格式一致。
 - SQLite 只保存可重建索引、批注元数据、审计事件和任务运行记录，不复制原始文档正文，降低敏感内容扩散风险。
-- API 支持可选 token 鉴权：设置 `LLM_WIKI_API_TOKEN` 后，请求需携带 `X-LLM-WIKI-TOKEN`。
+- API 支持可选分级 token 鉴权：`LLM_WIKI_READ_TOKEN` 可读索引、审计和问答，`LLM_WIKI_API_TOKEN` 具备管理权限，可导入、重建、编译和生成文件。
 - 受控导入通道把本地文件或公开 URL 复制到 `docs/<category>/` 后重建索引，阻断私网 URL、超大文件、未知扩展和权限配置拒绝的路径。
 - Markdown wiki 编译层把原始文档转成可读、可 lint、可被 agent 维护的知识页，降低每次查询都从原始文件临时拼上下文的脆弱性。
 

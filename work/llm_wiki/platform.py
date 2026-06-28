@@ -216,6 +216,11 @@ class LLMWikiPlatform:
                 "provider": self.config.llm.provider,
                 "model": self.config.llm.model,
             },
+            "auth": {
+                "enabled": self.config.auth_enabled,
+                "admin_token_env": self.config.api_token_env,
+                "read_token_env": self.config.api_read_token_env,
+            },
             "store": self.store.stats(),
         }
 

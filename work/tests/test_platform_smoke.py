@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import threading
 import tempfile
 import unittest
@@ -135,12 +136,77 @@ class PlatformSmokeTest(unittest.TestCase):
                 thread.join(timeout=5)
 
             self.assertIn("LLM Wiki Research Studio", index_html)
+            self.assertIn("authName", index_html)
             self.assertIn("refreshAll", app_js)
             self.assertIn("generateSlides", app_js)
             self.assertIn("importSource", app_js)
+            self.assertIn("token scopes", app_js)
             self.assertEqual(health["status"], "ok")
             self.assertIn(lint["status"], {"ok", "error"})
             self.assertEqual(favicon_status, 204)
+
+    def test_http_read_and_admin_token_scopes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-auth-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            docs = wiki / "docs" / "00_inbox"
+            docs.mkdir(parents=True)
+            (wiki / "question").mkdir()
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (wiki / "config.json").write_text(
+                json.dumps(
+                    {
+                        "api": {
+                            "token_env": "LLM_WIKI_TEST_ADMIN_TOKEN",
+                            "read_token_env": "LLM_WIKI_TEST_READ_TOKEN",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (docs / "auth.md").write_text("认证分级：read token 只读，admin token 可管理。\n", encoding="utf-8")
+
+            with temporary_env(
+                {
+                    "LLM_WIKI_TEST_ADMIN_TOKEN": "admin-secret",
+                    "LLM_WIKI_TEST_READ_TOKEN": "read-secret",
+                }
+            ):
+                platform = LLMWikiPlatform.from_wiki_root(wiki)
+                httpd = build_server(platform, "127.0.0.1", 0)
+                thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                    read_headers = {"X-LLM-WIKI-TOKEN": "read-secret"}
+                    admin_headers = {"X-LLM-WIKI-TOKEN": "admin-secret"}
+                    bad_headers = {"X-LLM-WIKI-TOKEN": "wrong"}
+
+                    health = json.loads(http_get(base + "/health"))
+                    unauth_index = http_get_status(base + "/index")
+                    bad_index = http_get_status(base + "/index", headers=bad_headers)
+                    read_index = json.loads(http_get(base + "/index", headers=read_headers))
+                    read_ask = http_post_status(
+                        base + "/ask",
+                        {"id": "auth-ask", "title": "统计 md 文件数量", "level": "简单"},
+                        headers=read_headers,
+                    )
+                    read_reindex = http_post_status(base + "/reindex", {}, headers=read_headers)
+                    admin_reindex = http_post_status(base + "/reindex", {}, headers=admin_headers)
+                finally:
+                    httpd.shutdown()
+                    httpd.server_close()
+                    thread.join(timeout=5)
+
+            self.assertTrue(health["auth"]["enabled"])
+            self.assertEqual(unauth_index, 401)
+            self.assertEqual(bad_index, 401)
+            self.assertEqual(len(read_index["files"]), 1)
+            self.assertEqual(read_ask, 200)
+            self.assertEqual(read_reindex, 403)
+            self.assertEqual(admin_reindex, 200)
 
     def test_generate_presentation_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-slides-test-") as tmp:
@@ -383,33 +449,67 @@ def escape_xml(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def http_get(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=5) as response:
+def http_get(url: str, headers: dict[str, str] | None = None) -> str:
+    request = urllib.request.Request(url, headers=headers or {}, method="GET")
+    with urllib.request.urlopen(request, timeout=5) as response:
         return response.read().decode("utf-8")
 
 
-def http_get_bytes(url: str) -> bytes:
-    with urllib.request.urlopen(url, timeout=5) as response:
+def http_get_bytes(url: str, headers: dict[str, str] | None = None) -> bytes:
+    request = urllib.request.Request(url, headers=headers or {}, method="GET")
+    with urllib.request.urlopen(request, timeout=5) as response:
         return response.read()
 
 
-def http_get_status(url: str) -> int:
+def http_get_status(url: str, headers: dict[str, str] | None = None) -> int:
+    request = urllib.request.Request(url, headers=headers or {}, method="GET")
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:
+        with urllib.request.urlopen(request, timeout=5) as response:
             return response.status
     except urllib.error.HTTPError as error:
         return error.code
 
 
-def http_post(url: str, payload: dict) -> str:
+def http_post(url: str, payload: dict, headers: dict[str, str] | None = None) -> str:
+    request_headers = {"Content-Type": "application/json", **(headers or {})}
     request = urllib.request.Request(
         url,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=request_headers,
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=20) as response:
         return response.read().decode("utf-8")
+
+
+def http_post_status(url: str, payload: dict, headers: dict[str, str] | None = None) -> int:
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(
+                url,
+                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json", **(headers or {})},
+                method="POST",
+            ),
+            timeout=20,
+        ) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+@contextlib.contextmanager
+def temporary_env(values: dict[str, str]):
+    old_values = {key: os.environ.get(key) for key in values}
+    try:
+        os.environ.update(values)
+        yield
+    finally:
+        for key, old_value in old_values.items():
+            if old_value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old_value
 
 
 def extract_docx_like_pptx(path: Path):

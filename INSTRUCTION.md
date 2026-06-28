@@ -144,15 +144,17 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `GET /index`：文件、批注和持久化状态
 - `GET /audit?limit=50`：审计事件
 - `GET /wiki/lint`：检查编译型 Markdown wiki
+- `GET /files/output/...`：下载生成物，例如 PPTX
 - `POST /ask`：单问，JSON body 示例 `{"id":"api-1","title":"统计 docx 文件数量","level":"简单"}`
 - `POST /groups/run`：运行题组，JSON body 示例 `{"groups":["group-1"]}`
 - `POST /sources/import`：导入本地文件或公开 URL，JSON body 示例 `{"source":"https://example.com/page.html","title":"网页资料","category":"00_inbox"}`
+- `POST /slides/generate`：生成 PPTX，JSON body 示例 `{"topic":"RAG 知识库建设方案","slide_count":6}`
 - `POST /reindex`：重建索引
 - `POST /wiki/compile`：将 `docs/` 编译为 `wiki/` Markdown 知识层
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `LLM_WIKI_API_TOKEN`，控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/audit`、`/wiki/lint`、`/files/...` 和 `/ask`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、重建索引、编译 wiki、运行题组和生成 PPT。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 

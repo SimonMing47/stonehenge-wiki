@@ -45,23 +45,30 @@ class PlatformHandler(BaseHTTPRequestHandler):
             return self.write_static(parsed.path.removeprefix("/assets/"))
         if parsed.path == "/health":
             return self.write_json(self.llm_wiki_platform.health())
-        if not self.authorized():
-            return self.write_json({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
         if parsed.path.startswith("/files/"):
+            if not self.ensure_authorized("read"):
+                return
             return self.write_wiki_file(parsed.path.removeprefix("/files/"))
         if parsed.path == "/index":
+            if not self.ensure_authorized("read"):
+                return
             return self.write_json(self.llm_wiki_platform.dump_index())
         if parsed.path == "/audit":
+            if not self.ensure_authorized("read"):
+                return
             limit = int(parse_qs(parsed.query).get("limit", ["50"])[0])
             return self.write_json({"events": self.llm_wiki_platform.audit_events(limit)})
         if parsed.path == "/wiki/lint":
+            if not self.ensure_authorized("read"):
+                return
             return self.write_json(self.llm_wiki_platform.lint_wiki())
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if not self.authorized():
-            return self.write_json({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+        required_scope = "read" if parsed.path == "/ask" else "admin"
+        if not self.ensure_authorized(required_scope):
+            return
         body = self.read_json()
         if parsed.path == "/ask":
             title = str(body.get("title", ""))
@@ -89,11 +96,29 @@ class PlatformHandler(BaseHTTPRequestHandler):
             return self.write_json(self.llm_wiki_platform.generate_presentation(topic, slide_count=slide_count))
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
-    def authorized(self) -> bool:
-        token = self.llm_wiki_platform.config.api_token
-        if not token:
+    def ensure_authorized(self, required_scope: str) -> bool:
+        status = self.auth_error_status(required_scope)
+        if status is None:
             return True
-        return self.headers.get("X-LLM-WIKI-TOKEN") == token
+        error = "forbidden" if status == HTTPStatus.FORBIDDEN else "unauthorized"
+        self.write_json({"error": error, "required_scope": required_scope}, status)
+        return False
+
+    def auth_error_status(self, required_scope: str) -> HTTPStatus | None:
+        config = self.llm_wiki_platform.config
+        admin_token = config.api_token
+        read_token = config.api_read_token
+        if not admin_token and not read_token:
+            return None
+
+        provided = self.headers.get("X-LLM-WIKI-TOKEN", "")
+        if admin_token and provided == admin_token:
+            return None
+        if required_scope == "read" and read_token and provided == read_token:
+            return None
+        if provided and read_token and provided == read_token:
+            return HTTPStatus.FORBIDDEN
+        return HTTPStatus.UNAUTHORIZED
 
     def read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0") or "0")
