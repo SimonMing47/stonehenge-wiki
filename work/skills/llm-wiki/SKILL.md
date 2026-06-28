@@ -60,6 +60,7 @@ For audit review:
 ```bash
 python3 work/main.py --audit-log --audit-limit 20
 python3 work/main.py --governance-report
+python3 work/main.py --evaluation-report --group group-1
 ```
 
 To compile and validate the persistent Markdown wiki layer:

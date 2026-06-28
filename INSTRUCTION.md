@@ -109,6 +109,13 @@ python3 work/main.py --governance-report
 python3 work/main.py --export-governance-report
 ```
 
+质量评估报告：
+
+```bash
+python3 work/main.py --evaluation-report --group group-1
+python3 work/main.py --export-evaluation-report --group group-1
+```
+
 编译 Markdown wiki：
 
 ```bash
@@ -171,12 +178,14 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `POST /sources/import`：导入本地文件或公开 URL，JSON body 示例 `{"source":"https://example.com/page.html","title":"网页资料","category":"00_inbox"}`
 - `POST /slides/generate`：生成 PPTX，JSON body 示例 `{"topic":"RAG 知识库建设方案","slide_count":6}`
 - `POST /reports/governance/export`：导出 Markdown 治理报告到 `output/reports/`
+- `POST /reports/evaluation`：运行题组质量评估，JSON body 示例 `{"groups":["group-1"]}`
+- `POST /reports/evaluation/export`：导出题组质量评估 Markdown/JSON 报告到 `output/reports/`
 - `POST /reindex`：重建索引
 - `POST /wiki/compile`：将 `docs/` 编译为 `wiki/` Markdown 知识层
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/audit`、`/wiki/lint`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、重建索引、编译 wiki、运行题组、生成 PPT 和导出治理报告。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/audit`、`/wiki/lint`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 
@@ -201,4 +210,5 @@ python3 work/skills/llm-wiki/scripts/run_llm_wiki.py --group group-1
 - 成功运行日志追加到 `result/output.md`
 - 运行状态、索引、审计写入 `llm-wiki/.state/wiki.sqlite`
 - 来源注册表会记录 metadata-only 版本历史，包含路径、SHA-256、大小、首次/末次观测时间和观测次数
+- 治理报告和质量评估报告写入 `llm-wiki/output/reports/`
 - 高危命令统一返回 `{"error_msg":"高危命令，拒绝访问"}`

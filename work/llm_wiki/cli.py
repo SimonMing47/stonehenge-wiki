@@ -34,6 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--audit-limit", type=int, default=50, help="Audit event count for --audit-log")
     parser.add_argument("--governance-report", action="store_true", help="Print governance report JSON")
     parser.add_argument("--export-governance-report", action="store_true", help="Write governance report Markdown")
+    parser.add_argument("--evaluation-report", action="store_true", help="Evaluate question groups and print a quality report")
+    parser.add_argument("--export-evaluation-report", action="store_true", help="Write question evaluation reports")
     parser.add_argument("--serve", action="store_true", help="Start the HTTP API service")
     parser.add_argument("--host", help="HTTP API host override")
     parser.add_argument("--port", type=int, help="HTTP API port override")
@@ -92,6 +94,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.export_governance_report:
         print_json(platform.export_governance_report())
+        return 0
+
+    if args.evaluation_report:
+        print_json(platform.evaluation_report(explicit_files=args.question, groups=args.group))
+        return 0
+
+    if args.export_evaluation_report:
+        print_json(platform.export_evaluation_report(explicit_files=args.question, groups=args.group))
         return 0
 
     if args.ask:

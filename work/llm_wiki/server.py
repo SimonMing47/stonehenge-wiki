@@ -117,6 +117,16 @@ class PlatformHandler(BaseHTTPRequestHandler):
             return self.write_json(self.llm_wiki_platform.generate_presentation(topic, slide_count=slide_count))
         if parsed.path == "/reports/governance/export":
             return self.write_json(self.llm_wiki_platform.export_governance_report())
+        if parsed.path == "/reports/evaluation":
+            groups = body.get("groups")
+            if isinstance(groups, str):
+                groups = [groups]
+            return self.write_json(self.llm_wiki_platform.evaluation_report(groups=groups))
+        if parsed.path == "/reports/evaluation/export":
+            groups = body.get("groups")
+            if isinstance(groups, str):
+                groups = [groups]
+            return self.write_json(self.llm_wiki_platform.export_evaluation_report(groups=groups))
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def ensure_authorized(self, required_scope: str) -> bool:

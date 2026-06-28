@@ -326,6 +326,38 @@ async function exportReport() {
   }
 }
 
+function selectedGroupsBody() {
+  const group = el("groupInput").value.trim();
+  return group ? JSON.stringify({ groups: [group] }) : "{}";
+}
+
+async function runEvaluation() {
+  setBusy("runEvaluationBtn", true);
+  try {
+    const result = await api("/reports/evaluation", { method: "POST", body: selectedGroupsBody() });
+    const summary = result.report?.summary || {};
+    el("governanceSummary").textContent = `evaluation ${summary.status || "unknown"} · ${summary.total_questions || 0} questions · score ${summary.score ?? 0}`;
+    await refreshAll();
+  } catch (error) {
+    el("governanceSummary").textContent = `evaluation failed · ${error.message}`;
+  } finally {
+    setBusy("runEvaluationBtn", false);
+  }
+}
+
+async function exportEvaluation() {
+  setBusy("exportEvaluationBtn", true);
+  try {
+    const result = await api("/reports/evaluation/export", { method: "POST", body: selectedGroupsBody() });
+    const summary = result.report?.summary || {};
+    el("governanceSummary").innerHTML = `evaluation ${escapeHtml(summary.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download evaluation</a>`;
+  } catch (error) {
+    el("governanceSummary").textContent = `evaluation failed · ${error.message}`;
+  } finally {
+    setBusy("exportEvaluationBtn", false);
+  }
+}
+
 async function generateSlides() {
   const topic = el("slidesTopic").value.trim() || el("questionInput").value.trim();
   if (!topic) return;
@@ -390,6 +422,8 @@ el("compileWikiBtn").addEventListener("click", compileWiki);
 el("lintWikiBtn").addEventListener("click", lintWiki);
 el("refreshReportBtn").addEventListener("click", refreshReport);
 el("exportReportBtn").addEventListener("click", exportReport);
+el("runEvaluationBtn").addEventListener("click", runEvaluation);
+el("exportEvaluationBtn").addEventListener("click", exportEvaluation);
 el("tokenForm").addEventListener("submit", (event) => event.preventDefault());
 el("saveTokenBtn").addEventListener("click", () => {
   localStorage.setItem("llmWikiApiToken", el("tokenInput").value.trim());

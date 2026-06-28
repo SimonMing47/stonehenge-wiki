@@ -9,6 +9,7 @@ from urllib.parse import quote
 from .answerer import QuestionAnswerer
 from .cli_io import load_questions, output_path_for_question_file, resolve_question_files, write_result_log
 from .config import PlatformConfig, load_config
+from .evaluation import build_evaluation_report
 from .indexer import WikiIndex
 from .importer import SourceImportError, import_source
 from .llm import LLMClient
@@ -195,6 +196,81 @@ class LLMWikiPlatform:
         write_result_log(self.wiki_root, f"成功解析{len(question_files)}个题组、{total}道题目，已成功输出答案。")
         return results
 
+    def evaluation_report(
+        self,
+        explicit_files: list[Path] | None = None,
+        groups: list[str] | None = None,
+    ) -> dict[str, Any]:
+        question_files = resolve_question_files(self.wiki_root, explicit_files, groups)
+        batches = [(question_file, load_questions(question_file)) for question_file in question_files]
+        report = build_evaluation_report(
+            self.health(),
+            batches,
+            self.answerer.answer,
+            self.answerer.explain,
+        )
+        result = {"status": "ok", "report": without_markdown(report)}
+        self.store.record_job(
+            "evaluation_report",
+            report["summary"]["status"],
+            {"question_files": [str(path) for path in question_files]},
+            result,
+        )
+        self.audit(
+            "evaluation.report",
+            new_request_id(),
+            "evaluation",
+            report["summary"]["status"],
+            report["summary"]["status"] != "ok",
+            {"summary": report["summary"], "risks": report["risks"]},
+        )
+        return result
+
+    def export_evaluation_report(
+        self,
+        explicit_files: list[Path] | None = None,
+        groups: list[str] | None = None,
+    ) -> dict[str, Any]:
+        question_files = resolve_question_files(self.wiki_root, explicit_files, groups)
+        batches = [(question_file, load_questions(question_file)) for question_file in question_files]
+        report = build_evaluation_report(
+            self.health(),
+            batches,
+            self.answerer.answer,
+            self.answerer.explain,
+        )
+        output_dir = self.wiki_root / "output" / "reports"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        markdown_target = output_dir / "evaluation-report.md"
+        json_target = output_dir / "evaluation-report.json"
+        markdown_target.write_text(report["markdown"], encoding="utf-8")
+        json_target.write_text(json.dumps(without_markdown(report), ensure_ascii=False, indent=2), encoding="utf-8")
+        markdown_rel = markdown_target.relative_to(self.wiki_root).as_posix()
+        json_rel = json_target.relative_to(self.wiki_root).as_posix()
+        result = {
+            "status": "ok",
+            "report": without_markdown(report),
+            "path": markdown_rel,
+            "json_path": json_rel,
+            "download_url": "/files/" + quote(markdown_rel, safe="/"),
+            "json_download_url": "/files/" + quote(json_rel, safe="/"),
+        }
+        self.store.record_job(
+            "evaluation_report_export",
+            report["summary"]["status"],
+            {"question_files": [str(path) for path in question_files]},
+            result,
+        )
+        self.audit(
+            "evaluation.report",
+            new_request_id(),
+            markdown_rel,
+            report["summary"]["status"],
+            report["summary"]["status"] != "ok",
+            {"summary": report["summary"], "risks": report["risks"]},
+        )
+        return result
+
     def dump_index(self) -> dict[str, Any]:
         return {
             "files": [
@@ -308,3 +384,7 @@ class LLMWikiPlatform:
 
 def new_request_id() -> str:
     return uuid.uuid4().hex
+
+
+def without_markdown(report: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in report.items() if key != "markdown"}

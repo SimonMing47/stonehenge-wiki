@@ -142,6 +142,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("generateSlides", app_js)
             self.assertIn("importSource", app_js)
             self.assertIn("token scopes", app_js)
+            self.assertIn("runEvaluation", app_js)
+            self.assertIn("runEvaluationBtn", index_html)
             self.assertEqual(health["status"], "ok")
             self.assertEqual(sources["sources"], [])
             self.assertIn(lint["status"], {"ok", "error"})
@@ -169,6 +171,10 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (docs / "auth.md").write_text("认证分级：read token 只读，admin token 可管理。\n", encoding="utf-8")
+            (wiki / "question" / "group-auth.md").write_text(
+                json.dumps([{"id": "auth-1", "title": "认证分级是什么", "level": "简单"}], ensure_ascii=False),
+                encoding="utf-8",
+            )
 
             with temporary_env(
                 {
@@ -207,8 +213,20 @@ class PlatformSmokeTest(unittest.TestCase):
                     )
                     read_reindex = http_post_status(base + "/reindex", {}, headers=read_headers)
                     read_export = http_post_status(base + "/reports/governance/export", {}, headers=read_headers)
+                    read_evaluation = http_post_status(
+                        base + "/reports/evaluation",
+                        {"groups": ["group-auth"]},
+                        headers=read_headers,
+                    )
                     admin_reindex = http_post_status(base + "/reindex", {}, headers=admin_headers)
                     admin_export = http_post_status(base + "/reports/governance/export", {}, headers=admin_headers)
+                    admin_evaluation = json.loads(
+                        http_post(
+                            base + "/reports/evaluation",
+                            {"groups": ["group-auth"]},
+                            headers=admin_headers,
+                        )
+                    )
                 finally:
                     httpd.shutdown()
                     httpd.server_close()
@@ -228,8 +246,76 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertTrue(read_explain["evidence"])
             self.assertEqual(read_reindex, 403)
             self.assertEqual(read_export, 403)
+            self.assertEqual(read_evaluation, 403)
             self.assertEqual(admin_reindex, 200)
             self.assertEqual(admin_export, 200)
+            self.assertEqual(admin_evaluation["report"]["summary"]["total_questions"], 1)
+
+    def test_evaluation_report_cli_api_and_export(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-eval-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            docs = wiki / "docs" / "04_常用命令"
+            docs.mkdir(parents=True)
+            (wiki / "question").mkdir()
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "sqlite.md").write_text(
+                "SQLite SELECT 命令用于查询表数据。\n"
+                "TODO: 补充 WHERE 示例,to:王五,end_date:20261231\n",
+                encoding="utf-8",
+            )
+            (wiki / "question" / "group-eval.md").write_text(
+                json.dumps(
+                    [
+                        {"id": "eval-1", "title": "统计 md 文件数量", "level": "简单"},
+                        {"id": "eval-2", "title": "统计 TODO 批注数量", "level": "简单"},
+                        {"id": "eval-3", "title": "SQLite SELECT 命令是什么", "level": "中等"},
+                        {"id": "eval-4", "title": "统计 pdf 文件数量", "level": "简单"},
+                    ],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            report = platform.evaluation_report(groups=["group-eval"])
+            summary = report["report"]["summary"]
+            self.assertEqual(summary["status"], "ok")
+            self.assertEqual(summary["total_questions"], 4)
+            self.assertEqual(summary["schema_valid"], 4)
+            self.assertEqual(summary["trace_covered"], 4)
+            self.assertEqual(report["report"]["risks"], [])
+
+            exported = platform.export_evaluation_report(groups=["group-eval"])
+            self.assertEqual(exported["status"], "ok")
+            self.assertTrue((wiki / exported["path"]).exists())
+            self.assertTrue((wiki / exported["json_path"]).exists())
+            self.assertIn("LLM Wiki Evaluation Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
+
+            cli_output = io.StringIO()
+            with contextlib.redirect_stdout(cli_output):
+                code = cli_main(["--wiki-root", str(wiki), "--evaluation-report", "--group", "group-eval"])
+            cli_report = json.loads(cli_output.getvalue())
+            self.assertEqual(code, 0)
+            self.assertEqual(cli_report["report"]["summary"]["score"], 100.0)
+
+            httpd = build_server(platform, "127.0.0.1", 0)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                api_report = json.loads(http_post(base + "/reports/evaluation", {"groups": ["group-eval"]}))
+                api_export = json.loads(http_post(base + "/reports/evaluation/export", {"groups": ["group-eval"]}))
+                report_bytes = http_get_bytes(base + api_export["download_url"])
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+                thread.join(timeout=5)
+
+            self.assertEqual(api_report["report"]["summary"]["schema_valid"], 4)
+            self.assertIn(b"LLM Wiki Evaluation Report", report_bytes)
 
     def test_generate_presentation_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-slides-test-") as tmp:

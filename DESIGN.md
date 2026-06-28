@@ -57,6 +57,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - 治理报告汇总来源状态、TODO 到期风险、阻断审计和任务历史，可通过 API/CLI 查看并导出 Markdown。
 - Markdown wiki 编译层把原始文档转成可读、可 lint、可被 agent 维护的知识页，降低每次查询都从原始文件临时拼上下文的脆弱性。
 - 独立问答解释通道返回检索路由、匹配词、命中文件、证据片段和安全判定，不改变题组答案的严格 JSON schema。
+- 质量评估报告批量运行题组，检查严格答案 schema、证据覆盖、安全阻断、空答案、LLM 使用和来源引用，用于回归验收。
 
 ## 平台模块
 
@@ -65,6 +66,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - `platform.py`：企业级服务门面，统一 CLI、skill、API 调用路径。
 - `importer.py`：受控知识源导入，处理 URL/文件读取、扩展名白名单、目录规范化、去重命名和 SSRF 防护。
 - `reports.py`：治理报告生成器，输出 JSON 摘要和 Markdown 报告。
+- `evaluation.py`：题组质量评估器，输出 schema、证据、安全和 LLM 使用指标。
 - `server.py`：标准库 HTTP API，适合评测环境零依赖运行。
 - `cli_io.py`：题组 JSON 读取、输出路径和自验证日志。
 - `office_bridge.py`：可选 LibreOffice/soffice 转换层，用于 `.doc/.ppt/.xls` 老式 Office 文件索引和修复；不可用时安全降级到二进制文本兜底。
