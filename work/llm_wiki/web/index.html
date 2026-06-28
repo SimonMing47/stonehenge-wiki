@@ -18,8 +18,10 @@
         </div>
         <nav class="nav">
           <a href="#ask">Ask</a>
+          <a href="#wiki">Wiki</a>
           <a href="#studio">Studio</a>
           <a href="#sources">Sources</a>
+          <a href="#governance">Governance</a>
           <a href="#audit">Audit</a>
         </nav>
         <div class="rail-foot">
@@ -67,6 +69,10 @@
             <strong id="llmName">disabled</strong>
           </div>
           <div>
+            <span>Knowledge</span>
+            <strong id="knowledgeMode">wiki</strong>
+          </div>
+          <div>
             <span>Auth</span>
             <strong id="authName">open</strong>
           </div>
@@ -104,6 +110,7 @@
                 <option>困难</option>
               </select>
               <button id="askBtn" type="button" class="primary">Ask</button>
+              <button id="explainBtn" type="button">Explain</button>
             </div>
             <div id="answerOutput" class="answer-output" aria-label="Answer output">
               <span class="muted">Ready</span>
@@ -130,6 +137,30 @@
           </div>
         </section>
 
+        <section id="wiki" class="wiki-workspace" aria-label="Compiled wiki workspace">
+          <div class="surface explain-pane">
+            <div class="section-head">
+              <h2>Explain</h2>
+              <span id="explainStatus">Ready</span>
+            </div>
+            <div id="explainOutput" class="explain-output">
+              <span class="muted">Ask a question, then inspect route, safety, and evidence.</span>
+            </div>
+          </div>
+
+          <div class="surface wiki-pane">
+            <div class="section-head">
+              <h2>Compiled Wiki</h2>
+              <span id="wikiStatus">Ready</span>
+            </div>
+            <div class="row-actions compact wiki-search">
+              <input id="wikiSearchInput" placeholder="Search compiled wiki sections" aria-label="Wiki section search" />
+              <button id="wikiSearchBtn" type="button">Search</button>
+            </div>
+            <div id="wikiSectionList" class="wiki-section-list"></div>
+          </div>
+        </section>
+
         <section class="surface run-row">
           <div>
             <h2>Question Groups</h2>
@@ -152,7 +183,7 @@
           </div>
         </section>
 
-        <section class="surface run-row">
+        <section id="governance" class="surface run-row">
           <div>
             <h2>Governance</h2>
             <p id="governanceSummary" class="muted">report not loaded</p>

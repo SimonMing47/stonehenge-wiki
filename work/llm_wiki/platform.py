@@ -99,6 +99,12 @@ class LLMWikiPlatform:
 
     def explain_question(self, title: str, q_id: str = "explain-1", level: str = "") -> dict[str, Any]:
         result = self.answerer.explain(Question(id=q_id, title=title, level=level))
+        wiki_match = self.search_wiki(title, limit=8)
+        result["wiki"] = {
+            "mode": "compiled_wiki",
+            "sections": wiki_match["sections"],
+            "section_count": len(wiki_match["sections"]),
+        }
         self.store.record_job(
             "question_explain",
             result["status"],
@@ -368,6 +374,12 @@ class LLMWikiPlatform:
             "wiki_root": str(self.wiki_root),
             "database_path": str(self.config.database_path),
             "compiled_wiki": str(self.wiki_root / "wiki"),
+            "knowledge_mode": "compiled_wiki",
+            "rag": {
+                "enabled": False,
+                "vector_store": False,
+                "retrieval_surface": "wiki_sections",
+            },
             "files": len(self.index.records),
             "comments": len(self.index.comments),
             "llm": {

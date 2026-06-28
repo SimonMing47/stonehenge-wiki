@@ -2,7 +2,9 @@ const state = {
   health: null,
   index: { files: [], comments: [], store: {} },
   audit: [],
-  governance: null
+  governance: null,
+  wikiSections: [],
+  explanation: null
 };
 
 const el = (id) => document.getElementById(id);
@@ -29,20 +31,23 @@ async function api(path, options = {}) {
 async function refreshAll() {
   setBusy("refreshBtn", true);
   try {
-    const [health, index, audit, governance] = await Promise.all([
+    const [health, index, audit, governance, wikiSections] = await Promise.all([
       api("/health"),
       api("/index"),
       api("/audit?limit=25"),
-      api("/reports/governance")
+      api("/reports/governance"),
+      api("/wiki/sections?limit=14")
     ]);
     state.health = health;
     state.index = index;
     state.audit = audit.events || [];
     state.governance = governance.report || null;
+    state.wikiSections = wikiSections.sections || [];
     renderHealth();
     renderIndex();
     renderAudit();
     renderGovernance();
+    renderWikiSections(state.wikiSections);
     setApiState(true);
   } catch (error) {
     setApiState(false, error.message);
@@ -63,6 +68,7 @@ function renderHealth() {
   el("llmName").textContent = llm.enabled
     ? `${llm.ready ? "ready" : "offline"} · ${llm.model || llm.provider || "model"}`
     : "disabled";
+  el("knowledgeMode").textContent = health.rag?.enabled ? "rag" : health.knowledge_mode || "wiki";
   const auth = health.auth || {};
   el("authName").textContent = auth.enabled ? "token scopes" : "open";
 }
@@ -138,6 +144,33 @@ function renderGovernance() {
   el("governanceSummary").textContent = `${summary.status || "unknown"} · ${riskCount} risks · ${summary.sources || 0} sources · ${report.todo?.total || 0} todos`;
 }
 
+function renderWikiSections(sections) {
+  const list = sections || [];
+  el("wikiStatus").textContent = `${list.length} sections`;
+  el("wikiSectionList").innerHTML = list.length
+    ? list.map(wikiSectionRow).join("")
+    : emptyRow("No compiled wiki sections");
+}
+
+function wikiSectionRow(section) {
+  const snippet = section.snippet || section.body || "";
+  return `
+    <div class="wiki-section-row">
+      <div class="wiki-section-title">
+        <strong>${escapeHtml(section.heading || section.page_title || "Section")}</strong>
+        <span>${escapeHtml(section.kind || "wiki")}</span>
+      </div>
+      <p>${escapeHtml(snippet.slice(0, 360))}</p>
+      <div class="meta">
+        <span>${escapeHtml(section.page_path || "")}</span>
+        <span>${escapeHtml(section.source_path || "topic")}</span>
+        <span>line ${Number(section.line_start || 0)}</span>
+        ${section.score ? `<span>score ${Number(section.score)}</span>` : ""}
+      </div>
+    </div>
+  `;
+}
+
 function renderPresentations(presentations) {
   if (!presentations.length) {
     el("artifactOutput").innerHTML = '<span class="muted">No deck yet</span>';
@@ -201,6 +234,80 @@ async function askQuestion() {
   } finally {
     setBusy("askBtn", false);
   }
+}
+
+async function explainQuestion() {
+  const title = el("questionInput").value.trim();
+  if (!title) return;
+  setBusy("explainBtn", true);
+  el("explainStatus").textContent = "Tracing";
+  try {
+    const explanation = await api("/explain", {
+      method: "POST",
+      body: JSON.stringify({
+        id: el("questionId").value.trim() || "console-1",
+        title,
+        level: el("questionLevel").value
+      })
+    });
+    state.explanation = explanation;
+    renderExplanation(explanation);
+    renderWikiSections(explanation.wiki?.sections || []);
+    el("explainStatus").textContent = explanation.status || "Complete";
+  } catch (error) {
+    el("explainOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
+    el("explainStatus").textContent = "Failed";
+  } finally {
+    setBusy("explainBtn", false);
+  }
+}
+
+function renderExplanation(explanation) {
+  const safety = explanation.safety || {};
+  const records = explanation.records || [];
+  const evidence = explanation.evidence || [];
+  const wiki = explanation.wiki || {};
+  const safetyClass = safety.blocked ? "blocked" : "ok";
+  el("explainOutput").innerHTML = `
+    <div class="trace-summary">
+      <div>
+        <span>Route</span>
+        <strong>${escapeHtml(explanation.route || "knowledge")}</strong>
+      </div>
+      <div>
+        <span>Safety</span>
+        <strong class="${safetyClass}">${escapeHtml(safety.blocked ? "blocked" : "ok")}</strong>
+      </div>
+      <div>
+        <span>Wiki Mode</span>
+        <strong>${escapeHtml(wiki.mode || "compiled_wiki")}</strong>
+      </div>
+      <div>
+        <span>Sections</span>
+        <strong>${Number(wiki.section_count || 0)}</strong>
+      </div>
+    </div>
+    ${safety.reason ? `<div class="answer-status blocked">${escapeHtml(safety.reason)}</div>` : ""}
+    <h3>Evidence</h3>
+    <div class="trace-list">
+      ${(evidence.length ? evidence : records.slice(0, 6)).map(traceRow).join("") || emptyRow("No evidence")}
+    </div>
+  `;
+}
+
+function traceRow(item) {
+  const path = item.source_path || item.path || "";
+  const text = item.text || item.heading || item.name || JSON.stringify(item);
+  return `
+    <div class="trace-row">
+      <strong>${escapeHtml(path)}</strong>
+      <p>${escapeHtml(text)}</p>
+      <div class="meta">
+        ${item.line ? `<span>line ${Number(item.line)}</span>` : ""}
+        ${item.score ? `<span>score ${Number(item.score)}</span>` : ""}
+      </div>
+    </div>
+  `;
 }
 
 function renderAnswer(answer) {
@@ -300,6 +407,23 @@ async function lintWiki() {
     el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
   } finally {
     setBusy("lintWikiBtn", false);
+  }
+}
+
+async function searchWikiSections() {
+  const query = el("wikiSearchInput").value.trim() || el("questionInput").value.trim();
+  const path = query ? `/wiki/search?q=${encodeURIComponent(query)}&limit=14` : "/wiki/sections?limit=14";
+  setBusy("wikiSearchBtn", true);
+  el("wikiStatus").textContent = "Searching";
+  try {
+    const result = await api(path);
+    state.wikiSections = result.sections || [];
+    renderWikiSections(state.wikiSections);
+  } catch (error) {
+    el("wikiSectionList").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
+    el("wikiStatus").textContent = "Failed";
+  } finally {
+    setBusy("wikiSearchBtn", false);
   }
 }
 
@@ -418,12 +542,14 @@ function escapeHtml(value) {
 
 el("refreshBtn").addEventListener("click", refreshAll);
 el("askBtn").addEventListener("click", askQuestion);
+el("explainBtn").addEventListener("click", explainQuestion);
 el("importBtn").addEventListener("click", importSource);
 el("generateSlidesBtn").addEventListener("click", generateSlides);
 el("runGroupBtn").addEventListener("click", runGroup);
 el("reindexBtn").addEventListener("click", reindex);
 el("compileWikiBtn").addEventListener("click", compileWiki);
 el("lintWikiBtn").addEventListener("click", lintWiki);
+el("wikiSearchBtn").addEventListener("click", searchWikiSections);
 el("refreshReportBtn").addEventListener("click", refreshReport);
 el("exportReportBtn").addEventListener("click", exportReport);
 el("runEvaluationBtn").addEventListener("click", runEvaluation);
