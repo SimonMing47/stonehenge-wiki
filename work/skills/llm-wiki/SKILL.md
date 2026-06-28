@@ -31,6 +31,12 @@ For an index inspection:
 python3 work/main.py --dump-index
 ```
 
+For a PowerPoint brief:
+
+```bash
+python3 work/main.py --generate-ppt "RAG 知识库建设方案" --slide-count 6
+```
+
 For an API service:
 
 ```bash
@@ -58,7 +64,7 @@ Always let the CLI perform safety checks before reading, executing, or repairing
 
 ## Outputs
 
-Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
+Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
 
 ## Helper Script
 

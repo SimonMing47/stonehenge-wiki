@@ -4,6 +4,7 @@ import json
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from .answerer import QuestionAnswerer
 from .cli_io import load_questions, output_path_for_question_file, resolve_question_files, write_result_log
@@ -11,6 +12,7 @@ from .config import PlatformConfig, load_config
 from .indexer import WikiIndex
 from .llm import LLMClient
 from .models import Question
+from .presentations import create_presentation
 from .security import PermissionGuard
 from .store import SQLiteStore
 from .wiki_compiler import WikiCompiler
@@ -87,6 +89,30 @@ class LLMWikiPlatform:
     def ask(self, title: str, q_id: str = "adhoc-1", level: str = "") -> dict[str, Any]:
         return self.answer_question(Question(id=q_id, title=title, level=level))
 
+    def generate_presentation(self, topic: str, slide_count: int = 6) -> dict[str, Any]:
+        request_id = new_request_id()
+        blocked, reason = self.guard.check_question(topic)
+        if blocked:
+            result = {"error_msg": "高危命令，拒绝访问", "reason": reason}
+            self.audit("slides.generate", request_id, topic or "presentation", "blocked", True, result)
+            return result
+
+        records = self.index.search(topic, limit=8)
+        answer = self.answer_question(Question(id="slides-brief", title=topic, level="中等"), request_id=request_id)
+        answer_datas = list(answer.get("answer", {}).get("datas", []) or [])
+        deck_rel, slides = create_presentation(self.wiki_root, topic, answer_datas, records, slide_count=slide_count)
+        result = {
+            "status": "ok",
+            "topic": topic,
+            "deck": deck_rel,
+            "download_url": "/files/" + quote(deck_rel, safe="/"),
+            "slide_count": len(slides),
+            "sources": [record.rel_path for record in records],
+        }
+        self.store.record_job("slides_generate", "ok", {"topic": topic}, result)
+        self.audit("slides.generate", request_id, deck_rel, "ok", False, result)
+        return result
+
     def run_group_file(self, question_file: Path) -> dict[str, Any]:
         questions = load_questions(question_file)
         request_id = new_request_id()
@@ -126,8 +152,26 @@ class LLMWikiPlatform:
                 for record in self.index.records
             ],
             "comments": [comment.summary() for comment in self.index.comments],
+            "presentations": self.list_presentations(),
             "store": self.store.stats(),
         }
+
+    def list_presentations(self) -> list[dict[str, Any]]:
+        output_dir = self.wiki_root / "output" / "presentations"
+        if not output_dir.exists():
+            return []
+        decks = []
+        for path in sorted(output_dir.glob("*.pptx"), key=lambda item: item.stat().st_mtime, reverse=True):
+            rel = path.relative_to(self.wiki_root).as_posix()
+            decks.append(
+                {
+                    "deck": rel,
+                    "name": path.name,
+                    "download_url": "/files/" + quote(rel, safe="/"),
+                    "size": path.stat().st_size,
+                }
+            )
+        return decks[:10]
 
     def audit_events(self, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_audit_events(limit)

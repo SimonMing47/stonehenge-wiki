@@ -13,12 +13,13 @@
           <span class="mark" aria-hidden="true">LW</span>
           <span>
             <strong>LLM Wiki</strong>
-            <small>Enterprise Console</small>
+            <small>Research Studio</small>
           </span>
         </div>
         <nav class="nav">
-          <a href="#query">Query</a>
-          <a href="#inventory">Inventory</a>
+          <a href="#ask">Ask</a>
+          <a href="#studio">Studio</a>
+          <a href="#sources">Sources</a>
           <a href="#audit">Audit</a>
         </nav>
         <div class="rail-foot">
@@ -30,7 +31,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">Knowledge Operations</p>
-            <h1>LLM Wiki Control Plane</h1>
+            <h1>LLM Wiki Research Studio</h1>
           </div>
           <div class="toolbar">
             <input id="tokenInput" type="password" placeholder="API token" aria-label="API token" />
@@ -63,14 +64,22 @@
           </div>
         </section>
 
-        <section id="query" class="surface query-grid">
-          <div class="query-pane">
+        <section id="ask" class="studio-grid" aria-label="LLM Wiki workspace">
+          <div id="sources" class="surface source-pane">
+            <div class="section-head">
+              <h2>Sources</h2>
+              <span id="fileScope">0 indexed</span>
+            </div>
+            <div id="fileList" class="source-list"></div>
+          </div>
+
+          <div class="surface ask-pane">
             <div class="section-head">
               <h2>Ask</h2>
               <span id="queryStatus">Ready</span>
             </div>
-            <textarea id="questionInput" rows="5" placeholder="统计 docx 文件数量"></textarea>
-            <div class="row-actions">
+            <textarea id="questionInput" rows="6" placeholder="问知识库里的任意问题，例如：如何在控制台连接高斯数据库"></textarea>
+            <div class="ask-actions">
               <input id="questionId" value="console-1" aria-label="Question id" />
               <select id="questionLevel" aria-label="Question level">
                 <option>简单</option>
@@ -79,8 +88,29 @@
               </select>
               <button id="askBtn" type="button" class="primary">Ask</button>
             </div>
+            <div id="answerOutput" class="answer-output" aria-label="Answer output">
+              <span class="muted">Ready</span>
+            </div>
           </div>
-          <pre id="answerOutput" class="output" aria-label="Answer output">{}</pre>
+
+          <div id="studio" class="surface artifact-pane">
+            <div class="section-head">
+              <h2>PPT Studio</h2>
+              <span id="slidesStatus">Ready</span>
+            </div>
+            <textarea id="slidesTopic" rows="5" placeholder="输入汇报主题，例如：RAG 知识库建设方案"></textarea>
+            <div class="ask-actions">
+              <select id="slideCount" aria-label="Slide count">
+                <option value="4">4 slides</option>
+                <option value="6" selected>6 slides</option>
+                <option value="8">8 slides</option>
+              </select>
+              <button id="generateSlidesBtn" type="button" class="primary">Generate PPT</button>
+            </div>
+            <div id="artifactOutput" class="artifact-output">
+              <span class="muted">No deck yet</span>
+            </div>
+          </div>
         </section>
 
         <section class="surface run-row">
@@ -105,14 +135,7 @@
           </div>
         </section>
 
-        <section id="inventory" class="split">
-          <div class="surface">
-            <div class="section-head">
-              <h2>Files</h2>
-              <span id="fileScope">0 indexed</span>
-            </div>
-            <div id="fileList" class="table-list"></div>
-          </div>
+        <section class="split">
           <div class="surface">
             <div class="section-head">
               <h2>Comments</h2>

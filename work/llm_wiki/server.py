@@ -6,7 +6,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from .platform import LLMWikiPlatform
 
@@ -45,6 +45,8 @@ class PlatformHandler(BaseHTTPRequestHandler):
             return self.write_json(self.llm_wiki_platform.health())
         if not self.authorized():
             return self.write_json({"error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+        if parsed.path.startswith("/files/"):
+            return self.write_wiki_file(parsed.path.removeprefix("/files/"))
         if parsed.path == "/index":
             return self.write_json(self.llm_wiki_platform.dump_index())
         if parsed.path == "/audit":
@@ -74,6 +76,10 @@ class PlatformHandler(BaseHTTPRequestHandler):
                 groups = [groups]
             results = self.llm_wiki_platform.run_groups(groups=groups)
             return self.write_json({"results": without_answers(results)})
+        if parsed.path == "/slides/generate":
+            topic = str(body.get("topic", ""))
+            slide_count = int(body.get("slide_count", 6) or 6)
+            return self.write_json(self.llm_wiki_platform.generate_presentation(topic, slide_count=slide_count))
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def authorized(self) -> bool:
@@ -106,6 +112,27 @@ class PlatformHandler(BaseHTTPRequestHandler):
         payload = target.read_bytes()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def write_wiki_file(self, rel_name: str) -> None:
+        safe_rel = unquote(rel_name).strip("/")
+        if not safe_rel.startswith("output/"):
+            return self.write_json({"error": "forbidden"}, HTTPStatus.FORBIDDEN)
+        root = self.llm_wiki_platform.wiki_root.resolve()
+        output_root = (root / "output").resolve()
+        target = (root / safe_rel).resolve()
+        if output_root not in target.parents:
+            return self.write_json({"error": "forbidden"}, HTTPStatus.FORBIDDEN)
+        if not target.is_file():
+            return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
+        payload = target.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+        encoded_name = quote(target.name)
+        self.send_header("Content-Disposition", f"attachment; filename=\"download.pptx\"; filename*=UTF-8''{encoded_name}")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()

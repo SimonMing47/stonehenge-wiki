@@ -63,20 +63,22 @@ function renderHealth() {
 function renderIndex() {
   const files = state.index.files || [];
   const comments = state.index.comments || [];
+  const presentations = state.index.presentations || [];
   el("fileScope").textContent = `${files.length} indexed`;
   el("commentScope").textContent = `${comments.length} found`;
   el("fileList").innerHTML = files.length
     ? files.map(fileRow).join("")
-    : emptyRow("No indexed files");
+    : emptySourceRow("No indexed files");
   el("commentList").innerHTML = comments.length
     ? comments.slice(0, 80).map(commentRow).join("")
     : emptyRow("No comments");
+  renderPresentations(presentations);
 }
 
 function fileRow(file) {
   const tags = (file.tags || []).join(", ") || "untagged";
   return `
-    <div class="row">
+    <div class="source-row">
       <strong>${escapeHtml(file.path)}</strong>
       <div class="meta">
         <span>${escapeHtml(file.suffix || "file")}</span>
@@ -102,6 +104,23 @@ function renderAudit() {
     : emptyRow("No audit events");
 }
 
+function renderPresentations(presentations) {
+  if (!presentations.length) {
+    el("artifactOutput").innerHTML = '<span class="muted">No deck yet</span>';
+    return;
+  }
+  el("artifactOutput").innerHTML = presentations
+    .slice(0, 4)
+    .map((item) => `
+      <div class="artifact-card">
+        <strong>${escapeHtml(item.name || item.deck)}</strong>
+        <span>${Math.round(Number(item.size || 0) / 1024)} KB</span>
+        <a href="${escapeHtml(item.download_url)}" target="_blank" rel="noreferrer">Download PPTX</a>
+      </div>
+    `)
+    .join("");
+}
+
 function auditRow(event) {
   const statusClass = event.blocked ? "blocked" : "ok";
   const title = event.payload?.title || event.subject || event.event_type;
@@ -121,6 +140,10 @@ function emptyRow(text) {
   return `<div class="row"><span class="muted">${escapeHtml(text)}</span></div>`;
 }
 
+function emptySourceRow(text) {
+  return `<div class="source-row"><span class="muted">${escapeHtml(text)}</span></div>`;
+}
+
 async function askQuestion() {
   const title = el("questionInput").value.trim();
   if (!title) return;
@@ -135,15 +158,31 @@ async function askQuestion() {
         level: el("questionLevel").value
       })
     });
-    el("answerOutput").textContent = JSON.stringify(answer, null, 2);
+    renderAnswer(answer);
     el("queryStatus").textContent = answer.answer?.error_msg ? "Blocked" : "Complete";
     await refreshAll();
   } catch (error) {
-    el("answerOutput").textContent = JSON.stringify({ error: error.message }, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
     el("queryStatus").textContent = "Failed";
   } finally {
     setBusy("askBtn", false);
   }
+}
+
+function renderAnswer(answer) {
+  const payload = answer.answer || {};
+  if (payload.error_msg) {
+    el("answerOutput").innerHTML = `<div class="answer-status blocked">${escapeHtml(payload.error_msg)}</div>`;
+    return;
+  }
+  const datas = payload.datas || [];
+  const body = datas
+    .map((item) => `<p>${escapeHtml(item)}</p>`)
+    .join("");
+  el("answerOutput").innerHTML = `
+    <div class="answer-status ok">${escapeHtml(answer.id || "answer")}</div>
+    ${body || '<p class="muted">No answer</p>'}
+  `;
 }
 
 async function runGroup() {
@@ -155,10 +194,10 @@ async function runGroup() {
       method: "POST",
       body: JSON.stringify({ groups: [group] })
     });
-    el("answerOutput").textContent = JSON.stringify(result, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
     await refreshAll();
   } catch (error) {
-    el("answerOutput").textContent = JSON.stringify({ error: error.message }, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
   } finally {
     setBusy("runGroupBtn", false);
   }
@@ -168,10 +207,10 @@ async function reindex() {
   setBusy("reindexBtn", true);
   try {
     const result = await api("/reindex", { method: "POST", body: "{}" });
-    el("answerOutput").textContent = JSON.stringify(result, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
     await refreshAll();
   } catch (error) {
-    el("answerOutput").textContent = JSON.stringify({ error: error.message }, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
   } finally {
     setBusy("reindexBtn", false);
   }
@@ -181,10 +220,10 @@ async function compileWiki() {
   setBusy("compileWikiBtn", true);
   try {
     const result = await api("/wiki/compile", { method: "POST", body: "{}" });
-    el("answerOutput").textContent = JSON.stringify(result, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
     await refreshAll();
   } catch (error) {
-    el("answerOutput").textContent = JSON.stringify({ error: error.message }, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
   } finally {
     setBusy("compileWikiBtn", false);
   }
@@ -194,12 +233,47 @@ async function lintWiki() {
   setBusy("lintWikiBtn", true);
   try {
     const result = await api("/wiki/lint");
-    el("answerOutput").textContent = JSON.stringify(result, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
     await refreshAll();
   } catch (error) {
-    el("answerOutput").textContent = JSON.stringify({ error: error.message }, null, 2);
+    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
   } finally {
     setBusy("lintWikiBtn", false);
+  }
+}
+
+async function generateSlides() {
+  const topic = el("slidesTopic").value.trim() || el("questionInput").value.trim();
+  if (!topic) return;
+  setBusy("generateSlidesBtn", true);
+  el("slidesStatus").textContent = "Generating";
+  try {
+    const result = await api("/slides/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        topic,
+        slide_count: Number(el("slideCount").value || 6)
+      })
+    });
+    if (result.error_msg) {
+      el("artifactOutput").innerHTML = `<div class="answer-status blocked">${escapeHtml(result.error_msg)}</div>`;
+      el("slidesStatus").textContent = "Blocked";
+      return;
+    }
+    el("artifactOutput").innerHTML = `
+      <div class="artifact-card">
+        <strong>${escapeHtml(result.topic || "Presentation")}</strong>
+        <span>${Number(result.slide_count || 0)} slides</span>
+        <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download PPTX</a>
+      </div>
+    `;
+    el("slidesStatus").textContent = "Complete";
+    await refreshAll();
+  } catch (error) {
+    el("artifactOutput").innerHTML = `<div class="answer-status blocked">${escapeHtml(error.message)}</div>`;
+    el("slidesStatus").textContent = "Failed";
+  } finally {
+    setBusy("generateSlidesBtn", false);
   }
 }
 
@@ -224,6 +298,7 @@ function escapeHtml(value) {
 
 el("refreshBtn").addEventListener("click", refreshAll);
 el("askBtn").addEventListener("click", askQuestion);
+el("generateSlidesBtn").addEventListener("click", generateSlides);
 el("runGroupBtn").addEventListener("click", runGroup);
 el("reindexBtn").addEventListener("click", reindex);
 el("compileWikiBtn").addEventListener("click", compileWiki);

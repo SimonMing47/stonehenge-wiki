@@ -248,15 +248,16 @@ h2 {
   box-shadow: var(--shadow);
 }
 
-.query-grid {
+.studio-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(280px, 1.05fr);
-  gap: 1px;
-  overflow: hidden;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(360px, 1.35fr) minmax(280px, 0.95fr);
+  gap: 18px;
+  align-items: stretch;
 }
 
-.query-pane,
-.output {
+.source-pane,
+.ask-pane,
+.artifact-pane {
   padding: 18px;
 }
 
@@ -268,26 +269,87 @@ h2 {
   margin-bottom: 14px;
 }
 
-.row-actions {
+.row-actions,
+.ask-actions {
   margin-top: 12px;
 }
 
-.row-actions input {
+.row-actions input,
+.ask-actions input {
   max-width: 220px;
 }
 
-.row-actions select {
+.row-actions select,
+.ask-actions select {
   max-width: 120px;
 }
 
-.output {
-  min-height: 250px;
-  margin: 0;
-  border-left: 1px solid var(--line);
-  background: #20231f;
-  color: #e7f0dd;
+.ask-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.answer-output,
+.artifact-output {
+  min-height: 190px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfaf6;
+  color: var(--ink);
+  padding: 14px;
   overflow: auto;
+}
+
+.answer-output p {
+  margin: 0 0 12px;
+  line-height: 1.55;
   white-space: pre-wrap;
+}
+
+.answer-output pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.answer-status {
+  display: inline-flex;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.artifact-card {
+  display: grid;
+  gap: 8px;
+}
+
+.artifact-card a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.source-list {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--line);
+  background: var(--line);
+  max-height: 480px;
+  overflow: auto;
+}
+
+.source-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  background: #fff;
+}
+
+.source-row strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
 }
 
 .run-row {
@@ -376,15 +438,10 @@ h2 {
     margin-left: auto;
   }
 
-  .query-grid,
+  .studio-grid,
   .split,
   .metrics {
     grid-template-columns: 1fr;
-  }
-
-  .output {
-    border-left: 0;
-    border-top: 1px solid var(--line);
   }
 
   .topbar,
@@ -404,12 +461,15 @@ h2 {
   }
 
   .toolbar,
-  .row-actions {
+  .row-actions,
+  .ask-actions {
     flex-wrap: wrap;
   }
 
   .row-actions input,
   .row-actions select,
+  .ask-actions input,
+  .ask-actions select,
   .compact input {
     max-width: none;
   }

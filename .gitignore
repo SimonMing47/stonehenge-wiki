@@ -4,6 +4,7 @@ __pycache__/
 work/.venv/
 llm-wiki/.state/
 llm-wiki/output/fixed/
+llm-wiki/output/presentations/
 llm-wiki/output/screenshots/
 llm-wiki/output/group-*-answer.md
 llm-wiki/wiki/index.md

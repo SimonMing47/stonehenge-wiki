@@ -19,6 +19,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reindex", action="store_true", help="Rebuild and persist the wiki index")
     parser.add_argument("--compile-wiki", action="store_true", help="Compile docs into the Markdown wiki layer")
     parser.add_argument("--lint-wiki", action="store_true", help="Validate the compiled Markdown wiki layer")
+    parser.add_argument("--generate-ppt", help="Generate a PPTX brief for a topic")
+    parser.add_argument("--slide-count", type=int, default=6, help="Slide count for --generate-ppt")
     parser.add_argument("--audit-log", action="store_true", help="Print recent audit events")
     parser.add_argument("--audit-limit", type=int, default=50, help="Audit event count for --audit-log")
     parser.add_argument("--serve", action="store_true", help="Start the HTTP API service")
@@ -59,6 +61,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.ask:
         print_json(platform.ask(args.ask))
+        return 0
+
+    if args.generate_ppt:
+        print_json(platform.generate_presentation(args.generate_ppt, slide_count=args.slide_count))
         return 0
 
     platform.run_groups(explicit_files=args.question, groups=args.group)

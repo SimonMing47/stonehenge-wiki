@@ -4,6 +4,7 @@ import json
 import threading
 import tempfile
 import unittest
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -129,10 +130,55 @@ class PlatformSmokeTest(unittest.TestCase):
                 httpd.server_close()
                 thread.join(timeout=5)
 
-            self.assertIn("LLM Wiki Control Plane", index_html)
+            self.assertIn("LLM Wiki Research Studio", index_html)
             self.assertIn("refreshAll", app_js)
+            self.assertIn("generateSlides", app_js)
             self.assertEqual(health["status"], "ok")
             self.assertIn(lint["status"], {"ok", "error"})
+
+    def test_generate_presentation_endpoint(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-slides-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            docs = wiki / "docs" / "04_常用命令"
+            docs.mkdir(parents=True)
+            (wiki / "question").mkdir()
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "database.md").write_text(
+                "SQLite SELECT 命令: SELECT * FROM documents WHERE topic = 'rag';\n",
+                encoding="utf-8",
+            )
+
+            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            httpd = build_server(platform, "127.0.0.1", 0)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                result = json.loads(
+                    http_post(base + "/slides/generate", {"topic": "SQLite SELECT 命令", "slide_count": 4})
+                )
+                deck_bytes = http_get_bytes(base + result["download_url"])
+                index = json.loads(http_get(base + "/index"))
+                traversal_status = http_get_status(base + "/files/output/../Permission.json")
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+                thread.join(timeout=5)
+
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["slide_count"], 4)
+            self.assertTrue(result["deck"].endswith(".pptx"))
+            self.assertGreater(len(deck_bytes), 1000)
+            self.assertEqual(index["presentations"][0]["deck"], result["deck"])
+            self.assertEqual(traversal_status, 403)
+            text, _ = extract_docx_like_pptx(wiki / result["deck"])
+            self.assertIn("SQLite SELECT", text)
+
+            direct = platform.generate_presentation("SQLite SELECT 命令", slide_count=6)
+            self.assertEqual(direct["slide_count"], 6)
 
     def test_knowledge_answers_use_llm_without_sending_password_queries(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-llm-test-") as tmp:
@@ -270,6 +316,36 @@ def escape_xml(text: str) -> str:
 def http_get(url: str) -> str:
     with urllib.request.urlopen(url, timeout=5) as response:
         return response.read().decode("utf-8")
+
+
+def http_get_bytes(url: str) -> bytes:
+    with urllib.request.urlopen(url, timeout=5) as response:
+        return response.read()
+
+
+def http_get_status(url: str) -> int:
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def http_post(url: str, payload: dict) -> str:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return response.read().decode("utf-8")
+
+
+def extract_docx_like_pptx(path: Path):
+    from llm_wiki.extractors import extract_pptx
+
+    return extract_pptx(path, path.name)
 
 
 def make_document_record(root: Path, rel_path: str, text: str):
