@@ -111,6 +111,8 @@ python3 work/main.py --set-source-status docs/00_inbox/risky.md --source-status 
 python3 work/main.py --list-source-reviews --source-review-path docs/00_inbox/risky.md
 ```
 
+命中 `Permission.json.file.deny` 的来源会被策略自动隔离为 `quarantined`；隔离来源保留来源注册表、版本和风险记录，但不会进入问答、PPT 生成或 compiled wiki 章节。
+
 治理报告：
 
 ```bash

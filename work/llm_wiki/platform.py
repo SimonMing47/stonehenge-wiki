@@ -17,7 +17,7 @@ from .models import Question
 from .presentations import create_presentation
 from .reports import build_governance_report
 from .security import PermissionGuard
-from .source_risk import scan_source_risks
+from .source_risk import MANDATORY_QUARANTINE_CODES, scan_source_risks
 from .store import SQLiteStore
 from .wiki_compiler import WikiCompiler
 
@@ -30,11 +30,16 @@ class LLMWikiPlatform:
         self.guard = PermissionGuard(self.wiki_root)
         self.llm_client = LLMClient(self.config.llm) if self.config.llm.enabled else None
         self.store = SQLiteStore(self.config.database_path)
+        policy_result: dict[str, Any] = {"quarantined": []}
         if self.config.persist_index:
             self.store.save_index(self.full_index)
-            self.store.save_wiki_sections(self.wiki_root / "wiki")
+            policy_result = self.apply_source_policy_quarantine()
         self.index = self.active_index()
         self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
+        if self.config.persist_index:
+            if policy_result.get("quarantined"):
+                self.compiler.compile()
+            self.store.save_wiki_sections(self.wiki_root / "wiki")
 
     @property
     def compiler(self) -> WikiCompiler:
@@ -46,10 +51,16 @@ class LLMWikiPlatform:
 
     def rebuild_index(self) -> dict[str, Any]:
         self.full_index.build()
+        policy_result: dict[str, Any] = {"quarantined": []}
         if self.config.persist_index:
             self.store.save_index(self.full_index)
-            self.store.save_wiki_sections(self.wiki_root / "wiki")
+            policy_result = self.apply_source_policy_quarantine()
         self.refresh_runtime_index()
+        if self.config.persist_index and policy_result.get("quarantined"):
+            self.compiler.compile()
+            self.store.save_wiki_sections(self.wiki_root / "wiki")
+        elif self.config.persist_index:
+            self.store.save_wiki_sections(self.wiki_root / "wiki")
         result = self.health()
         self.store.record_job("reindex", "ok", {"wiki_root": str(self.wiki_root)}, result)
         return result
@@ -327,6 +338,16 @@ class LLMWikiPlatform:
             result = {"error": "invalid_status", "allowed": ["active", "quarantined"]}
             self.audit("source.review", request_id, rel_path, "blocked", True, result)
             return result
+        if normalized_status == "active":
+            policy_reason = self.source_policy_quarantine_reason(rel_path)
+            if policy_reason:
+                result = {
+                    "error": "policy_quarantine_required",
+                    "path": rel_path,
+                    "reason": policy_reason,
+                }
+                self.audit("source.review", request_id, rel_path, "blocked", True, result)
+                return result
         updated = self.store.update_source_status(rel_path, normalized_status, reason=reason, actor=actor)
         if updated is None:
             result = {"error": "not_found", "path": rel_path}
@@ -366,6 +387,53 @@ class LLMWikiPlatform:
 
     def source_risk_report(self) -> dict[str, Any]:
         return scan_source_risks(self.full_index, self.guard)
+
+    def source_policy_quarantine_reason(self, rel_path: str) -> str:
+        risk_report = self.source_risk_report()
+        codes = {
+            str(finding.get("code") or "")
+            for finding in risk_report.get("findings", [])
+            if finding.get("source_path") == rel_path
+        }
+        mandatory = sorted(codes & MANDATORY_QUARANTINE_CODES)
+        return ",".join(mandatory)
+
+    def apply_source_policy_quarantine(self) -> dict[str, Any]:
+        risk_report = self.source_risk_report()
+        current = {
+            source["rel_path"]: source
+            for source in self.store.list_sources(include_missing=True)
+            if source.get("status") != "missing"
+        }
+        by_path: dict[str, set[str]] = {}
+        for finding in risk_report.get("findings", []):
+            code = str(finding.get("code") or "")
+            if code not in MANDATORY_QUARANTINE_CODES:
+                continue
+            rel_path = str(finding.get("source_path") or "")
+            if not rel_path:
+                continue
+            by_path.setdefault(rel_path, set()).add(code)
+
+        quarantined: list[dict[str, Any]] = []
+        for rel_path, codes in sorted(by_path.items()):
+            source = current.get(rel_path)
+            if not source or source.get("status") == "quarantined":
+                continue
+            reason = "policy:" + ",".join(sorted(codes))
+            updated = self.store.update_source_status(rel_path, "quarantined", reason=reason, actor="policy")
+            if updated:
+                quarantined.append({"path": rel_path, "reason": reason})
+
+        result = {
+            "status": "ok",
+            "quarantined": quarantined,
+            "count": len(quarantined),
+        }
+        if quarantined:
+            self.store.record_job("source_policy_quarantine", "ok", {"codes": sorted(MANDATORY_QUARANTINE_CODES)}, result)
+            self.audit("source.policy", new_request_id(), "source_registry", "ok", False, result)
+        return result
 
     def governance_report(self) -> dict[str, Any]:
         source_risk_report = self.source_risk_report()

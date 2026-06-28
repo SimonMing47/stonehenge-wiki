@@ -54,6 +54,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - 受控导入通道把本地文件或公开 URL 复制到 `docs/<category>/` 后重建索引，阻断私网 URL、超大文件、未知扩展和权限配置拒绝的路径。
 - 治理报告汇总来源状态、TODO 到期风险、阻断审计和任务历史，可通过 API/CLI 查看并导出 Markdown。
 - 来源审批支持 `active/quarantined` 状态；被隔离来源仍保留 provenance、版本和风险记录，但会从问答、PPT 生成和编译后的 wiki 知识面中剔除。
+- `Permission.json.file.deny` 命中的来源会被策略自动隔离，避免黑名单文件通过普通知识问答或 compiled wiki 间接泄露。
 - Markdown wiki 编译层把原始文档转成可读、可 lint、可被 agent 维护的知识页；章节搜索只读 `wiki/` 编译层，避免退回到原始文档切片。
 - 独立问答解释通道返回检索路由、匹配词、命中文件、证据片段和安全判定，不改变题组答案的严格 JSON schema。
 - 质量评估报告批量运行题组，检查严格答案 schema、证据覆盖、安全阻断、空答案、LLM 使用和来源引用，用于回归验收。

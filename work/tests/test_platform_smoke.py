@@ -498,6 +498,47 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(api_status["source_status"], "quarantined")
             self.assertTrue(api_reviews["reviews"])
 
+    def test_permission_denied_sources_are_policy_quarantined(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-policy-quarantine-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            docs = wiki / "docs" / "02_环境信息"
+            docs.mkdir(parents=True)
+            (wiki / "question").mkdir()
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text(
+                json.dumps({"file": {"deny": ["spark-*.env"]}}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (docs / "spark-prod.env").write_text(
+                "SPARK_TOKEN=denied-secret\nSpark production endpoint should not be active knowledge.\n",
+                encoding="utf-8",
+            )
+
+            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            denied_rel = "docs/02_环境信息/spark-prod.env"
+            sources = {source["rel_path"]: source for source in platform.list_sources()}
+            reviews = platform.list_source_reviews(rel_path=denied_rel)
+            health = platform.health()
+
+            self.assertEqual(sources[denied_rel]["status"], "quarantined")
+            self.assertEqual(health["files"], 0)
+            self.assertEqual(health["all_files"], 1)
+            self.assertEqual(health["store"]["quarantined_sources"], 1)
+            self.assertEqual(reviews[0]["actor"], "policy")
+            self.assertIn("permission_file_deny", reviews[0]["reason"])
+            self.assertEqual(platform.ask("Spark production endpoint")["answer"], {"datas": []})
+            self.assertEqual(platform.search_wiki("Spark production endpoint", limit=5)["sections"], [])
+
+            activate = platform.set_source_status(denied_rel, "active", reason="operator override", actor="test")
+            self.assertEqual(activate["error"], "policy_quarantine_required")
+            self.assertEqual(platform.list_sources()[0]["status"], "quarantined")
+
+            platform.rebuild_index()
+            self.assertEqual(platform.list_sources()[0]["status"], "quarantined")
+            self.assertEqual(platform.health()["files"], 0)
+
     def test_evaluation_report_cli_api_and_export(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-eval-test-") as tmp:
             root = Path(tmp)

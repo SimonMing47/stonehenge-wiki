@@ -168,7 +168,12 @@ function riskRow(finding) {
   const source = registry.find((item) => item.rel_path === finding.source_path) || {};
   const status = source.status || "active";
   const nextStatus = status === "quarantined" ? "active" : "quarantined";
-  const actionLabel = status === "quarantined" ? "Activate" : "Quarantine";
+  const sourceFindings = state.sourceRisk?.findings || [];
+  const policyHeld = status === "quarantined" && sourceFindings.some((item) => {
+    return item.source_path === finding.source_path && item.code === "permission_file_deny";
+  });
+  const actionLabel = policyHeld ? "Policy held" : status === "quarantined" ? "Activate" : "Quarantine";
+  const disabled = policyHeld ? "disabled" : "";
   return `
     <div class="risk-row severity-${escapeHtml(finding.severity || "low")}">
       <div class="risk-title">
@@ -181,7 +186,7 @@ function riskRow(finding) {
         ${finding.evidence ? `<span>${escapeHtml(finding.evidence)}</span>` : ""}
       </div>
       <div class="risk-actions">
-        <button type="button" data-source-path="${escapeHtml(finding.source_path)}" data-source-status="${escapeHtml(nextStatus)}">${actionLabel}</button>
+        <button type="button" data-source-path="${escapeHtml(finding.source_path)}" data-source-status="${escapeHtml(nextStatus)}" ${disabled}>${actionLabel}</button>
       </div>
     </div>
   `;

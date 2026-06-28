@@ -11,6 +11,7 @@ from .models import CommentRecord, DocumentRecord
 from .security import SYSTEM_SECRET_RE, PermissionGuard
 
 SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+MANDATORY_QUARANTINE_CODES = {"permission_file_deny"}
 SECRET_ASSIGNMENT_RE = re.compile(
     r"(?i)(\b[\w.-]*(?:password|passwd|secret|token|credential|api[_-]?key)[\w.-]*\b)\s*[:=]\s*([^,\s;<>]+)"
 )
