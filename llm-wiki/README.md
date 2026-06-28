@@ -44,10 +44,12 @@ python3 work/main.py --lint-wiki
 
 ```bash
 python3 work/main.py --readiness-report --group group-demo
+python3 work/main.py --readiness-report --group group-demo --readiness-fail-on fail
 python3 work/main.py --export-readiness-report --group group-demo
+python3 work/main.py --export-release-bundle --group group-demo
 ```
 
-导出的 Markdown 和 JSON 报告位于 `output/reports/readiness-report.*`。该报告以 pass/warn/fail 方式检查题组数量、权限安全、compiled wiki、no-RAG 架构、来源隔离、修复输出、审计、LLM 和 API token scope。
+导出的 Markdown 和 JSON 报告位于 `output/reports/readiness-report.*`。该报告以 pass/warn/fail 方式检查题组数量、权限安全、compiled wiki、no-RAG 架构、来源隔离、修复输出、审计、LLM 和 API token scope。`--readiness-fail-on fail|warn` 可作为 CI 门禁；release bundle 位于 `output/releases/`，只包含报告、题组、答案和 compiled wiki，不包含原始 `docs/` 或 `.state/wiki.sqlite`。
 
 ## 批注/TODO
 

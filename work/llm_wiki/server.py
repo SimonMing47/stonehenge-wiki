@@ -99,6 +99,21 @@ class PlatformHandler(BaseHTTPRequestHandler):
                     )
                 }
             )
+        if parsed.path == "/wiki/pages":
+            if not self.ensure_authorized("read"):
+                return
+            limit = int(parse_qs(parsed.query).get("limit", ["200"])[0])
+            return self.write_json(self.llm_wiki_platform.list_wiki_pages(limit=limit))
+        if parsed.path == "/wiki/page":
+            if not self.ensure_authorized("read"):
+                return
+            page_path = parse_qs(parsed.query).get("path", [""])[0]
+            result = self.llm_wiki_platform.get_wiki_page(page_path)
+            if result.get("error") == "invalid_path":
+                return self.write_json(result, HTTPStatus.BAD_REQUEST)
+            if result.get("error") == "not_found":
+                return self.write_json(result, HTTPStatus.NOT_FOUND)
+            return self.write_json(result)
         if parsed.path == "/wiki/search":
             if not self.ensure_authorized("read"):
                 return
@@ -181,6 +196,17 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if isinstance(groups, str):
                 groups = [groups]
             return self.write_json(self.llm_wiki_platform.export_readiness_report(groups=groups))
+        if parsed.path == "/reports/release/export":
+            groups = body.get("groups")
+            if isinstance(groups, str):
+                groups = [groups]
+            include_evaluation = bool(body.get("include_evaluation", False))
+            return self.write_json(
+                self.llm_wiki_platform.export_release_bundle(
+                    groups=groups,
+                    include_evaluation=include_evaluation,
+                )
+            )
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def ensure_authorized(self, required_scope: str) -> bool:

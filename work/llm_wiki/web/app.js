@@ -5,6 +5,8 @@ const state = {
   governance: null,
   readiness: null,
   wikiSections: [],
+  wikiPages: [],
+  wikiPage: null,
   sourceRisk: null,
   explanation: null
 };
@@ -34,13 +36,14 @@ async function api(path, options = {}) {
 async function refreshAll() {
   setBusy("refreshBtn", true);
   try {
-    const [health, index, audit, governance, readiness, wikiSections, sourceRisk] = await Promise.all([
+    const [health, index, audit, governance, readiness, wikiSections, wikiPages, sourceRisk] = await Promise.all([
       api("/health"),
       api("/index"),
       api("/audit?limit=25"),
       api("/reports/governance"),
       api("/reports/readiness"),
       api("/wiki/sections?limit=14"),
+      api("/wiki/pages?limit=200"),
       api("/sources/risk")
     ]);
     state.health = health;
@@ -49,14 +52,17 @@ async function refreshAll() {
     state.governance = governance.report || null;
     state.readiness = readiness.report || null;
     state.wikiSections = wikiSections.sections || [];
+    state.wikiPages = wikiPages.pages || [];
     state.sourceRisk = sourceRisk;
     renderHealth();
     renderIndex();
     renderAudit();
     renderGovernance();
     renderReadiness();
+    renderWikiPageList();
     renderWikiSections(state.wikiSections);
     renderSourceRisk();
+    await ensureWikiPagePreview();
     setApiState(true);
   } catch (error) {
     setApiState(false, error.message);
@@ -233,6 +239,71 @@ function renderWikiSections(sections) {
   el("wikiSectionList").innerHTML = list.length
     ? list.map(wikiSectionRow).join("")
     : emptyRow("No compiled wiki sections");
+}
+
+function renderWikiPageList() {
+  const pages = state.wikiPages || [];
+  el("wikiPageStatus").textContent = `${pages.length} articles`;
+  el("wikiPageList").innerHTML = pages.length
+    ? pages.map(wikiPageRow).join("")
+    : emptyRow("No compiled wiki articles");
+}
+
+function wikiPageRow(page) {
+  const selectedPath = state.wikiPage?.page?.path || "";
+  const active = selectedPath === page.path ? " active" : "";
+  const meta = [page.kind, page.file_type, page.source_path].filter(Boolean).join(" · ");
+  return `
+    <button type="button" class="wiki-page-row${active}" data-wiki-page-path="${escapeHtml(page.path)}">
+      <strong>${escapeHtml(page.title || page.path)}</strong>
+      <span>${escapeHtml(meta || page.path)}</span>
+      ${page.excerpt ? `<small>${escapeHtml(page.excerpt)}</small>` : ""}
+    </button>
+  `;
+}
+
+async function ensureWikiPagePreview() {
+  const pages = state.wikiPages || [];
+  if (!pages.length) {
+    renderWikiPagePreview();
+    return;
+  }
+  const selectedPath = state.wikiPage?.page?.path;
+  const target = pages.some((page) => page.path === selectedPath) ? selectedPath : pages[0].path;
+  if (!target) return;
+  await loadWikiPage(target, { quiet: true });
+}
+
+async function loadWikiPage(path, options = {}) {
+  if (!path) return;
+  if (!options.quiet) {
+    el("wikiPageMeta").textContent = "Loading";
+  }
+  try {
+    const result = await api(`/wiki/page?path=${encodeURIComponent(path)}`);
+    state.wikiPage = result;
+    renderWikiPagePreview();
+    renderWikiPageList();
+  } catch (error) {
+    el("wikiPageTitle").textContent = "Preview";
+    el("wikiPageMeta").textContent = "Failed";
+    el("wikiPagePreview").innerHTML = `<div class="answer-status blocked">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function renderWikiPagePreview() {
+  const detail = state.wikiPage || {};
+  const page = detail.page || {};
+  if (!page.path) {
+    el("wikiPageTitle").textContent = "Preview";
+    el("wikiPageMeta").textContent = "Select an article";
+    el("wikiPagePreview").innerHTML = `<span class="muted">Select an article from the list.</span>`;
+    return;
+  }
+  const meta = [page.kind, page.file_type, page.source_path || page.path].filter(Boolean).join(" · ");
+  el("wikiPageTitle").textContent = page.title || page.path;
+  el("wikiPageMeta").textContent = meta;
+  el("wikiPagePreview").innerHTML = markdownToHtml(detail.markdown || "");
 }
 
 function wikiSectionRow(section) {
@@ -593,6 +664,20 @@ async function exportReadiness() {
   }
 }
 
+async function exportRelease() {
+  setBusy("exportReleaseBtn", true);
+  try {
+    const result = await api("/reports/release/export", { method: "POST", body: selectedGroupsBody() });
+    const readiness = result.manifest?.reports?.readiness || "readiness";
+    el("governanceSummary").innerHTML = `release bundle · ${escapeHtml(readiness)} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download release</a>`;
+    await refreshAll();
+  } catch (error) {
+    el("governanceSummary").textContent = `release export failed · ${error.message}`;
+  } finally {
+    setBusy("exportReleaseBtn", false);
+  }
+}
+
 function selectedGroupsBody() {
   const group = el("groupInput").value.trim();
   return group ? JSON.stringify({ groups: [group] }) : "{}";
@@ -700,6 +785,76 @@ function writeWikiOutput(result) {
   el("wikiOperationOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
 }
 
+function markdownToHtml(markdown) {
+  const lines = String(markdown || "").split("\n");
+  const html = [];
+  let inList = false;
+  let inCode = false;
+  for (const line of lines) {
+    if (line.startsWith("```")) {
+      if (inCode) {
+        html.push("</code></pre>");
+        inCode = false;
+      } else {
+        if (inList) {
+          html.push("</ul>");
+          inList = false;
+        }
+        html.push("<pre><code>");
+        inCode = true;
+      }
+      continue;
+    }
+    if (inCode) {
+      html.push(escapeHtml(line) + "\n");
+      continue;
+    }
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      continue;
+    }
+    if (trimmed.startsWith("## ")) {
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(`<h3>${escapeHtml(trimmed.slice(3))}</h3>`);
+    } else if (trimmed.startsWith("# ")) {
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(`<h2>${escapeHtml(trimmed.slice(2))}</h2>`);
+    } else if (trimmed.startsWith("- ")) {
+      if (!inList) {
+        html.push("<ul>");
+        inList = true;
+      }
+      html.push(`<li>${formatInlineMarkdown(trimmed.slice(2))}</li>`);
+    } else {
+      if (inList) {
+        html.push("</ul>");
+        inList = false;
+      }
+      html.push(`<p>${formatInlineMarkdown(trimmed)}</p>`);
+    }
+  }
+  if (inList) html.push("</ul>");
+  if (inCode) html.push("</code></pre>");
+  return html.join("");
+}
+
+function formatInlineMarkdown(value) {
+  return escapeHtml(value)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\[\[([^]|]+)\|([^]]+)\]\]/g, "$2")
+    .replace(/\[\[([^]]+)\]\]/g, "$1");
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -722,11 +877,17 @@ el("refreshReportBtn").addEventListener("click", refreshReport);
 el("exportReportBtn").addEventListener("click", exportReport);
 el("refreshReadinessBtn").addEventListener("click", refreshReadiness);
 el("exportReadinessBtn").addEventListener("click", exportReadiness);
+el("exportReleaseBtn").addEventListener("click", exportRelease);
 el("runEvaluationBtn").addEventListener("click", runEvaluation);
 el("exportEvaluationBtn").addEventListener("click", exportEvaluation);
 el("tokenForm").addEventListener("submit", (event) => event.preventDefault());
 window.addEventListener("hashchange", renderPage);
 document.addEventListener("click", (event) => {
+  const wikiPageButton = event.target.closest("[data-wiki-page-path]");
+  if (wikiPageButton) {
+    loadWikiPage(wikiPageButton.dataset.wikiPagePath || "");
+    return;
+  }
   const button = event.target.closest("[data-source-status]");
   if (!button) return;
   setSourceStatus(button.dataset.sourcePath, button.dataset.sourceStatus, button);

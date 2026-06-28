@@ -117,6 +117,26 @@
         </section>
 
         <section id="wiki" class="page" data-page="wiki" aria-label="Compiled wiki workspace">
+          <div class="wiki-reader">
+            <div class="surface wiki-page-list-pane">
+              <div class="section-head">
+                <h2>Articles</h2>
+                <span id="wikiPageStatus">Ready</span>
+              </div>
+              <div id="wikiPageList" class="wiki-page-list"></div>
+            </div>
+
+            <article class="surface wiki-page-preview-pane">
+              <div class="section-head">
+                <h2 id="wikiPageTitle">Preview</h2>
+                <span id="wikiPageMeta">Select an article</span>
+              </div>
+              <div id="wikiPagePreview" class="wiki-page-preview">
+                <span class="muted">Select an article from the list.</span>
+              </div>
+            </article>
+          </div>
+
           <div class="wiki-workspace">
             <div class="surface explain-pane">
               <div class="section-head">
@@ -218,6 +238,7 @@
               <button id="exportReportBtn" type="button">Export Markdown</button>
               <button id="refreshReadinessBtn" type="button">Refresh Readiness</button>
               <button id="exportReadinessBtn" type="button">Export Readiness</button>
+              <button id="exportReleaseBtn" type="button">Export Release</button>
               <button id="runEvaluationBtn" type="button">Run Evaluation</button>
               <button id="exportEvaluationBtn" type="button">Export Evaluation</button>
             </div>

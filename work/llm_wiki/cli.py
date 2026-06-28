@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from .platform import LLMWikiPlatform
+from .readiness import readiness_exit_code
 from .server import serve
 
 
@@ -49,6 +50,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--export-evaluation-report", action="store_true", help="Write question evaluation reports")
     parser.add_argument("--readiness-report", action="store_true", help="Print enterprise readiness gates as JSON")
     parser.add_argument("--export-readiness-report", action="store_true", help="Write enterprise readiness report files")
+    parser.add_argument("--readiness-fail-on", choices=["never", "fail", "warn"], default="never", help="Return exit code 2 when readiness reaches this severity")
+    parser.add_argument("--export-release-bundle", action="store_true", help="Write a metadata-only enterprise release bundle")
+    parser.add_argument("--release-include-evaluation", action="store_true", help="Include a freshly generated evaluation report in the release bundle")
     parser.add_argument("--serve", action="store_true", help="Start the HTTP API service")
     parser.add_argument("--host", help="HTTP API host override")
     parser.add_argument("--port", type=int, help="HTTP API port override")
@@ -152,11 +156,23 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.readiness_report:
-        print_json(platform.readiness_report(explicit_files=args.question, groups=args.group))
-        return 0
+        result = platform.readiness_report(explicit_files=args.question, groups=args.group)
+        print_json(result)
+        return readiness_exit_code(result["report"]["summary"], args.readiness_fail_on)
 
     if args.export_readiness_report:
-        print_json(platform.export_readiness_report(explicit_files=args.question, groups=args.group))
+        result = platform.export_readiness_report(explicit_files=args.question, groups=args.group)
+        print_json(result)
+        return readiness_exit_code(result["report"]["summary"], args.readiness_fail_on)
+
+    if args.export_release_bundle:
+        print_json(
+            platform.export_release_bundle(
+                explicit_files=args.question,
+                groups=args.group,
+                include_evaluation=args.release_include_evaluation,
+            )
+        )
         return 0
 
     if args.ask:

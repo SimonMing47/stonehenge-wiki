@@ -131,10 +131,12 @@ python3 work/main.py --export-evaluation-report --group group-1
 
 ```bash
 python3 work/main.py --readiness-report --group group-demo
+python3 work/main.py --readiness-report --group group-demo --readiness-fail-on fail
 python3 work/main.py --export-readiness-report --group group-demo
+python3 work/main.py --export-release-bundle --group group-demo
 ```
 
-readiness report 会检查 Python 运行时、`llm-wiki` 目录结构、CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。
+readiness report 会检查 Python 运行时、`llm-wiki` 目录结构、CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。`--readiness-fail-on fail|warn` 适合 CI 使用，命中对应级别时返回退出码 2。release bundle 会打包报告、题组、答案和 compiled wiki，不打包原始 `docs/` 文件或 `.state/wiki.sqlite`。
 
 编译 Markdown wiki：
 
@@ -149,6 +151,8 @@ python3 work/main.py --list-wiki-sections --wiki-section-limit 20
 python3 work/main.py --list-wiki-sections --wiki-section-source docs/04_常用命令/sqlite.md
 python3 work/main.py --search-wiki "SQLite SELECT" --wiki-section-limit 5
 ```
+
+浏览器控制台的 `Wiki` 页面提供 compiled wiki 文章列表和同页预览，可直接点开 `wiki/index.md`、`wiki/sources/*.md`、`wiki/topics/*.md` 查看内容，不会回退读取原始 `docs/`。
 
 检查 Markdown wiki：
 

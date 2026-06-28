@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import uuid
+import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -360,6 +362,113 @@ class LLMWikiPlatform:
         )
         return result
 
+    def export_release_bundle(
+        self,
+        explicit_files: list[Path] | None = None,
+        groups: list[str] | None = None,
+        include_evaluation: bool = False,
+    ) -> dict[str, Any]:
+        question_files = resolve_question_files(self.wiki_root, explicit_files, groups)
+        readiness = self.export_readiness_report(explicit_files=explicit_files, groups=groups)
+        governance = self.export_governance_report()
+        evaluation = None
+        if include_evaluation:
+            evaluation = self.export_evaluation_report(explicit_files=explicit_files, groups=groups)
+
+        output_dir = self.wiki_root / "output" / "releases"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        target = output_dir / f"llm-wiki-release-{timestamp}.zip"
+        manifest = self.release_manifest(question_files, readiness, governance, evaluation)
+
+        with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as bundle:
+            bundle.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+            bundle.writestr(
+                "reports/governance-report.json",
+                json.dumps(governance.get("report", {}), ensure_ascii=False, indent=2),
+            )
+            add_if_exists(bundle, self.wiki_root / readiness["path"], "reports/readiness-report.md")
+            add_if_exists(bundle, self.wiki_root / readiness["json_path"], "reports/readiness-report.json")
+            add_if_exists(bundle, self.wiki_root / governance["path"], "reports/governance-report.md")
+            if evaluation:
+                add_if_exists(bundle, self.wiki_root / evaluation["path"], "reports/evaluation-report.md")
+                add_if_exists(bundle, self.wiki_root / evaluation["json_path"], "reports/evaluation-report.json")
+            for rel in ["README.md", "AGENTS.md", "Permission.json", "config.json"]:
+                add_if_exists(bundle, self.wiki_root / rel, rel)
+            for question_file in question_files:
+                if question_file.exists():
+                    arcname = "question/" + question_file.name
+                    add_if_exists(bundle, question_file, arcname)
+                answer_path = output_path_for_question_file(self.wiki_root, question_file)
+                if answer_path.exists():
+                    add_if_exists(bundle, answer_path, "output/" + answer_path.name)
+            add_tree(bundle, self.wiki_root / "wiki", "wiki")
+
+        rel = target.relative_to(self.wiki_root).as_posix()
+        result = {
+            "status": "ok",
+            "path": rel,
+            "download_url": "/files/" + quote(rel, safe="/"),
+            "manifest": manifest,
+            "size": target.stat().st_size,
+        }
+        self.store.record_job(
+            "release_bundle_export",
+            "ok",
+            {
+                "question_files": [str(path) for path in question_files],
+                "include_evaluation": include_evaluation,
+            },
+            result,
+        )
+        self.audit(
+            "release.export",
+            new_request_id(),
+            rel,
+            "ok",
+            False,
+            {"manifest": manifest},
+        )
+        return result
+
+    def release_manifest(
+        self,
+        question_files: list[Path],
+        readiness: dict[str, Any],
+        governance: dict[str, Any],
+        evaluation: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        health = self.health()
+        answer_files = [
+            output_path_for_question_file(self.wiki_root, path).relative_to(self.wiki_root).as_posix()
+            for path in question_files
+            if output_path_for_question_file(self.wiki_root, path).exists()
+        ]
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "wiki_root": str(self.wiki_root),
+            "knowledge_mode": health.get("knowledge_mode"),
+            "rag": health.get("rag", {}),
+            "llm": health.get("llm", {}),
+            "reports": {
+                "readiness": readiness.get("path"),
+                "governance": governance.get("path"),
+                "evaluation": evaluation.get("path") if evaluation else None,
+            },
+            "question_files": [
+                path.relative_to(self.wiki_root).as_posix() if self.wiki_root in path.resolve().parents else str(path)
+                for path in question_files
+                if path.exists()
+            ],
+            "answer_files": answer_files,
+            "included": {
+                "compiled_wiki": True,
+                "raw_docs": False,
+                "sqlite_state": False,
+                "screenshots": False,
+            },
+        }
+
     def dump_index(self) -> dict[str, Any]:
         source_risk_report = self.source_risk_report()
         risk_by_path = {item["source_path"]: item for item in source_risk_report["sources"]}
@@ -448,6 +557,33 @@ class LLMWikiPlatform:
             "status": "ok",
             "query": query,
             "sections": self.store.search_wiki_sections(query, limit=limit),
+        }
+
+    def list_wiki_pages(self, limit: int = 200) -> dict[str, Any]:
+        compiled_root = self.wiki_root / "wiki"
+        pages: list[dict[str, Any]] = []
+        if compiled_root.exists():
+            for path in sorted(compiled_root.rglob("*.md"), key=wiki_page_sort_key):
+                page = read_wiki_page_summary(compiled_root, path)
+                pages.append(page)
+                if len(pages) >= limit:
+                    break
+        return {"status": "ok", "pages": pages, "count": len(pages)}
+
+    def get_wiki_page(self, page_path: str) -> dict[str, Any]:
+        compiled_root = (self.wiki_root / "wiki").resolve()
+        safe_path = Path(page_path.strip("/"))
+        if safe_path.is_absolute() or ".." in safe_path.parts:
+            return {"error": "invalid_path"}
+        target = (compiled_root / safe_path).resolve()
+        if compiled_root not in target.parents and target != compiled_root:
+            return {"error": "invalid_path"}
+        if not target.is_file() or target.suffix.lower() != ".md":
+            return {"error": "not_found"}
+        return {
+            "status": "ok",
+            "page": read_wiki_page_summary(compiled_root, target),
+            "markdown": strip_front_matter(target.read_text(encoding="utf-8", errors="ignore")),
         }
 
     def source_risk_report(self) -> dict[str, Any]:
@@ -619,3 +755,89 @@ def new_request_id() -> str:
 
 def without_markdown(report: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in report.items() if key != "markdown"}
+
+
+def add_if_exists(bundle: zipfile.ZipFile, path: Path, arcname: str) -> None:
+    if path.is_file():
+        bundle.write(path, arcname)
+
+
+def add_tree(bundle: zipfile.ZipFile, root: Path, arc_root: str) -> None:
+    if not root.exists():
+        return
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        bundle.write(path, f"{arc_root}/{path.relative_to(root).as_posix()}")
+
+
+def wiki_page_sort_key(path: Path) -> tuple[int, str]:
+    rel = path.as_posix()
+    if rel.endswith("/index.md"):
+        return (0, rel)
+    if "/sources/" in rel:
+        return (1, rel)
+    if "/topics/" in rel:
+        return (2, rel)
+    return (3, rel)
+
+
+def read_wiki_page_summary(compiled_root: Path, path: Path) -> dict[str, Any]:
+    raw = path.read_text(encoding="utf-8", errors="ignore")
+    meta, body = split_front_matter(raw)
+    title = meta.get("title") or first_heading(body) or path.stem
+    rel = path.relative_to(compiled_root).as_posix()
+    return {
+        "path": rel,
+        "title": title,
+        "kind": meta.get("kind") or infer_wiki_page_kind(rel),
+        "source_path": meta.get("source_path", ""),
+        "file_type": meta.get("file_type", ""),
+        "excerpt": first_paragraph(body),
+    }
+
+
+def split_front_matter(raw: str) -> tuple[dict[str, str], str]:
+    if not raw.startswith("---\n"):
+        return {}, raw
+    lines = raw.splitlines()
+    end = next((idx for idx, line in enumerate(lines[1:], start=1) if line.strip() == "---"), None)
+    if end is None:
+        return {}, raw
+    meta: dict[str, str] = {}
+    for line in lines[1:end]:
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        meta[key.strip()] = value.strip().strip('"')
+    return meta, "\n".join(lines[end + 1 :]).strip()
+
+
+def strip_front_matter(raw: str) -> str:
+    return split_front_matter(raw)[1]
+
+
+def infer_wiki_page_kind(rel_path: str) -> str:
+    if rel_path == "index.md":
+        return "index"
+    if rel_path == "log.md":
+        return "log"
+    if rel_path.startswith("sources/"):
+        return "source"
+    if rel_path.startswith("topics/"):
+        return "topic"
+    return "page"
+
+
+def first_heading(markdown: str) -> str:
+    for line in markdown.splitlines():
+        if line.startswith("# "):
+            return line.removeprefix("# ").strip()
+    return ""
+
+
+def first_paragraph(markdown: str) -> str:
+    for line in markdown.splitlines():
+        cleaned = line.strip()
+        if not cleaned or cleaned.startswith("#") or cleaned.startswith("- "):
+            continue
+        return cleaned[:220]
+    return ""

@@ -338,3 +338,11 @@ def render_markdown(summary: dict[str, Any], gates: list[dict[str, Any]]) -> str
     if all(item.get("status") == "pass" for item in gates):
         lines.append("- No remediation required.")
     return "\n".join(lines) + "\n"
+
+
+def readiness_exit_code(summary: dict[str, Any], fail_on: str) -> int:
+    if fail_on == "fail" and int(summary.get("fail") or 0) > 0:
+        return 2
+    if fail_on == "warn" and (int(summary.get("fail") or 0) > 0 or int(summary.get("warn") or 0) > 0):
+        return 2
+    return 0

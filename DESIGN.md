@@ -59,6 +59,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - 独立问答解释通道返回检索路由、匹配词、命中文件、证据片段和安全判定，不改变题组答案的严格 JSON schema。
 - 质量评估报告批量运行题组，检查严格答案 schema、证据覆盖、安全阻断、空答案、LLM 使用和来源引用，用于回归验收。
 - 企业 readiness report 把题目硬约束和生产交付项转成可审计门禁，覆盖运行时、目录结构、CLI/skill、题组数量、权限、安全、compiled wiki、no-RAG 架构、来源治理、修复输出、审计、LLM 和 token scope。
+- release bundle 面向企业验收留档，只打包报告、题组、答案、配置契约和 compiled wiki，不打包原始 `docs/` 或 SQLite 状态库，避免敏感内容二次扩散。
 
 ## 平台模块
 

@@ -141,11 +141,21 @@ class PlatformSmokeTest(unittest.TestCase):
             compiled = platform.compile_wiki()
             source_rel = "docs/04_常用命令/sqlite.md"
             sections = platform.list_wiki_sections(source_path=source_rel)
+            pages = platform.list_wiki_pages()
+            source_page = next(page for page in pages["pages"] if page.get("source_path") == source_rel)
+            page_detail = platform.get_wiki_page(source_page["path"])
+            invalid_page = platform.get_wiki_page("../docs/secret.md")
             section_text = "\n".join(section["body"] for section in sections)
             search = platform.search_wiki("SQLite SELECT", limit=5)
 
             self.assertGreaterEqual(compiled["wiki_sections"], 1)
             self.assertTrue(sections)
+            self.assertGreaterEqual(pages["count"], 2)
+            self.assertEqual(source_page["kind"], "source")
+            self.assertEqual(page_detail["status"], "ok")
+            self.assertIn("# sqlite.md", page_detail["markdown"])
+            self.assertNotIn("should-not-be-indexed", page_detail["markdown"])
+            self.assertEqual(invalid_page["error"], "invalid_path")
             self.assertIn("SQLite SELECT", section_text)
             self.assertNotIn("should-not-be-indexed", section_text)
             self.assertNotIn("删除全部文档", section_text)
@@ -168,6 +178,9 @@ class PlatformSmokeTest(unittest.TestCase):
                     http_get(base + "/wiki/sections?source_path=" + quote(source_rel, safe=""))
                 )
                 api_search = json.loads(http_get(base + "/wiki/search?q=SQLite%20SELECT&limit=5"))
+                api_pages = json.loads(http_get(base + "/wiki/pages?limit=20"))
+                api_page = json.loads(http_get(base + "/wiki/page?path=" + quote(source_page["path"], safe="")))
+                traversal_status = http_get_status(base + "/wiki/page?path=../docs/secret.md")
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -175,6 +188,9 @@ class PlatformSmokeTest(unittest.TestCase):
 
             self.assertTrue(api_sections["sections"])
             self.assertTrue(any(section["source_path"] == source_rel for section in api_search["sections"]))
+            self.assertTrue(any(page["path"] == source_page["path"] for page in api_pages["pages"]))
+            self.assertIn("# sqlite.md", api_page["markdown"])
+            self.assertEqual(traversal_status, 400)
 
     def test_http_console_assets_and_health(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-web-test-") as tmp:
@@ -210,9 +226,14 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("wikiSectionCount", index_html)
             self.assertIn('data-page="audit"', index_html)
             self.assertIn('data-page="sources"', index_html)
+            self.assertIn("Articles", index_html)
+            self.assertIn("wikiPageList", index_html)
+            self.assertIn("wikiPagePreview", index_html)
             self.assertIn("refreshAll", app_js)
             self.assertIn("renderPage", app_js)
             self.assertIn("hashchange", app_js)
+            self.assertIn("loadWikiPage", app_js)
+            self.assertIn("markdownToHtml", app_js)
             self.assertIn("generateSlides", app_js)
             self.assertIn("importSource", app_js)
             self.assertIn("wiki_sections", app_js)
@@ -222,8 +243,12 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("token scopes", app_js)
             self.assertIn("readiness", app_js)
             self.assertIn("refreshReadinessBtn", index_html)
+            self.assertIn("exportRelease", app_js)
+            self.assertIn("exportReleaseBtn", index_html)
             self.assertIn("runEvaluation", app_js)
             self.assertIn("runEvaluationBtn", index_html)
+            self.assertIn(".wiki-reader", styles_css)
+            self.assertIn(".wiki-page-row", styles_css)
             self.assertIn(".page.active", styles_css)
             self.assertEqual(health["status"], "ok")
             self.assertEqual(sources["sources"], [])
@@ -284,6 +309,11 @@ class PlatformSmokeTest(unittest.TestCase):
                     read_source_risk = json.loads(http_get(base + "/sources/risk", headers=read_headers))
                     read_source_reviews = json.loads(http_get(base + "/sources/reviews", headers=read_headers))
                     read_wiki_sections = json.loads(http_get(base + "/wiki/sections", headers=read_headers))
+                    read_wiki_pages = json.loads(http_get(base + "/wiki/pages", headers=read_headers))
+                    read_wiki_page_path = read_wiki_pages["pages"][0]["path"]
+                    read_wiki_page = json.loads(
+                        http_get(base + "/wiki/page?path=" + quote(read_wiki_page_path, safe=""), headers=read_headers)
+                    )
                     read_wiki_search = json.loads(
                         http_get(base + "/wiki/search?q=auth", headers=read_headers)
                     )
@@ -310,6 +340,11 @@ class PlatformSmokeTest(unittest.TestCase):
                     read_export = http_post_status(base + "/reports/governance/export", {}, headers=read_headers)
                     read_readiness_export = http_post_status(
                         base + "/reports/readiness/export",
+                        {"groups": ["group-auth"]},
+                        headers=read_headers,
+                    )
+                    read_release_export = http_post_status(
+                        base + "/reports/release/export",
                         {"groups": ["group-auth"]},
                         headers=read_headers,
                     )
@@ -348,6 +383,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(read_source_risk["status"], "ok")
             self.assertEqual(read_source_reviews["reviews"], [])
             self.assertTrue(read_wiki_sections["sections"])
+            self.assertTrue(read_wiki_pages["pages"])
+            self.assertEqual(read_wiki_page["status"], "ok")
             self.assertEqual(read_wiki_search["status"], "ok")
             self.assertTrue(read_wiki_search["sections"])
             self.assertEqual(read_report["status"], "ok")
@@ -362,6 +399,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(read_source_status, 403)
             self.assertEqual(read_export, 403)
             self.assertEqual(read_readiness_export, 403)
+            self.assertEqual(read_release_export, 403)
             self.assertEqual(read_evaluation, 403)
             self.assertEqual(admin_reindex, 200)
             self.assertEqual(admin_export, 200)
@@ -693,6 +731,37 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(cli_report["report"]["summary"]["fail"], 0)
 
+            fail_gate_output = io.StringIO()
+            with contextlib.redirect_stdout(fail_gate_output):
+                code = cli_main(
+                    ["--wiki-root", str(wiki), "--readiness-report", "--group", "group-ready", "--readiness-fail-on", "fail"]
+                )
+            self.assertEqual(code, 0)
+
+            warn_gate_output = io.StringIO()
+            with contextlib.redirect_stdout(warn_gate_output):
+                code = cli_main(
+                    ["--wiki-root", str(wiki), "--readiness-report", "--group", "group-ready", "--readiness-fail-on", "warn"]
+                )
+            self.assertEqual(code, 2)
+
+            bundle = platform.export_release_bundle(groups=["group-ready"])
+            bundle_path = wiki / bundle["path"]
+            self.assertTrue(bundle_path.exists())
+            self.assertFalse(bundle["manifest"]["included"]["raw_docs"])
+            self.assertFalse(bundle["manifest"]["included"]["sqlite_state"])
+            with zipfile.ZipFile(bundle_path) as archive:
+                names = set(archive.namelist())
+                manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+            self.assertIn("reports/readiness-report.json", names)
+            self.assertIn("reports/governance-report.md", names)
+            self.assertIn("wiki/index.md", names)
+            self.assertIn("question/group-ready.md", names)
+            self.assertNotIn("docs/04_常用命令/sqlite.md", names)
+            self.assertNotIn(".state/wiki.sqlite", names)
+            self.assertEqual(manifest["knowledge_mode"], "compiled_wiki")
+            self.assertFalse(manifest["included"]["raw_docs"])
+
             httpd = build_server(platform, "127.0.0.1", 0)
             thread = threading.Thread(target=httpd.serve_forever, daemon=True)
             thread.start()
@@ -701,6 +770,8 @@ class PlatformSmokeTest(unittest.TestCase):
                 api_report = json.loads(http_get(base + "/reports/readiness?group=group-ready"))
                 api_export = json.loads(http_post(base + "/reports/readiness/export", {"groups": ["group-ready"]}))
                 report_bytes = http_get_bytes(base + api_export["download_url"])
+                api_bundle = json.loads(http_post(base + "/reports/release/export", {"groups": ["group-ready"]}))
+                bundle_bytes = http_get_bytes(base + api_bundle["download_url"])
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -708,6 +779,8 @@ class PlatformSmokeTest(unittest.TestCase):
 
             self.assertEqual(api_report["report"]["summary"]["fail"], 0)
             self.assertIn(b"LLM Wiki Readiness Report", report_bytes)
+            self.assertGreater(len(bundle_bytes), 1000)
+            self.assertFalse(api_bundle["manifest"]["included"]["raw_docs"])
 
     def test_generate_presentation_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-slides-test-") as tmp:
