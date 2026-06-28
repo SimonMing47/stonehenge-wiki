@@ -28,6 +28,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--slide-count", type=int, default=6, help="Slide count for --generate-ppt")
     parser.add_argument("--audit-log", action="store_true", help="Print recent audit events")
     parser.add_argument("--audit-limit", type=int, default=50, help="Audit event count for --audit-log")
+    parser.add_argument("--governance-report", action="store_true", help="Print governance report JSON")
+    parser.add_argument("--export-governance-report", action="store_true", help="Write governance report Markdown")
     parser.add_argument("--serve", action="store_true", help="Start the HTTP API service")
     parser.add_argument("--host", help="HTTP API host override")
     parser.add_argument("--port", type=int, help="HTTP API port override")
@@ -70,6 +72,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.audit_log:
         print_json({"events": platform.audit_events(args.audit_limit)})
+        return 0
+
+    if args.governance_report:
+        print_json(platform.governance_report())
+        return 0
+
+    if args.export_governance_report:
+        print_json(platform.export_governance_report())
         return 0
 
     if args.ask:

@@ -191,13 +191,16 @@ class PlatformSmokeTest(unittest.TestCase):
                     bad_index = http_get_status(base + "/index", headers=bad_headers)
                     read_index = json.loads(http_get(base + "/index", headers=read_headers))
                     read_sources = json.loads(http_get(base + "/sources", headers=read_headers))
+                    read_report = json.loads(http_get(base + "/reports/governance", headers=read_headers))
                     read_ask = http_post_status(
                         base + "/ask",
                         {"id": "auth-ask", "title": "统计 md 文件数量", "level": "简单"},
                         headers=read_headers,
                     )
                     read_reindex = http_post_status(base + "/reindex", {}, headers=read_headers)
+                    read_export = http_post_status(base + "/reports/governance/export", {}, headers=read_headers)
                     admin_reindex = http_post_status(base + "/reindex", {}, headers=admin_headers)
+                    admin_export = http_post_status(base + "/reports/governance/export", {}, headers=admin_headers)
                 finally:
                     httpd.shutdown()
                     httpd.server_close()
@@ -208,9 +211,13 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(bad_index, 401)
             self.assertEqual(len(read_index["files"]), 1)
             self.assertEqual(len(read_sources["sources"]), 1)
+            self.assertEqual(read_report["status"], "ok")
+            self.assertIn("summary", read_report["report"])
             self.assertEqual(read_ask, 200)
             self.assertEqual(read_reindex, 403)
+            self.assertEqual(read_export, 403)
             self.assertEqual(admin_reindex, 200)
+            self.assertEqual(admin_export, 200)
 
     def test_generate_presentation_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-slides-test-") as tmp:
@@ -311,6 +318,15 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(json.loads(source_output.getvalue())["sources"][0]["status"], "missing")
 
+            report = platform.governance_report()
+            self.assertEqual(report["status"], "ok")
+            self.assertEqual(report["report"]["summary"]["missing_sources"], 1)
+            self.assertIn("missing_sources", {risk["code"] for risk in report["report"]["risks"]})
+            exported = platform.export_governance_report()
+            self.assertEqual(exported["status"], "ok")
+            self.assertTrue((wiki / exported["path"]).exists())
+            self.assertIn("LLM Wiki Governance Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
+
             blocked = platform.ingest_source("http://127.0.0.1/private.md")
             self.assertEqual(blocked["reason"], "private_url")
 
@@ -329,6 +345,9 @@ class PlatformSmokeTest(unittest.TestCase):
                 )
                 index = json.loads(http_get(base + "/index"))
                 source_list = json.loads(http_get(base + "/sources?include_missing=1"))
+                governance = json.loads(http_get(base + "/reports/governance"))
+                exported_api = json.loads(http_post(base + "/reports/governance/export", {}))
+                report_bytes = http_get_bytes(base + exported_api["download_url"])
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -341,6 +360,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(len(index["source_registry"]), 1)
             self.assertEqual(len(source_list["sources"]), 2)
             self.assertEqual({item["status"] for item in source_list["sources"]}, {"active", "missing"})
+            self.assertEqual(governance["report"]["summary"]["status"], "attention")
+            self.assertIn(b"LLM Wiki Governance Report", report_bytes)
 
     def test_knowledge_answers_use_llm_without_sending_password_queries(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-llm-test-") as tmp:

@@ -226,6 +226,25 @@ class SQLiteStore:
             events.append(event)
         return events
 
+    def list_jobs(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self.connect() as con:
+            rows = con.execute(
+                """
+                SELECT id, created_at, job_type, status, input_json, output_json
+                FROM job_runs
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        jobs: list[dict[str, Any]] = []
+        for row in rows:
+            job = dict(row)
+            job["input"] = json.loads(job.pop("input_json") or "{}")
+            job["output"] = json.loads(job.pop("output_json") or "{}")
+            jobs.append(job)
+        return jobs
+
     def list_sources(self, include_missing: bool = False) -> list[dict[str, Any]]:
         where = "" if include_missing else "WHERE s.status != 'missing'"
         with self.connect() as con:
@@ -255,12 +274,14 @@ class SQLiteStore:
             file_count = con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
             comment_count = con.execute("SELECT COUNT(*) FROM comments").fetchone()[0]
             audit_count = con.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0]
+            job_count = con.execute("SELECT COUNT(*) FROM job_runs").fetchone()[0]
             source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status != 'missing'").fetchone()[0]
             missing_source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status = 'missing'").fetchone()[0]
         return {
             "files": file_count,
             "comments": comment_count,
             "audit_events": audit_count,
+            "jobs": job_count,
             "sources": source_count,
             "missing_sources": missing_source_count,
         }

@@ -67,6 +67,10 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if not self.ensure_authorized("read"):
                 return
             return self.write_json(self.llm_wiki_platform.lint_wiki())
+        if parsed.path == "/reports/governance":
+            if not self.ensure_authorized("read"):
+                return
+            return self.write_json(self.llm_wiki_platform.governance_report())
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
@@ -99,6 +103,8 @@ class PlatformHandler(BaseHTTPRequestHandler):
             topic = str(body.get("topic", ""))
             slide_count = int(body.get("slide_count", 6) or 6)
             return self.write_json(self.llm_wiki_platform.generate_presentation(topic, slide_count=slide_count))
+        if parsed.path == "/reports/governance/export":
+            return self.write_json(self.llm_wiki_platform.export_governance_report())
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def ensure_authorized(self, required_scope: str) -> bool:

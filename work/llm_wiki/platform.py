@@ -14,6 +14,7 @@ from .importer import SourceImportError, import_source
 from .llm import LLMClient
 from .models import Question
 from .presentations import create_presentation
+from .reports import build_governance_report
 from .security import PermissionGuard
 from .store import SQLiteStore
 from .wiki_compiler import WikiCompiler
@@ -195,6 +196,39 @@ class LLMWikiPlatform:
 
     def list_sources(self, include_missing: bool = False) -> list[dict[str, Any]]:
         return self.store.list_sources(include_missing=include_missing)
+
+    def governance_report(self) -> dict[str, Any]:
+        report = build_governance_report(
+            self.health(),
+            self.list_sources(include_missing=True),
+            self.index.comments,
+            self.audit_events(100),
+            self.store.list_jobs(50),
+        )
+        return {"status": "ok", "report": report.as_dict()}
+
+    def export_governance_report(self) -> dict[str, Any]:
+        report = build_governance_report(
+            self.health(),
+            self.list_sources(include_missing=True),
+            self.index.comments,
+            self.audit_events(100),
+            self.store.list_jobs(50),
+        )
+        output_dir = self.wiki_root / "output" / "reports"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        target = output_dir / "governance-report.md"
+        target.write_text(report.markdown, encoding="utf-8")
+        rel = target.relative_to(self.wiki_root).as_posix()
+        result = {
+            "status": "ok",
+            "report": report.as_dict(),
+            "path": rel,
+            "download_url": "/files/" + quote(rel, safe="/"),
+        }
+        self.store.record_job("governance_report", "ok", {"wiki_root": str(self.wiki_root)}, result)
+        self.audit("governance.report", new_request_id(), rel, "ok", False, {"summary": report.summary})
+        return result
 
     def list_presentations(self) -> list[dict[str, Any]]:
         output_dir = self.wiki_root / "output" / "presentations"

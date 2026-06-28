@@ -1,7 +1,8 @@
 const state = {
   health: null,
   index: { files: [], comments: [], store: {} },
-  audit: []
+  audit: [],
+  governance: null
 };
 
 const el = (id) => document.getElementById(id);
@@ -28,17 +29,20 @@ async function api(path, options = {}) {
 async function refreshAll() {
   setBusy("refreshBtn", true);
   try {
-    const [health, index, audit] = await Promise.all([
+    const [health, index, audit, governance] = await Promise.all([
       api("/health"),
       api("/index"),
-      api("/audit?limit=25")
+      api("/audit?limit=25"),
+      api("/reports/governance")
     ]);
     state.health = health;
     state.index = index;
     state.audit = audit.events || [];
+    state.governance = governance.report || null;
     renderHealth();
     renderIndex();
     renderAudit();
+    renderGovernance();
     setApiState(true);
   } catch (error) {
     setApiState(false, error.message);
@@ -114,6 +118,17 @@ function renderAudit() {
   el("auditList").innerHTML = events.length
     ? events.map(auditRow).join("")
     : emptyRow("No audit events");
+}
+
+function renderGovernance() {
+  const report = state.governance;
+  if (!report) {
+    el("governanceSummary").textContent = "report not loaded";
+    return;
+  }
+  const summary = report.summary || {};
+  const riskCount = (report.risks || []).length;
+  el("governanceSummary").textContent = `${summary.status || "unknown"} · ${riskCount} risks · ${summary.sources || 0} sources · ${report.todo?.total || 0} todos`;
 }
 
 function renderPresentations(presentations) {
@@ -281,6 +296,33 @@ async function lintWiki() {
   }
 }
 
+async function refreshReport() {
+  setBusy("refreshReportBtn", true);
+  try {
+    const result = await api("/reports/governance");
+    state.governance = result.report || null;
+    renderGovernance();
+  } catch (error) {
+    el("governanceSummary").textContent = `failed · ${error.message}`;
+  } finally {
+    setBusy("refreshReportBtn", false);
+  }
+}
+
+async function exportReport() {
+  setBusy("exportReportBtn", true);
+  try {
+    const result = await api("/reports/governance/export", { method: "POST", body: "{}" });
+    state.governance = result.report || null;
+    renderGovernance();
+    el("governanceSummary").innerHTML = `${escapeHtml(result.report?.summary?.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download report</a>`;
+  } catch (error) {
+    el("governanceSummary").textContent = `failed · ${error.message}`;
+  } finally {
+    setBusy("exportReportBtn", false);
+  }
+}
+
 async function generateSlides() {
   const topic = el("slidesTopic").value.trim() || el("questionInput").value.trim();
   if (!topic) return;
@@ -343,6 +385,8 @@ el("runGroupBtn").addEventListener("click", runGroup);
 el("reindexBtn").addEventListener("click", reindex);
 el("compileWikiBtn").addEventListener("click", compileWiki);
 el("lintWikiBtn").addEventListener("click", lintWiki);
+el("refreshReportBtn").addEventListener("click", refreshReport);
+el("exportReportBtn").addEventListener("click", exportReport);
 el("tokenForm").addEventListener("submit", (event) => event.preventDefault());
 el("saveTokenBtn").addEventListener("click", () => {
   localStorage.setItem("llmWikiApiToken", el("tokenInput").value.trim());

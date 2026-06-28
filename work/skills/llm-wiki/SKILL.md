@@ -56,6 +56,7 @@ For audit review:
 
 ```bash
 python3 work/main.py --audit-log --audit-limit 20
+python3 work/main.py --governance-report
 ```
 
 To compile and validate the persistent Markdown wiki layer:
@@ -71,7 +72,7 @@ Always let the CLI perform safety checks before reading, executing, or repairing
 
 ## Outputs
 
-Imported sources are copied under `llm-wiki/docs/<category>/` and reindexed. Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
+Imported sources are copied under `llm-wiki/docs/<category>/` and reindexed. Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Governance reports are written under `llm-wiki/output/reports/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
 
 ## Helper Script
 
