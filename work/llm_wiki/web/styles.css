@@ -497,16 +497,19 @@ h2 {
 }
 
 .split .surface,
-#audit.surface {
+#audit.surface,
+.risk-pane {
   padding: 18px;
 }
 
-#audit.surface {
+#audit.surface,
+.risk-pane {
   margin-top: 18px;
 }
 
 .table-list,
-.audit-list {
+.audit-list,
+.risk-list {
   display: grid;
   gap: 1px;
   border: 1px solid var(--line);
@@ -516,7 +519,8 @@ h2 {
 }
 
 .row,
-.audit-row {
+.audit-row,
+.risk-row {
   display: grid;
   gap: 6px;
   padding: 12px;
@@ -524,8 +528,47 @@ h2 {
 }
 
 .row strong,
-.audit-row strong {
+.audit-row strong,
+.risk-row strong {
   overflow-wrap: anywhere;
+}
+
+.risk-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.risk-title span {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.risk-row {
+  border-left: 3px solid transparent;
+}
+
+.risk-row p {
+  margin: 0;
+  color: #303744;
+  line-height: 1.45;
+}
+
+.severity-critical {
+  border-left-color: #7a271a;
+}
+
+.severity-high {
+  border-left-color: var(--danger);
+}
+
+.severity-medium {
+  border-left-color: #b54708;
+}
+
+.severity-low {
+  border-left-color: var(--muted);
 }
 
 .meta {

@@ -4,6 +4,7 @@ const state = {
   audit: [],
   governance: null,
   wikiSections: [],
+  sourceRisk: null,
   explanation: null
 };
 
@@ -31,23 +32,26 @@ async function api(path, options = {}) {
 async function refreshAll() {
   setBusy("refreshBtn", true);
   try {
-    const [health, index, audit, governance, wikiSections] = await Promise.all([
+    const [health, index, audit, governance, wikiSections, sourceRisk] = await Promise.all([
       api("/health"),
       api("/index"),
       api("/audit?limit=25"),
       api("/reports/governance"),
-      api("/wiki/sections?limit=14")
+      api("/wiki/sections?limit=14"),
+      api("/sources/risk")
     ]);
     state.health = health;
     state.index = index;
     state.audit = audit.events || [];
     state.governance = governance.report || null;
     state.wikiSections = wikiSections.sections || [];
+    state.sourceRisk = sourceRisk;
     renderHealth();
     renderIndex();
     renderAudit();
     renderGovernance();
     renderWikiSections(state.wikiSections);
+    renderSourceRisk();
     setApiState(true);
   } catch (error) {
     setApiState(false, error.message);
@@ -63,6 +67,7 @@ function renderHealth() {
   el("commentCount").textContent = String(health.comments ?? store.comments ?? 0);
   el("auditCount").textContent = String(store.audit_events ?? 0);
   el("wikiSectionCount").textContent = String(store.wiki_sections ?? 0);
+  el("sourceRiskCount").textContent = String(state.sourceRisk?.summary?.risk_count ?? 0);
   el("dbName").textContent = (health.database_path || "wiki.sqlite").split("/").slice(-1)[0];
   const llm = health.llm || {};
   el("llmName").textContent = llm.enabled
@@ -142,6 +147,34 @@ function renderGovernance() {
   const summary = report.summary || {};
   const riskCount = (report.risks || []).length;
   el("governanceSummary").textContent = `${summary.status || "unknown"} · ${riskCount} risks · ${summary.sources || 0} sources · ${report.todo?.total || 0} todos`;
+}
+
+function renderSourceRisk() {
+  const report = state.sourceRisk || {};
+  const summary = report.summary || {};
+  const findings = report.findings || [];
+  el("sourceRiskCount").textContent = String(summary.risk_count ?? 0);
+  el("riskStatus").textContent = `${summary.status || "unknown"} · ${summary.sources_with_risks || 0} sources`;
+  el("riskList").innerHTML = findings.length
+    ? findings.slice(0, 80).map(riskRow).join("")
+    : emptyRow("No source risks");
+}
+
+function riskRow(finding) {
+  const location = finding.line ? `${finding.source_path}:${finding.line}` : finding.source_path;
+  return `
+    <div class="risk-row severity-${escapeHtml(finding.severity || "low")}">
+      <div class="risk-title">
+        <strong>${escapeHtml(finding.code || "risk")}</strong>
+        <span>${escapeHtml(finding.severity || "")}</span>
+      </div>
+      <p>${escapeHtml(finding.message || "")}</p>
+      <div class="meta">
+        <span>${escapeHtml(location || "")}</span>
+        ${finding.evidence ? `<span>${escapeHtml(finding.evidence)}</span>` : ""}
+      </div>
+    </div>
+  `;
 }
 
 function renderWikiSections(sections) {

@@ -102,6 +102,12 @@ python3 work/main.py --import-source ./docs/source.pdf --import-title "知识库
 python3 work/main.py --audit-log --audit-limit 20
 ```
 
+来源风险扫描：
+
+```bash
+python3 work/main.py --source-risk-report
+```
+
 治理报告：
 
 ```bash
@@ -176,6 +182,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `GET /index`：文件、批注和持久化状态
 - `GET /sources?include_missing=1`：来源注册表，包含 origin、hash、大小、状态和最后索引时间
 - `GET /sources/history?path=docs/03_学习材料/Knowledge-Notes.md`：来源版本历史，只记录路径、hash、大小和观测次数，不复制原始正文
+- `GET /sources/risk`：来源风险扫描，检查提示注入、权限黑名单、密钥位置、危险代码、抽取失败和 TODO 风险
 - `GET /audit?limit=50`：审计事件
 - `GET /wiki/lint`：检查编译型 Markdown wiki
 - `GET /wiki/sections?source_path=docs/04_常用命令/sqlite.md&limit=20`：查看编译后的 wiki 章节

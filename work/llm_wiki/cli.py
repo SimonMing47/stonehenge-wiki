@@ -22,6 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--list-source-versions", action="store_true", help="Print source version history records as JSON")
     parser.add_argument("--source-history", help="Print version history for one source registry path")
     parser.add_argument("--source-history-limit", type=int, default=50, help="Version record count for source history")
+    parser.add_argument("--source-risk-report", action="store_true", help="Print source risk scan report as JSON")
     parser.add_argument("--list-wiki-sections", action="store_true", help="Print compiled wiki sections as JSON")
     parser.add_argument("--wiki-section-source", help="Filter compiled wiki sections by source registry path")
     parser.add_argument("--wiki-section-limit", type=int, default=50, help="Compiled wiki section count")
@@ -86,6 +87,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.source_history:
         print_json({"versions": platform.list_source_versions(rel_path=args.source_history, limit=args.source_history_limit)})
+        return 0
+
+    if args.source_risk_report:
+        print_json(platform.source_risk_report())
         return 0
 
     if args.list_wiki_sections:

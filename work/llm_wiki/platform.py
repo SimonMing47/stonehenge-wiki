@@ -17,6 +17,7 @@ from .models import Question
 from .presentations import create_presentation
 from .reports import build_governance_report
 from .security import PermissionGuard
+from .source_risk import scan_source_risks
 from .store import SQLiteStore
 from .wiki_compiler import WikiCompiler
 
@@ -283,6 +284,8 @@ class LLMWikiPlatform:
         return result
 
     def dump_index(self) -> dict[str, Any]:
+        source_risk_report = self.source_risk_report()
+        risk_by_path = {item["source_path"]: item for item in source_risk_report["sources"]}
         return {
             "files": [
                 {
@@ -290,12 +293,14 @@ class LLMWikiPlatform:
                     "suffix": record.suffix,
                     "tags": sorted(record.tags),
                     "comment_count": len(record.comments),
+                    "risk": risk_by_path.get(record.rel_path, {"risk_count": 0, "max_severity": "none", "codes": []}),
                 }
                 for record in self.index.records
             ],
             "comments": [comment.summary() for comment in self.index.comments],
             "presentations": self.list_presentations(),
             "source_registry": self.list_sources(),
+            "source_risks": source_risk_report,
             "store": self.store.stats(),
         }
 
@@ -315,23 +320,30 @@ class LLMWikiPlatform:
             "sections": self.store.search_wiki_sections(query, limit=limit),
         }
 
+    def source_risk_report(self) -> dict[str, Any]:
+        return scan_source_risks(self.index, self.guard)
+
     def governance_report(self) -> dict[str, Any]:
+        source_risk_report = self.source_risk_report()
         report = build_governance_report(
             self.health(),
             self.list_sources(include_missing=True),
             self.index.comments,
             self.audit_events(100),
             self.store.list_jobs(50),
+            source_risk_report=source_risk_report,
         )
         return {"status": "ok", "report": report.as_dict()}
 
     def export_governance_report(self) -> dict[str, Any]:
+        source_risk_report = self.source_risk_report()
         report = build_governance_report(
             self.health(),
             self.list_sources(include_missing=True),
             self.index.comments,
             self.audit_events(100),
             self.store.list_jobs(50),
+            source_risk_report=source_risk_report,
         )
         output_dir = self.wiki_root / "output" / "reports"
         output_dir.mkdir(parents=True, exist_ok=True)

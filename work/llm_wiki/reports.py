@@ -13,6 +13,7 @@ from .models import CommentRecord
 class GovernanceReport:
     summary: dict[str, Any]
     risks: list[dict[str, Any]]
+    source_risks: dict[str, Any]
     source_status: dict[str, int]
     categories: dict[str, int]
     suffixes: dict[str, int]
@@ -25,6 +26,7 @@ class GovernanceReport:
         return {
             "summary": self.summary,
             "risks": self.risks,
+            "source_risks": self.source_risks,
             "source_status": self.source_status,
             "categories": self.categories,
             "suffixes": self.suffixes,
@@ -41,15 +43,18 @@ def build_governance_report(
     audit_events: list[dict[str, Any]],
     jobs: list[dict[str, Any]],
     today: date | None = None,
+    source_risk_report: dict[str, Any] | None = None,
 ) -> GovernanceReport:
     today = today or datetime.now(timezone.utc).date()
+    source_risk_report = source_risk_report or empty_source_risk_report()
     source_status = Counter(str(item.get("status") or "unknown") for item in sources)
     categories = Counter(str(item.get("category") or "uncategorized") for item in sources)
     suffixes = Counter(str(item.get("suffix") or Path(str(item.get("rel_path") or "")).suffix.lstrip(".") or "unknown") for item in sources)
     todo = todo_summary(comments, today)
     blocked_events = [event for event in audit_events if event.get("blocked")]
     failed_jobs = [job for job in jobs if job.get("status") not in {"ok", "success"}]
-    risks = build_risks(source_status, todo, blocked_events, failed_jobs)
+    risks = build_risks(source_status, todo, blocked_events, failed_jobs, source_risk_report)
+    source_risk_summary = source_risk_report.get("summary", {})
     summary = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "status": "attention" if risks else "ok",
@@ -61,11 +66,25 @@ def build_governance_report(
         "jobs": int(health.get("store", {}).get("jobs") or 0),
         "llm_ready": bool(health.get("llm", {}).get("ready")),
         "auth_enabled": bool(health.get("auth", {}).get("enabled")),
+        "source_risks": int(source_risk_summary.get("risk_count") or 0),
+        "critical_source_risks": int(source_risk_summary.get("critical") or 0),
+        "sources_with_risks": int(source_risk_summary.get("sources_with_risks") or 0),
     }
-    markdown = render_markdown(summary, risks, source_status, categories, suffixes, todo, jobs, audit_events)
+    markdown = render_markdown(
+        summary,
+        risks,
+        source_risk_report,
+        source_status,
+        categories,
+        suffixes,
+        todo,
+        jobs,
+        audit_events,
+    )
     return GovernanceReport(
         summary=summary,
         risks=risks,
+        source_risks=source_risk_report,
         source_status=dict(source_status),
         categories=dict(categories),
         suffixes=dict(suffixes),
@@ -114,6 +133,7 @@ def build_risks(
     todo: dict[str, Any],
     blocked_events: list[dict[str, Any]],
     failed_jobs: list[dict[str, Any]],
+    source_risk_report: dict[str, Any],
 ) -> list[dict[str, Any]]:
     risks: list[dict[str, Any]] = []
     if source_status.get("missing", 0):
@@ -126,12 +146,23 @@ def build_risks(
         risks.append({"severity": "medium", "code": "blocked_events", "count": len(blocked_events)})
     if failed_jobs:
         risks.append({"severity": "medium", "code": "failed_jobs", "count": len(failed_jobs)})
+    source_summary = source_risk_report.get("summary", {})
+    critical = int(source_summary.get("critical") or 0)
+    high = int(source_summary.get("high") or 0)
+    risk_count = int(source_summary.get("risk_count") or 0)
+    if critical:
+        risks.append({"severity": "critical", "code": "critical_source_risks", "count": critical})
+    if high:
+        risks.append({"severity": "high", "code": "high_source_risks", "count": high})
+    elif risk_count:
+        risks.append({"severity": "medium", "code": "source_risks", "count": risk_count})
     return risks
 
 
 def render_markdown(
     summary: dict[str, Any],
     risks: list[dict[str, Any]],
+    source_risk_report: dict[str, Any],
     source_status: dict[str, int],
     categories: dict[str, int],
     suffixes: dict[str, int],
@@ -151,6 +182,7 @@ def render_markdown(
         f"- Jobs: {summary['jobs']}",
         f"- LLM ready: {summary['llm_ready']}",
         f"- Auth enabled: {summary['auth_enabled']}",
+        f"- Source risks: {summary['source_risks']} across {summary['sources_with_risks']} sources",
         "",
         "## Risks",
         "",
@@ -159,6 +191,8 @@ def render_markdown(
         lines.extend(f"- {risk['severity']}: {risk['code']} ({risk['count']})" for risk in risks)
     else:
         lines.append("- No active risks detected.")
+    lines.extend(["", "## Source Risk Review", ""])
+    lines.extend(source_risk_lines(source_risk_report))
     lines.extend(["", "## Source Status", ""])
     lines.extend(counter_lines(source_status))
     lines.extend(["", "## Categories", ""])
@@ -183,6 +217,41 @@ def render_markdown(
     lines.extend(["", "## Latest Audit", ""])
     lines.extend(audit_lines(audit_events[:10]))
     return "\n".join(lines) + "\n"
+
+
+def empty_source_risk_report() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "summary": {
+            "status": "ok",
+            "sources_scanned": 0,
+            "sources_with_risks": 0,
+            "risk_count": 0,
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0,
+        },
+        "by_severity": {},
+        "by_code": {},
+        "sources": [],
+        "findings": [],
+    }
+
+
+def source_risk_lines(source_risk_report: dict[str, Any]) -> list[str]:
+    findings = source_risk_report.get("findings", [])
+    if not findings:
+        return ["- No source risks detected."]
+    lines: list[str] = []
+    for finding in findings[:15]:
+        location = finding.get("source_path") or "source"
+        if finding.get("line"):
+            location = f"{location}:{finding['line']}"
+        lines.append(
+            f"- {finding.get('severity')}: {finding.get('code')} / {location} / {finding.get('message')}"
+        )
+    return lines
 
 
 def counter_lines(counter: dict[str, int]) -> list[str]:

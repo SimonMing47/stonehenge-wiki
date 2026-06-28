@@ -61,6 +61,10 @@
             <strong id="wikiSectionCount">0</strong>
           </div>
           <div>
+            <span>Source Risks</span>
+            <strong id="sourceRiskCount">0</strong>
+          </div>
+          <div>
             <span>Database</span>
             <strong id="dbName">wiki.sqlite</strong>
           </div>
@@ -194,6 +198,14 @@
             <button id="runEvaluationBtn" type="button">Run Evaluation</button>
             <button id="exportEvaluationBtn" type="button">Export Evaluation</button>
           </div>
+        </section>
+
+        <section class="surface risk-pane">
+          <div class="section-head">
+            <h2>Source Risk Review</h2>
+            <span id="riskStatus">Ready</span>
+          </div>
+          <div id="riskList" class="risk-list"></div>
         </section>
 
         <section class="split">

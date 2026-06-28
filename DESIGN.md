@@ -64,6 +64,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - `platform.py`：企业级服务门面，统一 CLI、skill、API 调用路径。
 - `importer.py`：受控知识源导入，处理 URL/文件读取、扩展名白名单、目录规范化、去重命名和 SSRF 防护。
 - `reports.py`：治理报告生成器，输出 JSON 摘要和 Markdown 报告。
+- `source_risk.py`：来源风险扫描器，检查提示注入、Permission 命中、密钥位置、危险代码、抽取失败和 TODO 风险。
 - `evaluation.py`：题组质量评估器，输出 schema、证据、安全和 LLM 使用指标。
 - `server.py`：标准库 HTTP API，适合评测环境零依赖运行。
 - `cli_io.py`：题组 JSON 读取、输出路径和自验证日志。

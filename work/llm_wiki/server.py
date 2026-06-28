@@ -65,6 +65,10 @@ class PlatformHandler(BaseHTTPRequestHandler):
             rel_path = query.get("path", [""])[0] or None
             limit = int(query.get("limit", ["50"])[0])
             return self.write_json({"versions": self.llm_wiki_platform.list_source_versions(rel_path=rel_path, limit=limit)})
+        if parsed.path == "/sources/risk":
+            if not self.ensure_authorized("read"):
+                return
+            return self.write_json(self.llm_wiki_platform.source_risk_report())
         if parsed.path == "/audit":
             if not self.ensure_authorized("read"):
                 return
