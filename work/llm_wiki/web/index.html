@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LLM Wiki Console</title>
+    <title data-i18n="title">K 神 LLM Wiki</title>
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body>
@@ -12,8 +12,8 @@
         <div class="brand">
           <span class="mark" aria-hidden="true">LW</span>
           <span>
-            <strong>LLM Wiki</strong>
-            <small>Research Studio</small>
+            <strong data-i18n="brand.title">K 神 LLM Wiki</strong>
+            <small data-i18n="brand.subtitle">LLM Wiki</small>
           </span>
         </div>
         <nav class="nav">
@@ -34,7 +34,7 @@
         <header class="topbar">
           <div>
             <p id="appSubtitle" class="eyebrow" data-i18n="top.subtitle">Knowledge Operations</p>
-            <h1 id="appTitle" data-i18n="top.title">LLM Wiki Research Studio</h1>
+            <h1 id="appTitle" data-i18n="top.title">K 神 LLM Wiki</h1>
           </div>
           <form id="tokenForm" class="toolbar">
             <button id="langToggle" type="button" data-i18n="toolbar.lang">English</button>
@@ -87,10 +87,10 @@
         <section id="ask" class="page" data-page="ask" aria-label="Ask workspace">
           <div class="surface ask-pane page-surface">
             <div class="section-head">
-              <h2>Ask</h2>
-              <span id="queryStatus">Ready</span>
+              <h2 data-i18n="ask.title">Ask</h2>
+              <span id="queryStatus" data-i18n="status.ready">Ready</span>
             </div>
-            <textarea id="questionInput" rows="6" placeholder="问知识库里的任意问题，例如：如何在控制台连接高斯数据库"></textarea>
+            <textarea id="questionInput" rows="6" data-i18n="ask.placeholder" data-placeholder-i18n="ask.placeholder"></textarea>
             <div class="ask-actions">
               <input id="questionId" value="console-1" aria-label="Question id" />
               <select id="questionLevel" aria-label="Question level">
@@ -98,22 +98,22 @@
                 <option>中等</option>
                 <option>困难</option>
               </select>
-              <button id="askBtn" type="button" class="primary">Ask</button>
-              <button id="explainBtn" type="button">Explain</button>
+              <button id="askBtn" type="button" class="primary" data-i18n="ask.button.ask">Ask</button>
+              <button id="explainBtn" type="button" data-i18n="ask.button.explain">Explain</button>
             </div>
             <div id="answerOutput" class="answer-output" aria-label="Answer output">
-              <span class="muted">Ready</span>
+              <span class="muted" data-i18n="status.ready">Ready</span>
             </div>
           </div>
 
           <div class="surface run-row">
             <div>
-              <h2>Question Groups</h2>
-              <p class="muted">question/group-*.md</p>
+              <h2 data-i18n="question_groups.title">Question Groups</h2>
+              <p class="muted" data-i18n="question_groups.subtitle">question/group-*.md</p>
             </div>
             <div class="row-actions compact">
-              <input id="groupInput" placeholder="group-1" aria-label="Group name" />
-              <button id="runGroupBtn" type="button">Run Group</button>
+              <input id="groupInput" data-placeholder-i18n="question_groups.placeholder" aria-label="Group name" />
+              <button id="runGroupBtn" type="button" data-i18n="question_groups.run">Run Group</button>
             </div>
           </div>
         </section>
@@ -122,19 +122,19 @@
           <div class="wiki-reader">
             <div class="surface wiki-page-list-pane">
               <div class="section-head">
-                <h2>Articles</h2>
-                <span id="wikiPageStatus">Ready</span>
+                <h2 data-i18n="wiki.articles">Articles</h2>
+                <span id="wikiPageStatus" data-i18n="status.ready">Ready</span>
               </div>
               <div id="wikiPageList" class="wiki-page-list"></div>
             </div>
 
             <article class="surface wiki-page-preview-pane">
               <div class="section-head">
-                <h2 id="wikiPageTitle">Preview</h2>
+                <h2 id="wikiPageTitle" data-i18n="wiki.preview">Preview</h2>
                 <span id="wikiPageMeta">Select an article</span>
               </div>
               <div id="wikiPagePreview" class="wiki-page-preview">
-                <span class="muted">Select an article from the list.</span>
+                <span class="muted" id="wikiPagePreviewHint" data-i18n="wiki.preview_hint">Select an article from the list.</span>
               </div>
             </article>
           </div>
@@ -142,22 +142,22 @@
           <div class="wiki-workspace">
             <div class="surface explain-pane">
               <div class="section-head">
-                <h2>Explain</h2>
-                <span id="explainStatus">Ready</span>
+                <h2 data-i18n="wiki.explain">Explain</h2>
+                <span id="explainStatus" data-i18n="status.ready">Ready</span>
               </div>
               <div id="explainOutput" class="explain-output">
-                <span class="muted">Ask a question, then inspect route, safety, and evidence.</span>
+                <span class="muted" id="explainHint" data-i18n="wiki.explain_hint">Ask a question, then inspect route, safety, and evidence.</span>
               </div>
             </div>
 
             <div class="surface wiki-pane">
               <div class="section-head">
-                <h2>Compiled Wiki</h2>
-                <span id="wikiStatus">Ready</span>
+                <h2 data-i18n="wiki.compiled">Compiled Wiki</h2>
+                <span id="wikiStatus" data-i18n="status.ready">Ready</span>
               </div>
               <div class="row-actions compact wiki-search">
-                <input id="wikiSearchInput" placeholder="Search compiled wiki sections" aria-label="Wiki section search" />
-                <button id="wikiSearchBtn" type="button">Search</button>
+                <input id="wikiSearchInput" data-placeholder-i18n="wiki.search_placeholder" aria-label="Wiki section search" />
+                <button id="wikiSearchBtn" type="button" data-i18n="wiki.search">Search</button>
               </div>
               <div id="wikiSectionList" class="wiki-section-list"></div>
             </div>
@@ -165,37 +165,37 @@
 
           <div class="surface run-row">
             <div>
-              <h2>Compiled Wiki</h2>
-              <p class="muted">wiki/index.md · wiki/sources · wiki/topics · wiki/log.md</p>
+              <h2 data-i18n="wiki.compiled">Compiled Wiki</h2>
+              <p class="muted" data-i18n="wiki.path_description">wiki/index.md · wiki/sources · wiki/topics · wiki/log.md</p>
             </div>
             <div class="row-actions compact">
-              <button id="compileWikiBtn" type="button">Compile</button>
-              <button id="lintWikiBtn" type="button">Lint</button>
+              <button id="compileWikiBtn" type="button" data-i18n="wiki.compile">Compile</button>
+              <button id="lintWikiBtn" type="button" data-i18n="wiki.lint">Lint</button>
             </div>
           </div>
 
           <div id="wikiOperationOutput" class="answer-output">
-            <span class="muted">Ready</span>
+            <span class="muted" data-i18n="status.ready">Ready</span>
           </div>
         </section>
 
         <section id="studio" class="page" data-page="studio" aria-label="PPT studio">
           <div class="surface artifact-pane page-surface">
             <div class="section-head">
-              <h2>PPT Studio</h2>
-              <span id="slidesStatus">Ready</span>
+              <h2 data-i18n="studio.title">PPT Studio</h2>
+              <span id="slidesStatus" data-i18n="status.ready">Ready</span>
             </div>
-            <textarea id="slidesTopic" rows="5" placeholder="输入汇报主题，例如：企业知识库建设方案"></textarea>
+            <textarea id="slidesTopic" rows="5" data-i18n="studio.topic_placeholder" data-placeholder-i18n="studio.topic_placeholder"></textarea>
             <div class="ask-actions">
               <select id="slideCount" aria-label="Slide count">
-                <option value="4">4 slides</option>
-                <option value="6" selected>6 slides</option>
-                <option value="8">8 slides</option>
+                <option value="4" data-i18n="studio.slides_4">4 slides</option>
+                <option value="6" data-i18n="studio.slides_6" selected>6 slides</option>
+                <option value="8" data-i18n="studio.slides_8">8 slides</option>
               </select>
-              <button id="generateSlidesBtn" type="button" class="primary">Generate PPT</button>
+              <button id="generateSlidesBtn" type="button" class="primary" data-i18n="studio.generate">Generate PPT</button>
             </div>
             <div id="artifactOutput" class="artifact-output">
-              <span class="muted">No deck yet</span>
+              <span class="muted" id="artifactHint" data-i18n="studio.hint">No deck yet</span>
             </div>
           </div>
         </section>
@@ -205,24 +205,24 @@
             <div class="surface source-pane">
               <div class="section-head">
                 <h2 data-i18n="sources.title">Raw</h2>
-                <span id="fileScope">0 indexed</span>
+                <span id="fileScope" data-i18n="sources.file_scope">0 indexed</span>
               </div>
               <div class="source-import">
-                <textarea id="importSource" rows="3" placeholder="Public URL or local file path"></textarea>
+                <textarea id="importSource" rows="3" data-placeholder-i18n="sources.import_placeholder"></textarea>
                 <div class="import-actions">
-                  <input id="importTitle" placeholder="Title" aria-label="Import title" />
-                  <input id="importCategory" value="00_inbox" aria-label="Import category" />
-                  <button id="importBtn" type="button" class="primary">Import</button>
+                  <input id="importTitle" data-placeholder-i18n="sources.import_title" aria-label="Import title" />
+                  <input id="importCategory" value="00_inbox" data-placeholder-i18n="sources.import_category" aria-label="Import category" />
+                  <button id="importBtn" type="button" class="primary" data-i18n="sources.import_btn">Import</button>
                 </div>
-                <div id="importStatus" class="import-status muted">Ready</div>
+                <div id="importStatus" class="import-status muted" data-i18n="status.ready">Ready</div>
               </div>
               <div id="fileList" class="source-list"></div>
             </div>
 
             <div class="surface comments-pane">
               <div class="section-head">
-                <h2>Comments</h2>
-                <span id="commentScope">0 found</span>
+                <h2 data-i18n="sources.comments_title">Comments</h2>
+                <span id="commentScope" data-i18n="sources.comment_scope">0 found</span>
               </div>
               <div id="commentList" class="table-list"></div>
             </div>
@@ -274,32 +274,32 @@
         <section id="governance" class="page" data-page="governance" aria-label="Governance">
           <div class="surface run-row">
             <div>
-              <h2>Governance</h2>
-              <p id="governanceSummary" class="muted">report not loaded</p>
+              <h2 data-i18n="governance.title">Governance</h2>
+              <p id="governanceSummary" class="muted" data-i18n="governance.summary_placeholder">report not loaded</p>
             </div>
             <div class="row-actions compact">
-              <button id="refreshReportBtn" type="button">Refresh Report</button>
-              <button id="exportReportBtn" type="button">Export Markdown</button>
-              <button id="refreshReadinessBtn" type="button">Refresh Readiness</button>
-              <button id="exportReadinessBtn" type="button">Export Readiness</button>
-              <button id="exportReleaseBtn" type="button">Export Release</button>
-              <button id="runEvaluationBtn" type="button">Run Evaluation</button>
-              <button id="exportEvaluationBtn" type="button">Export Evaluation</button>
+              <button id="refreshReportBtn" type="button" data-i18n="governance.refresh_report">Refresh Report</button>
+              <button id="exportReportBtn" type="button" data-i18n="governance.export_markdown">Export Markdown</button>
+              <button id="refreshReadinessBtn" type="button" data-i18n="governance.refresh_readiness">Refresh Readiness</button>
+              <button id="exportReadinessBtn" type="button" data-i18n="governance.export_readiness">Export Readiness</button>
+              <button id="exportReleaseBtn" type="button" data-i18n="governance.export_release">Export Release</button>
+              <button id="runEvaluationBtn" type="button" data-i18n="governance.run_evaluation">Run Evaluation</button>
+              <button id="exportEvaluationBtn" type="button" data-i18n="governance.export_evaluation">Export Evaluation</button>
             </div>
           </div>
 
           <div class="surface readiness-pane">
             <div class="section-head">
-              <h2>Readiness Gates</h2>
-              <span id="readinessStatus">Ready</span>
+              <h2 data-i18n="governance.readiness_title">Readiness Gates</h2>
+              <span id="readinessStatus" data-i18n="status.ready">Ready</span>
             </div>
             <div id="readinessList" class="gate-list"></div>
           </div>
 
           <div class="surface risk-pane">
             <div class="section-head">
-              <h2>Source Risk Review</h2>
-              <span id="riskStatus">Ready</span>
+              <h2 data-i18n="governance.risk_title">Source Risk Review</h2>
+              <span id="riskStatus" data-i18n="status.ready">Ready</span>
             </div>
             <div id="riskList" class="risk-list"></div>
           </div>
@@ -308,8 +308,8 @@
         <section id="audit" class="page" data-page="audit" aria-label="Audit">
           <div class="surface audit-pane">
             <div class="section-head">
-              <h2>Audit</h2>
-              <span>latest events</span>
+              <h2 data-i18n="audit.title">Audit</h2>
+              <span data-i18n="audit.subtitle">latest events</span>
             </div>
             <div id="auditList" class="audit-list"></div>
           </div>
