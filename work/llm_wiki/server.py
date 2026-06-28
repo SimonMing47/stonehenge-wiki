@@ -39,6 +39,8 @@ class PlatformHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path in {"/", "/console"}:
             return self.write_static("index.html")
+        if parsed.path == "/favicon.ico":
+            return self.write_no_content()
         if parsed.path.startswith("/assets/"):
             return self.write_static(parsed.path.removeprefix("/assets/"))
         if parsed.path == "/health":
@@ -68,6 +70,11 @@ class PlatformHandler(BaseHTTPRequestHandler):
             return self.write_json(self.llm_wiki_platform.ask(title, q_id=q_id, level=level))
         if parsed.path == "/reindex":
             return self.write_json(self.llm_wiki_platform.rebuild_index())
+        if parsed.path == "/sources/import":
+            source = str(body.get("source", ""))
+            title = str(body.get("title", ""))
+            category = str(body.get("category", "00_inbox"))
+            return self.write_json(self.llm_wiki_platform.ingest_source(source, title=title, category=category))
         if parsed.path == "/wiki/compile":
             return self.write_json(self.llm_wiki_platform.compile_wiki())
         if parsed.path == "/groups/run":
@@ -103,6 +110,12 @@ class PlatformHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+
+    def write_no_content(self) -> None:
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def write_static(self, rel_name: str) -> None:
         static_root = Path(__file__).resolve().parent / "web"

@@ -53,6 +53,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - Skill 和 HTTP API 不重新实现逻辑，只调用平台服务，确保所有入口的安全、审计和格式一致。
 - SQLite 只保存可重建索引、批注元数据、审计事件和任务运行记录，不复制原始文档正文，降低敏感内容扩散风险。
 - API 支持可选 token 鉴权：设置 `LLM_WIKI_API_TOKEN` 后，请求需携带 `X-LLM-WIKI-TOKEN`。
+- 受控导入通道把本地文件或公开 URL 复制到 `docs/<category>/` 后重建索引，阻断私网 URL、超大文件、未知扩展和权限配置拒绝的路径。
 - Markdown wiki 编译层把原始文档转成可读、可 lint、可被 agent 维护的知识页，降低每次查询都从原始文件临时拼上下文的脆弱性。
 
 ## 平台模块
@@ -60,6 +61,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - `config.py`：加载 `llm-wiki/config.json`，控制状态目录、数据库、API 和审计。
 - `store.py`：SQLite 持久化层，保存索引快照、批注表、审计事件和任务运行结果。
 - `platform.py`：企业级服务门面，统一 CLI、skill、API 调用路径。
+- `importer.py`：受控知识源导入，处理 URL/文件读取、扩展名白名单、目录规范化、去重命名和 SSRF 防护。
 - `server.py`：标准库 HTTP API，适合评测环境零依赖运行。
 - `cli_io.py`：题组 JSON 读取、输出路径和自验证日志。
 - `office_bridge.py`：可选 LibreOffice/soffice 转换层，用于 `.doc/.ppt/.xls` 老式 Office 文件索引和修复；不可用时安全降级到二进制文本兜底。

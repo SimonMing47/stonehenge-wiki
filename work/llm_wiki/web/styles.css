@@ -74,6 +74,10 @@ textarea {
   outline: none;
 }
 
+.secret-input {
+  -webkit-text-security: disc;
+}
+
 textarea {
   resize: vertical;
   min-height: 128px;
@@ -290,6 +294,31 @@ h2 {
   align-items: center;
 }
 
+.source-import {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.source-import textarea {
+  min-height: 86px;
+}
+
+.import-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.import-actions button {
+  width: 100%;
+}
+
+.import-status {
+  min-height: 18px;
+  overflow-wrap: anywhere;
+}
+
 .answer-output,
 .artifact-output {
   min-height: 190px;
@@ -473,4 +502,5 @@ h2 {
   .compact input {
     max-width: none;
   }
+
 }

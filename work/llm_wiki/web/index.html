@@ -33,12 +33,12 @@
             <p class="eyebrow">Knowledge Operations</p>
             <h1>LLM Wiki Research Studio</h1>
           </div>
-          <div class="toolbar">
-            <input id="tokenInput" type="password" placeholder="API token" aria-label="API token" />
+          <form id="tokenForm" class="toolbar">
+            <input id="tokenInput" class="secret-input" type="text" placeholder="API token" aria-label="API token" autocomplete="off" spellcheck="false" />
             <button id="saveTokenBtn" type="button">Save</button>
             <button id="refreshBtn" type="button">Refresh</button>
             <button id="reindexBtn" type="button" class="primary">Reindex</button>
-          </div>
+          </form>
         </header>
 
         <section class="metrics" aria-label="Platform status">
@@ -69,6 +69,15 @@
             <div class="section-head">
               <h2>Sources</h2>
               <span id="fileScope">0 indexed</span>
+            </div>
+            <div class="source-import">
+              <textarea id="importSource" rows="3" placeholder="Public URL or local file path"></textarea>
+              <div class="import-actions">
+                <input id="importTitle" placeholder="Title" aria-label="Import title" />
+                <input id="importCategory" value="00_inbox" aria-label="Import category" />
+                <button id="importBtn" type="button" class="primary">Import</button>
+              </div>
+              <div id="importStatus" class="import-status muted">Ready</div>
             </div>
             <div id="fileList" class="source-list"></div>
           </div>

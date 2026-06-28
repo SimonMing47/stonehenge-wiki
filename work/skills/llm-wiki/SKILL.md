@@ -31,6 +31,12 @@ For an index inspection:
 python3 work/main.py --dump-index
 ```
 
+For source ingestion:
+
+```bash
+python3 work/main.py --import-source ./docs/source.pdf --import-title "RAG 评估材料" --import-category 03_学习材料
+```
+
 For a PowerPoint brief:
 
 ```bash
@@ -64,7 +70,7 @@ Always let the CLI perform safety checks before reading, executing, or repairing
 
 ## Outputs
 
-Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
+Imported sources are copied under `llm-wiki/docs/<category>/` and reindexed. Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
 
 ## Helper Script
 

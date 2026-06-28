@@ -10,6 +10,7 @@ from .answerer import QuestionAnswerer
 from .cli_io import load_questions, output_path_for_question_file, resolve_question_files, write_result_log
 from .config import PlatformConfig, load_config
 from .indexer import WikiIndex
+from .importer import SourceImportError, import_source
 from .llm import LLMClient
 from .models import Question
 from .presentations import create_presentation
@@ -88,6 +89,31 @@ class LLMWikiPlatform:
 
     def ask(self, title: str, q_id: str = "adhoc-1", level: str = "") -> dict[str, Any]:
         return self.answer_question(Question(id=q_id, title=title, level=level))
+
+    def ingest_source(self, source: str, title: str = "", category: str = "00_inbox") -> dict[str, Any]:
+        request_id = new_request_id()
+        try:
+            imported = import_source(self.wiki_root, source, self.guard, title=title, category=category)
+        except SourceImportError as exc:
+            result = {"error_msg": str(exc), "reason": exc.reason}
+            self.audit("source.import", request_id, source or "source", "blocked", True, result)
+            self.store.record_job("source_import", "blocked", {"source": source, "title": title, "category": category}, result)
+            return result
+
+        health = self.rebuild_index()
+        result = {
+            "status": "ok",
+            "source": imported.source,
+            "source_type": imported.source_type,
+            "path": imported.rel_path,
+            "size": imported.size,
+            "sha256": imported.sha256,
+            "files": health["files"],
+            "comments": health["comments"],
+        }
+        self.store.record_job("source_import", "ok", {"source": source, "title": title, "category": category}, result)
+        self.audit("source.import", request_id, imported.rel_path, "ok", False, result)
+        return result
 
     def generate_presentation(self, topic: str, slide_count: int = 6) -> dict[str, Any]:
         request_id = new_request_id()

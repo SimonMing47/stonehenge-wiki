@@ -17,6 +17,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ask", help="Answer one ad-hoc question and print JSON to stdout")
     parser.add_argument("--dump-index", action="store_true", help="Print indexed paths/comments as JSON")
     parser.add_argument("--reindex", action="store_true", help="Rebuild and persist the wiki index")
+    parser.add_argument("--import-source", help="Import a local file or public URL into docs/00_inbox")
+    parser.add_argument("--import-title", default="", help="Optional title used for the imported filename")
+    parser.add_argument("--import-category", default="00_inbox", help="Target docs category for --import-source")
     parser.add_argument("--compile-wiki", action="store_true", help="Compile docs into the Markdown wiki layer")
     parser.add_argument("--lint-wiki", action="store_true", help="Validate the compiled Markdown wiki layer")
     parser.add_argument("--generate-ppt", help="Generate a PPTX brief for a topic")
@@ -41,6 +44,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.reindex:
         print_json(platform.rebuild_index())
+        return 0
+
+    if args.import_source:
+        print_json(platform.ingest_source(args.import_source, title=args.import_title, category=args.import_category))
         return 0
 
     if args.compile_wiki:

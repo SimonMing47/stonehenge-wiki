@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.playwright-cli/
 work/.venv/
 llm-wiki/.state/
 llm-wiki/output/fixed/

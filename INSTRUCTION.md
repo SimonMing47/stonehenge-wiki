@@ -80,6 +80,12 @@ python3 work/main.py --dump-index
 python3 work/main.py --reindex
 ```
 
+导入知识源并自动重建索引：
+
+```bash
+python3 work/main.py --import-source ./docs/source.pdf --import-title "RAG 评估材料" --import-category 03_学习材料
+```
+
 查看审计日志：
 
 ```bash
@@ -140,8 +146,11 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `GET /wiki/lint`：检查编译型 Markdown wiki
 - `POST /ask`：单问，JSON body 示例 `{"id":"api-1","title":"统计 docx 文件数量","level":"简单"}`
 - `POST /groups/run`：运行题组，JSON body 示例 `{"groups":["group-1"]}`
+- `POST /sources/import`：导入本地文件或公开 URL，JSON body 示例 `{"source":"https://example.com/page.html","title":"网页资料","category":"00_inbox"}`
 - `POST /reindex`：重建索引
 - `POST /wiki/compile`：将 `docs/` 编译为 `wiki/` Markdown 知识层
+
+导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
 如果设置了 `LLM_WIKI_API_TOKEN`，控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 

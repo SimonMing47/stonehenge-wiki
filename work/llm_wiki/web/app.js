@@ -216,6 +216,33 @@ async function reindex() {
   }
 }
 
+async function importSource() {
+  const source = el("importSource").value.trim();
+  if (!source) return;
+  setBusy("importBtn", true);
+  el("importStatus").textContent = "Importing";
+  try {
+    const result = await api("/sources/import", {
+      method: "POST",
+      body: JSON.stringify({
+        source,
+        title: el("importTitle").value.trim(),
+        category: el("importCategory").value.trim() || "00_inbox"
+      })
+    });
+    if (result.error_msg) {
+      el("importStatus").textContent = `Blocked · ${result.reason || result.error_msg}`;
+      return;
+    }
+    el("importStatus").textContent = `Imported · ${result.path}`;
+    await refreshAll();
+  } catch (error) {
+    el("importStatus").textContent = `Failed · ${error.message}`;
+  } finally {
+    setBusy("importBtn", false);
+  }
+}
+
 async function compileWiki() {
   setBusy("compileWikiBtn", true);
   try {
@@ -298,11 +325,13 @@ function escapeHtml(value) {
 
 el("refreshBtn").addEventListener("click", refreshAll);
 el("askBtn").addEventListener("click", askQuestion);
+el("importBtn").addEventListener("click", importSource);
 el("generateSlidesBtn").addEventListener("click", generateSlides);
 el("runGroupBtn").addEventListener("click", runGroup);
 el("reindexBtn").addEventListener("click", reindex);
 el("compileWikiBtn").addEventListener("click", compileWiki);
 el("lintWikiBtn").addEventListener("click", lintWiki);
+el("tokenForm").addEventListener("submit", (event) => event.preventDefault());
 el("saveTokenBtn").addEventListener("click", () => {
   localStorage.setItem("llmWikiApiToken", el("tokenInput").value.trim());
   refreshAll();

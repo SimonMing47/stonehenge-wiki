@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import threading
 import tempfile
@@ -11,6 +13,7 @@ from pathlib import Path
 
 from llm_wiki.extractors import extract_docx
 from llm_wiki.answerer import QuestionAnswerer
+from llm_wiki.cli import main as cli_main
 from llm_wiki.llm import LLMAnswer, build_context
 from llm_wiki.indexer import WikiIndex
 from llm_wiki.models import Question
@@ -125,6 +128,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 app_js = http_get(base + "/assets/app.js")
                 health = json.loads(http_get(base + "/health"))
                 lint = json.loads(http_get(base + "/wiki/lint"))
+                favicon_status = http_get_status(base + "/favicon.ico")
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -133,8 +137,10 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("LLM Wiki Research Studio", index_html)
             self.assertIn("refreshAll", app_js)
             self.assertIn("generateSlides", app_js)
+            self.assertIn("importSource", app_js)
             self.assertEqual(health["status"], "ok")
             self.assertIn(lint["status"], {"ok", "error"})
+            self.assertEqual(favicon_status, 204)
 
     def test_generate_presentation_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-slides-test-") as tmp:
@@ -179,6 +185,70 @@ class PlatformSmokeTest(unittest.TestCase):
 
             direct = platform.generate_presentation("SQLite SELECT 命令", slide_count=6)
             self.assertEqual(direct["slide_count"], 6)
+
+    def test_source_import_cli_api_and_private_url_guard(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-import-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            incoming = root / "incoming"
+            (wiki / "docs").mkdir(parents=True)
+            (wiki / "question").mkdir()
+            (wiki / "output").mkdir()
+            incoming.mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            source = incoming / "rag-notes.md"
+            source.write_text(
+                "企业知识库导入说明：RAG Notes 应进入 inbox。\n"
+                "TODO: 补充验收清单,to:李四,end_date:20261231\n",
+                encoding="utf-8",
+            )
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = cli_main(
+                    [
+                        "--wiki-root",
+                        str(wiki),
+                        "--import-source",
+                        str(source),
+                        "--import-title",
+                        "RAG Notes",
+                        "--import-category",
+                        "03_学习材料",
+                    ]
+                )
+            self.assertEqual(code, 0)
+
+            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            imported = wiki / "docs" / "03_学习材料" / "RAG-Notes.md"
+            self.assertTrue(imported.exists())
+            self.assertEqual(platform.health()["files"], 1)
+            self.assertEqual(platform.health()["comments"], 1)
+            blocked = platform.ingest_source("http://127.0.0.1/private.md")
+            self.assertEqual(blocked["reason"], "private_url")
+
+            extra = incoming / "ops.html"
+            extra.write_text("<html><body>NotebookLM 风格问答入口</body></html>", encoding="utf-8")
+            httpd = build_server(platform, "127.0.0.1", 0)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                result = json.loads(
+                    http_post(
+                        base + "/sources/import",
+                        {"source": str(extra), "title": "Ops Console", "category": "00_inbox"},
+                    )
+                )
+                index = json.loads(http_get(base + "/index"))
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+                thread.join(timeout=5)
+
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["path"], "docs/00_inbox/Ops-Console.html")
+            self.assertEqual(len(index["files"]), 2)
 
     def test_knowledge_answers_use_llm_without_sending_password_queries(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-llm-test-") as tmp:
