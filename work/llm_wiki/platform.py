@@ -294,6 +294,16 @@ class LLMWikiPlatform:
     def list_source_versions(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_source_versions(rel_path=rel_path, limit=limit)
 
+    def list_chunks(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        return self.store.list_chunks(rel_path=rel_path, limit=limit)
+
+    def search_chunks(self, query: str, limit: int = 10, rel_path: str | None = None) -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "query": query,
+            "chunks": self.store.search_chunks(query=query, limit=limit, rel_path=rel_path),
+        }
+
     def governance_report(self) -> dict[str, Any]:
         report = build_governance_report(
             self.health(),

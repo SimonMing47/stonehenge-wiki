@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+from .chunks import ChunkRecord, build_chunks
 from .indexer import WikiIndex
 from .models import CommentRecord, DocumentRecord
 
@@ -103,6 +104,19 @@ class SQLiteStore:
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_source_versions_identity ON source_versions(rel_path, sha256);
                 CREATE INDEX IF NOT EXISTS idx_source_versions_rel_path ON source_versions(rel_path);
+                CREATE TABLE IF NOT EXISTS document_chunks (
+                  chunk_id TEXT PRIMARY KEY,
+                  rel_path TEXT NOT NULL,
+                  ordinal INTEGER NOT NULL,
+                  text TEXT NOT NULL,
+                  terms_json TEXT NOT NULL,
+                  line_start INTEGER NOT NULL,
+                  line_end INTEGER NOT NULL,
+                  char_count INTEGER NOT NULL,
+                  indexed_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_document_chunks_rel_path ON document_chunks(rel_path);
+                CREATE INDEX IF NOT EXISTS idx_document_chunks_ordinal ON document_chunks(rel_path, ordinal);
                 """
             )
 
@@ -111,6 +125,7 @@ class SQLiteStore:
         with self.connect() as con:
             con.execute("DELETE FROM comments")
             con.execute("DELETE FROM files")
+            con.execute("DELETE FROM document_chunks")
             con.executemany(
                 """
                 INSERT INTO files(rel_path, suffix, name, tags_json, text_preview, comment_count, indexed_at)
@@ -124,6 +139,15 @@ class SQLiteStore:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [self._comment_row(comment, now) for comment in index.comments],
+            )
+            con.executemany(
+                """
+                INSERT INTO document_chunks(
+                    chunk_id, rel_path, ordinal, text, terms_json, line_start, line_end, char_count, indexed_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [self._chunk_row(chunk, now) for record in index.records for chunk in build_chunks(record)],
             )
             self._sync_source_registry(con, index, now)
 
@@ -265,7 +289,8 @@ class SQLiteStore:
                   s.rel_path, s.origin_type, s.origin, s.title, s.category, s.sha256,
                   s.size, s.status, s.imported_at, s.updated_at, s.last_indexed_at,
                   f.suffix, f.tags_json, f.comment_count,
-                  (SELECT COUNT(*) FROM source_versions v WHERE v.rel_path = s.rel_path) AS version_count
+                  (SELECT COUNT(*) FROM source_versions v WHERE v.rel_path = s.rel_path) AS version_count,
+                  (SELECT COUNT(*) FROM document_chunks c WHERE c.rel_path = s.rel_path) AS chunk_count
                 FROM source_registry s
                 LEFT JOIN files f ON f.rel_path = s.rel_path
                 {where}
@@ -279,8 +304,58 @@ class SQLiteStore:
             item["tags"] = json.loads(tags_json)
             item["comment_count"] = int(item["comment_count"] or 0)
             item["version_count"] = int(item["version_count"] or 0)
+            item["chunk_count"] = int(item["chunk_count"] or 0)
             sources.append(item)
         return sources
+
+    def list_chunks(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        params: tuple[Any, ...]
+        where = ""
+        if rel_path:
+            where = "WHERE rel_path = ?"
+            params = (rel_path, limit)
+        else:
+            params = (limit,)
+        with self.connect() as con:
+            rows = con.execute(
+                f"""
+                SELECT chunk_id, rel_path, ordinal, text, terms_json, line_start, line_end, char_count, indexed_at
+                FROM document_chunks
+                {where}
+                ORDER BY rel_path ASC, ordinal ASC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [decode_chunk_row(row) for row in rows]
+
+    def search_chunks(self, query: str, limit: int = 10, rel_path: str | None = None) -> list[dict[str, Any]]:
+        from .indexer import query_terms
+
+        terms = query_terms(query)
+        if not terms:
+            return self.list_chunks(rel_path=rel_path, limit=limit)
+        params: tuple[Any, ...] = (rel_path,) if rel_path else ()
+        where = "WHERE rel_path = ?" if rel_path else ""
+        with self.connect() as con:
+            rows = con.execute(
+                f"""
+                SELECT chunk_id, rel_path, ordinal, text, terms_json, line_start, line_end, char_count, indexed_at
+                FROM document_chunks
+                {where}
+                """,
+                params,
+            ).fetchall()
+        scored: list[tuple[int, dict[str, Any]]] = []
+        for row in rows:
+            chunk = decode_chunk_row(row)
+            score = score_chunk(chunk, terms)
+            if score:
+                chunk["score"] = score
+                chunk["snippet"] = chunk_snippet(str(chunk.get("text") or ""), terms)
+                scored.append((score, chunk))
+        scored.sort(key=lambda item: (-item[0], item[1]["rel_path"], item[1]["ordinal"]))
+        return [chunk for _, chunk in scored[:limit]]
 
     def list_source_versions(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         params: tuple[Any, ...]
@@ -309,6 +384,7 @@ class SQLiteStore:
             comment_count = con.execute("SELECT COUNT(*) FROM comments").fetchone()[0]
             audit_count = con.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0]
             job_count = con.execute("SELECT COUNT(*) FROM job_runs").fetchone()[0]
+            chunk_count = con.execute("SELECT COUNT(*) FROM document_chunks").fetchone()[0]
             source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status != 'missing'").fetchone()[0]
             missing_source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status = 'missing'").fetchone()[0]
             source_version_count = con.execute("SELECT COUNT(*) FROM source_versions").fetchone()[0]
@@ -317,6 +393,7 @@ class SQLiteStore:
             "comments": comment_count,
             "audit_events": audit_count,
             "jobs": job_count,
+            "chunks": chunk_count,
             "sources": source_count,
             "missing_sources": missing_source_count,
             "source_versions": source_version_count,
@@ -345,6 +422,19 @@ class SQLiteStore:
             comment.line,
             comment.author,
             1 if comment.structured else 0,
+            indexed_at,
+        )
+
+    def _chunk_row(self, chunk: ChunkRecord, indexed_at: str) -> tuple[Any, ...]:
+        return (
+            chunk.chunk_id,
+            chunk.rel_path,
+            chunk.ordinal,
+            chunk.text,
+            json.dumps(chunk.terms, ensure_ascii=False),
+            chunk.line_start,
+            chunk.line_end,
+            chunk.char_count,
             indexed_at,
         )
 
@@ -433,3 +523,42 @@ def source_category(rel_path: str) -> str:
     if len(parts) >= 3 and parts[0] == "docs":
         return parts[1]
     return "uncategorized"
+
+
+def decode_chunk_row(row: sqlite3.Row) -> dict[str, Any]:
+    chunk = dict(row)
+    chunk["terms"] = json.loads(chunk.pop("terms_json") or "[]")
+    return chunk
+
+
+def score_chunk(chunk: dict[str, Any], terms: list[str]) -> int:
+    hay_path = str(chunk.get("rel_path") or "").lower()
+    hay_text = str(chunk.get("text") or "").lower()
+    chunk_terms = {str(term).lower() for term in chunk.get("terms", [])}
+    score = 0
+    for term in terms:
+        low = term.lower()
+        if low in hay_path:
+            score += 3
+        if low in chunk_terms:
+            score += 12
+        count = hay_text.count(low)
+        if count:
+            score += min(count * 3, 12)
+    return score
+
+
+def chunk_snippet(text: str, terms: list[str], radius: int = 180) -> str:
+    low_text = text.lower()
+    positions = [low_text.find(term.lower()) for term in terms if low_text.find(term.lower()) >= 0]
+    if not positions:
+        return text[: radius * 2].strip()
+    center = min(positions)
+    start = max(0, center - radius)
+    end = min(len(text), center + radius)
+    snippet = text[start:end].strip()
+    if start:
+        snippet = "..." + snippet
+    if end < len(text):
+        snippet += "..."
+    return snippet

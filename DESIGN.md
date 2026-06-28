@@ -58,11 +58,13 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - Markdown wiki 编译层把原始文档转成可读、可 lint、可被 agent 维护的知识页，降低每次查询都从原始文件临时拼上下文的脆弱性。
 - 独立问答解释通道返回检索路由、匹配词、命中文件、证据片段和安全判定，不改变题组答案的严格 JSON schema。
 - 质量评估报告批量运行题组，检查严格答案 schema、证据覆盖、安全阻断、空答案、LLM 使用和来源引用，用于回归验收。
+- 持久化 chunk 检索层把清洗后的来源文本切成可审计片段，记录 chunk_id、来源路径、行号、匹配词和得分，默认过滤密码/密钥和 prompt 注入行。
 
 ## 平台模块
 
 - `config.py`：加载 `llm-wiki/config.json`，控制状态目录、数据库、API 和审计。
 - `store.py`：SQLite 持久化层，保存索引快照、批注表、来源注册表、来源版本历史、审计事件和任务运行结果。
+- `chunks.py`：chunk 清洗与切分逻辑，作为后续向量化和混合检索的扩展点。
 - `platform.py`：企业级服务门面，统一 CLI、skill、API 调用路径。
 - `importer.py`：受控知识源导入，处理 URL/文件读取、扩展名白名单、目录规范化、去重命名和 SSRF 防护。
 - `reports.py`：治理报告生成器，输出 JSON 摘要和 Markdown 报告。

@@ -82,6 +82,8 @@ python3 work/main.py --list-sources
 python3 work/main.py --list-sources --include-missing-sources
 python3 work/main.py --list-source-versions
 python3 work/main.py --source-history docs/03_学习材料/RAG-Notes.md
+python3 work/main.py --list-chunks --chunk-limit 20
+python3 work/main.py --search-chunks "SQLite SELECT" --chunk-limit 5
 ```
 
 重建并持久化索引：
@@ -168,6 +170,8 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `GET /index`：文件、批注和持久化状态
 - `GET /sources?include_missing=1`：来源注册表，包含 origin、hash、大小、状态和最后索引时间
 - `GET /sources/history?path=docs/03_学习材料/RAG-Notes.md`：来源版本历史，只记录路径、hash、大小和观测次数，不复制原始正文
+- `GET /chunks?path=docs/04_常用命令/sqlite-sql-language.html&limit=20`：持久化 chunk 列表
+- `GET /chunks/search?q=SQLite%20SELECT&limit=5`：chunk 级检索，返回 chunk_id、来源、行号、文本和得分
 - `GET /audit?limit=50`：审计事件
 - `GET /wiki/lint`：检查编译型 Markdown wiki
 - `GET /reports/governance`：治理报告 JSON，包含来源状态、TODO 风险、审计阻断和任务历史
@@ -185,7 +189,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/audit`、`/wiki/lint`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/chunks`、`/chunks/search`、`/audit`、`/wiki/lint`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 
@@ -210,5 +214,6 @@ python3 work/skills/llm-wiki/scripts/run_llm_wiki.py --group group-1
 - 成功运行日志追加到 `result/output.md`
 - 运行状态、索引、审计写入 `llm-wiki/.state/wiki.sqlite`
 - 来源注册表会记录 metadata-only 版本历史，包含路径、SHA-256、大小、首次/末次观测时间和观测次数
+- chunk 级检索索引写入 `llm-wiki/.state/wiki.sqlite` 的 `document_chunks` 表，默认跳过密码、密钥和 prompt 注入行
 - 治理报告和质量评估报告写入 `llm-wiki/output/reports/`
 - 高危命令统一返回 `{"error_msg":"高危命令，拒绝访问"}`

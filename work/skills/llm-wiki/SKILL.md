@@ -33,6 +33,7 @@ python3 work/main.py --dump-index
 python3 work/main.py --list-sources
 python3 work/main.py --list-source-versions
 python3 work/main.py --source-history "docs/03_学习材料/RAG-Notes.md"
+python3 work/main.py --search-chunks "SQLite SELECT" --chunk-limit 5
 ```
 
 For source ingestion:
@@ -76,7 +77,7 @@ Always let the CLI perform safety checks before reading, executing, or repairing
 
 ## Outputs
 
-Imported sources are copied under `llm-wiki/docs/<category>/` and reindexed. Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Governance reports are written under `llm-wiki/output/reports/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index, source registry, metadata-only source version history, and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
+Imported sources are copied under `llm-wiki/docs/<category>/` and reindexed. Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Governance and evaluation reports are written under `llm-wiki/output/reports/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index, source registry, metadata-only source version history, retrieval chunks, and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
 
 ## Helper Script
 
