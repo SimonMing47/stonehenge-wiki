@@ -277,6 +277,84 @@ h2 {
   gap: 18px;
 }
 
+.agents-layout {
+  margin-top: 16px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1.2fr 0.8fr;
+}
+
+.agent-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0 6px;
+}
+
+.inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-height: 40px;
+  background: #fff;
+}
+
+.agents-list,
+.category-map-list {
+  display: grid;
+  gap: 10px;
+  max-height: 560px;
+  overflow: auto;
+  padding: 0 0 4px;
+}
+
+.agent-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.agent-row-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.agent-fields,
+.category-map-row {
+  display: grid;
+  gap: 8px;
+}
+
+.agent-fields label,
+.category-map-row label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.agent-fields input,
+.agent-fields .inline-field,
+.category-map-row input,
+.category-map-row select {
+  width: 100%;
+}
+
+.agent-remove-btn,
+.category-map-remove {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .source-pane,
 .ask-pane,
 .artifact-pane,
@@ -770,6 +848,7 @@ h2 {
   .wiki-workspace,
   .wiki-reader,
   .source-page-grid,
+  .agents-layout,
   .metrics {
     grid-template-columns: 1fr;
   }

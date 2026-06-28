@@ -42,10 +42,42 @@ COMMAND_TERMS = {
 
 
 class QuestionAnswerer:
-    def __init__(self, index: WikiIndex, guard: PermissionGuard, llm_client: LLMClient | None = None):
+    def __init__(
+        self,
+        index: WikiIndex,
+        guard: PermissionGuard,
+        llm_client: LLMClient | None = None,
+        llm_clients: dict[str, LLMClient] | None = None,
+        default_agent: str = "default",
+        source_agent_map: dict[str, str] | None = None,
+    ):
         self.index = index
         self.guard = guard
         self.llm_client = llm_client
+        self.llm_clients = llm_clients or {}
+        self.default_agent = default_agent
+        self.source_agent_map = source_agent_map or {}
+
+    @staticmethod
+    def source_category(rel_path: str) -> str:
+        parts = rel_path.split("/")
+        if len(parts) >= 3 and parts[0] == "docs":
+            return parts[1]
+        return "uncategorized"
+
+    def _select_llm_client(self, records: list[DocumentRecord]) -> LLMClient | None:
+        if not self.llm_clients:
+            return self.llm_client
+        if not records:
+            return self.llm_clients.get(self.default_agent, self.llm_client)
+        agent_names = {
+            self.source_agent_map.get(self.source_category(record.rel_path), self.default_agent)
+            for record in records
+        }
+        if len(agent_names) == 1:
+            target = next(iter(agent_names))
+            return self.llm_clients.get(target) or self.llm_clients.get(self.default_agent) or self.llm_client
+        return self.llm_clients.get(self.default_agent, self.llm_client)
 
     def answer(self, question: Question) -> dict:
         blocked, _ = self.guard.check_question(question.title)
@@ -199,9 +231,10 @@ class QuestionAnswerer:
             )
         if not snippets:
             snippets = [record.rel_path for record in records]
-        if self.llm_client and not self.guard.has_password_intent(title):
+        llm_client = self._select_llm_client(records)
+        if llm_client and not self.guard.has_password_intent(title):
             try:
-                llm_answer = self.llm_client.answer(title, records, snippets)
+                llm_answer = llm_client.answer(title, records, snippets)
             except Exception:
                 llm_answer = None
             if llm_answer:

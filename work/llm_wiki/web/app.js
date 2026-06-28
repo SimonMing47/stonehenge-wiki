@@ -8,11 +8,120 @@ const state = {
   wikiPages: [],
   wikiPage: null,
   sourceRisk: null,
-  explanation: null
+  explanation: null,
+  llm: null,
+  llmConfig: null,
 };
 
-const pages = new Set(["ask", "wiki", "studio", "sources", "governance", "audit"]);
+const pages = new Set(["ask", "wiki", "studio", "sources", "agents", "governance", "audit"]);
 const el = (id) => document.getElementById(id);
+
+const LANG_KEY = "llmWikiLanguage";
+const lang = localStorage.getItem(LANG_KEY) || "zh";
+const I18N = {
+  zh: {
+    "nav.ask": "问答",
+    "nav.wiki": "知识库",
+    "nav.studio": "PPT",
+    "nav.raw": "原始源",
+    "nav.agents": "LLM配置",
+    "nav.governance": "治理",
+    "nav.audit": "审计",
+    "top.subtitle": "知识运营",
+    "top.title": "LLM Wiki 研究工作台",
+    "toolbar.lang": "English",
+    "toolbar.save": "保存",
+    "toolbar.refresh": "刷新",
+    "toolbar.reindex": "重建索引",
+    "token.placeholder": "API token",
+    "metric.files": "文件",
+    "metric.comments": "评论",
+    "metric.audit": "审计",
+    "metric.wiki_sections": "Wiki 片段",
+    "metric.source_risks": "风险项",
+    "metric.database": "数据库",
+    "metric.llm": "大模型",
+    "metric.knowledge": "知识模式",
+    "metric.auth": "鉴权",
+    "sources.title": "原始源",
+    "agents.title": "LLM 代理",
+    "agents.enabled": "启用 LLM",
+    "agents.default_agent": "默认代理",
+    "agents.agent_list": "代理列表",
+    "agents.category_map": "分类映射",
+    "agents.add": "新增代理",
+    "agents.save": "保存配置",
+    "agents.add_mapping": "新增映射",
+    "agents.default_fallback": "fallback",
+    "agents.provider": "模型服务",
+    "agents.model": "模型",
+    "agents.base_url": "Base URL",
+    "agents.api_key_env": "API Key 环境变量",
+    "agents.env_file": "环境文件",
+    "agents.timeout_seconds": "超时（秒）",
+    "agents.max_context_chars": "上下文字符数",
+    "agents.max_tokens": "Max Tokens",
+    "agents.temperature": "Temperature",
+    "agents.enabled_flag": "启用",
+    "agents.actions": "操作",
+    "agents.remove": "删除",
+    "agents.name": "名称",
+    "agents.category": "分类",
+    "agents.agent": "代理",
+  },
+  en: {
+    "nav.ask": "Ask",
+    "nav.wiki": "Wiki",
+    "nav.studio": "Studio",
+    "nav.raw": "Raw",
+    "nav.agents": "Agents",
+    "nav.governance": "Governance",
+    "nav.audit": "Audit",
+    "top.subtitle": "Knowledge Operations",
+    "top.title": "LLM Wiki Research Studio",
+    "toolbar.lang": "中文",
+    "toolbar.save": "Save",
+    "toolbar.refresh": "Refresh",
+    "toolbar.reindex": "Reindex",
+    "token.placeholder": "API token",
+    "metric.files": "Files",
+    "metric.comments": "Comments",
+    "metric.audit": "Audit Events",
+    "metric.wiki_sections": "Wiki Sections",
+    "metric.source_risks": "Source Risks",
+    "metric.database": "Database",
+    "metric.llm": "LLM",
+    "metric.knowledge": "Knowledge",
+    "metric.auth": "Auth",
+    "sources.title": "Raw",
+    "agents.title": "LLM Agents",
+    "agents.enabled": "LLM enabled",
+    "agents.default_agent": "Default agent",
+    "agents.agent_list": "Agents",
+    "agents.category_map": "Category mapping",
+    "agents.add": "Add Agent",
+    "agents.save": "Save",
+    "agents.add_mapping": "Add Mapping",
+    "agents.default_fallback": "fallback",
+    "agents.provider": "Provider",
+    "agents.model": "Model",
+    "agents.base_url": "Base URL",
+    "agents.api_key_env": "API Key env",
+    "agents.env_file": "Env file",
+    "agents.timeout_seconds": "Timeout (s)",
+    "agents.max_context_chars": "Context chars",
+    "agents.max_tokens": "Max tokens",
+    "agents.temperature": "Temperature",
+    "agents.enabled_flag": "Enabled",
+    "agents.actions": "Actions",
+    "agents.remove": "Remove",
+    "agents.name": "Name",
+    "agents.category": "Category",
+    "agents.agent": "Agent",
+  },
+};
+
+let currentLanguage = lang;
 
 async function api(path, options = {}) {
   const token = localStorage.getItem("llmWikiApiToken") || "";
@@ -46,6 +155,7 @@ async function refreshAll() {
       api("/wiki/pages?limit=200"),
       api("/sources/risk")
     ]);
+    const llmConfig = await api("/llm/config").catch(() => null);
     state.health = health;
     state.index = index;
     state.audit = audit.events || [];
@@ -54,6 +164,9 @@ async function refreshAll() {
     state.wikiSections = wikiSections.sections || [];
     state.wikiPages = wikiPages.pages || [];
     state.sourceRisk = sourceRisk;
+    if (llmConfig) {
+      state.llmConfig = llmConfig;
+    }
     renderHealth();
     renderIndex();
     renderAudit();
@@ -61,6 +174,7 @@ async function refreshAll() {
     renderReadiness();
     renderWikiPageList();
     renderWikiSections(state.wikiSections);
+    renderLLMConfig();
     renderSourceRisk();
     await ensureWikiPagePreview();
     setApiState(true);
@@ -87,6 +201,240 @@ function renderHealth() {
   el("knowledgeMode").textContent = health.rag?.enabled ? "rag" : health.knowledge_mode || "wiki";
   const auth = health.auth || {};
   el("authName").textContent = auth.enabled ? "token scopes" : "open";
+}
+
+function renderLLMConfig() {
+  const config = state.llmConfig && state.llmConfig.llm ? state.llmConfig.llm : {};
+  const agentMap = config.agents || {};
+  const categoryMap = config.category_agents || {};
+  const sourceCategories = (state.llmConfig && state.llmConfig.source_categories) || [];
+  const agentNames = Object.keys(agentMap).sort();
+
+  el("llmEnabled").checked = Boolean(config.enabled);
+  el("llmDefaultAgent").value = String(config.default_agent || "default");
+
+  el("llmAgentsList").innerHTML = agentNames.length
+    ? agentNames.map((name) => llmAgentRow(name, agentMap[name] || {})).join("")
+    : "";
+  if (!agentNames.length) {
+    el("llmAgentsList").innerHTML = emptyRow("No configured LLM agents");
+  }
+
+  renderLLMCategoryMappings(categoryMap, sourceCategories, agentNames);
+}
+
+function renderLLMCategoryMappings(categoryMap, sourceCategories, agentNames) {
+  const rows = [...new Set([...Object.keys(categoryMap), ...sourceCategories.filter(Boolean)])].sort();
+  if (!rows.length) {
+    el("llmCategoryAgentMap").innerHTML = emptyRow("No category mapping");
+    return;
+  }
+  el("llmCategoryAgentMap").innerHTML = rows
+    .map((category) => llmCategoryMappingRow(category, categoryMap[category] || "", agentNames))
+    .join("");
+}
+
+function llmAgentRow(name, data) {
+  const defaults = {
+    enabled: true,
+    provider: "",
+    model: "",
+    base_url: "",
+    api_key_env: "",
+    env_file: "",
+    timeout_seconds: 60,
+    max_context_chars: 12000,
+    max_tokens: 800,
+    temperature: 0.1,
+  };
+  const cfg = { ...defaults, ...data };
+  const rowId = `agent-${name}`;
+  return `
+    <div class="agent-row" data-agent-row="${escapeHtml(name)}">
+      <div class="agent-row-head">
+        <strong>${escapeHtml(name)}</strong>
+        <button type="button" data-remove-agent="${escapeHtml(name)}" class="agent-remove-btn">${translate("agents.remove")}</button>
+      </div>
+      <div class="agent-fields">
+        <label>
+          <span>${translate("agents.enabled_flag")}</span>
+          <input type="checkbox" ${cfg.enabled ? "checked" : ""} data-agent-enabled="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.provider")}</span>
+          <input type="text" value="${escapeHtml(cfg.provider)}" data-agent-provider="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.model")}</span>
+          <input type="text" value="${escapeHtml(cfg.model)}" data-agent-model="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.base_url")}</span>
+          <input type="text" value="${escapeHtml(cfg.base_url)}" data-agent-base-url="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.api_key_env")}</span>
+          <input type="text" value="${escapeHtml(cfg.api_key_env)}" data-agent-api-key-env="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.env_file")}</span>
+          <input type="text" value="${escapeHtml(cfg.env_file)}" data-agent-env-file="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.timeout_seconds")}</span>
+          <input type="number" value="${escapeHtml(cfg.timeout_seconds)}" data-agent-timeout="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.max_context_chars")}</span>
+          <input type="number" value="${escapeHtml(cfg.max_context_chars)}" data-agent-context="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.max_tokens")}</span>
+          <input type="number" value="${escapeHtml(cfg.max_tokens)}" data-agent-tokens="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.temperature")}</span>
+          <input type="number" step="0.1" value="${escapeHtml(cfg.temperature)}" data-agent-temperature="${escapeHtml(rowId)}" />
+        </label>
+      </div>
+    </div>
+  `;
+}
+
+function llmCategoryMappingRow(category, currentAgent, agentNames) {
+  const optionElements = ["<option value=\"\">--</option>"]
+    .concat(agentNames.map((agent) => `<option value="${escapeHtml(agent)}" ${agent === currentAgent ? "selected" : ""}>${escapeHtml(agent)}</option>`))
+    .join("");
+  return `
+    <div class="category-map-row">
+      <label>
+        <span>${translate("agents.category")}</span>
+        <input type="text" value="${escapeHtml(category)}" data-category-key />
+      </label>
+      <label>
+        <span>${translate("agents.agent")}</span>
+        <select data-category-agent>
+          ${optionElements}
+        </select>
+      </label>
+      <button type="button" class="category-map-remove" data-remove-category>${translate("agents.remove")}</button>
+    </div>
+  `;
+}
+
+function addAgentRow() {
+  const container = el("llmAgentsList");
+  const index = container.querySelectorAll(".agent-row").length + 1;
+  const name = `agent-${index}`;
+  const existing = new Set(Array.from(container.querySelectorAll(".agent-row")).map((row) => row.dataset.agentRow || ""));
+  const uniqueName = existing.has(name) ? `${name}-${Date.now()}` : name;
+  container.insertAdjacentHTML(
+    "beforeend",
+    llmAgentRow(uniqueName, {
+      enabled: true,
+      provider: "deepseek",
+      model: "deepseek-chat",
+      base_url: "https://api.deepseek.com/v1",
+      api_key_env: "DEEPSEEK_API_KEY",
+      env_file: "~/.hermes/.env",
+    })
+  );
+}
+
+function addCategoryMappingRow() {
+  const container = el("llmCategoryAgentMap");
+  const agentNames = Object.keys((state.llmConfig?.llm?.agents || {}));
+  container.insertAdjacentHTML("beforeend", llmCategoryMappingRow("", "", agentNames));
+}
+
+function removeAgentRow(target) {
+  const row = target.closest(".agent-row");
+  if (!row) return;
+  row.remove();
+}
+
+function removeCategoryMapping(target) {
+  const row = target.closest(".category-map-row");
+  if (!row) return;
+  row.remove();
+}
+
+async function saveLlmConfig() {
+  setBusy("saveAgentsBtn", true);
+  el("llmConfigStatus").textContent = "Saving";
+  try {
+    const payload = collectLLMConfigPayload();
+    const result = await api("/llm/config", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    if (result.error) {
+      el("llmConfigStatus").textContent = `failed · ${result.error}`;
+      return;
+    }
+    state.llmConfig = result;
+    renderLLMConfig();
+    el("llmConfigStatus").textContent = "Saved";
+    await refreshAll();
+  } catch (error) {
+    el("llmConfigStatus").textContent = `failed · ${error.message}`;
+  } finally {
+    setBusy("saveAgentsBtn", false);
+  }
+}
+
+function collectLLMConfigPayload() {
+  const rawAgents = {};
+  el("llmAgentsList")
+    .querySelectorAll(".agent-row")
+    .forEach((row) => {
+      const name = row.dataset.agentRow || "";
+      if (!name) return;
+      const rowId = `agent-${name}`;
+      const enabled = row.querySelector(`[data-agent-enabled="${CSS.escape(rowId)}"]`);
+      const provider = row.querySelector(`[data-agent-provider="${CSS.escape(rowId)}"]`);
+      const model = row.querySelector(`[data-agent-model="${CSS.escape(rowId)}"]`);
+      const baseUrl = row.querySelector(`[data-agent-base-url="${CSS.escape(rowId)}"]`);
+      const apiKeyEnv = row.querySelector(`[data-agent-api-key-env="${CSS.escape(rowId)}"]`);
+      const envFile = row.querySelector(`[data-agent-env-file="${CSS.escape(rowId)}"]`);
+      const timeout = row.querySelector(`[data-agent-timeout="${CSS.escape(rowId)}"]`);
+      const maxContext = row.querySelector(`[data-agent-context="${CSS.escape(rowId)}"]`);
+      const maxTokens = row.querySelector(`[data-agent-tokens="${CSS.escape(rowId)}"]`);
+      const temperature = row.querySelector(`[data-agent-temperature="${CSS.escape(rowId)}"]`);
+      if (!name.trim()) {
+        return;
+      }
+      rawAgents[name] = {
+        enabled: Boolean(enabled && enabled.checked),
+        provider: String(provider?.value || "").trim(),
+        model: String(model?.value || "").trim(),
+        base_url: String(baseUrl?.value || "").trim(),
+        api_key_env: String(apiKeyEnv?.value || "").trim(),
+        env_file: String(envFile?.value || "").trim(),
+        timeout_seconds: Number(timeout?.value || 60),
+        max_context_chars: Number(maxContext?.value || 12000),
+        max_tokens: Number(maxTokens?.value || 800),
+        temperature: Number(temperature?.value || 0.1),
+      };
+    });
+
+  const categoryAgents = {};
+  el("llmCategoryAgentMap").querySelectorAll(".category-map-row").forEach((row) => {
+    const key = row.querySelector("[data-category-key]");
+    const select = row.querySelector("[data-category-agent]");
+    const category = String(key?.value || "").trim();
+    const target = String(select?.value || "").trim();
+    if (category && target && rawAgents[target]) {
+      categoryAgents[category] = target;
+    }
+  });
+
+  return {
+    enabled: Boolean(el("llmEnabled").checked),
+    default_agent: String(el("llmDefaultAgent").value || "default").trim(),
+    agents: rawAgents,
+    category_agents: categoryAgents,
+  };
 }
 
 function renderIndex() {
@@ -863,6 +1211,37 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function translate(key) {
+  return I18N[currentLanguage]?.[key] || key;
+}
+
+function applyLanguage() {
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    const key = node.getAttribute("data-i18n");
+    if (!key) return;
+    const translation = translate(key);
+    if (node.tagName === "INPUT" || node.tagName === "TEXTAREA") {
+      node.placeholder = translation;
+    } else {
+      node.textContent = translation;
+    }
+  });
+
+  document.querySelectorAll("[data-placeholder-i18n]").forEach((node) => {
+    const key = node.getAttribute("data-placeholder-i18n");
+    if (!key) return;
+    node.placeholder = translate(key);
+  });
+  el("llmEnabled")?.setAttribute("aria-label", translate("agents.enabled"));
+  renderLLMConfig();
+}
+
+function setLanguage(value) {
+  currentLanguage = value === "en" ? "en" : "zh";
+  localStorage.setItem(LANG_KEY, currentLanguage);
+  applyLanguage();
+}
+
 el("refreshBtn").addEventListener("click", refreshAll);
 el("askBtn").addEventListener("click", askQuestion);
 el("explainBtn").addEventListener("click", explainQuestion);
@@ -881,11 +1260,30 @@ el("exportReleaseBtn").addEventListener("click", exportRelease);
 el("runEvaluationBtn").addEventListener("click", runEvaluation);
 el("exportEvaluationBtn").addEventListener("click", exportEvaluation);
 el("tokenForm").addEventListener("submit", (event) => event.preventDefault());
+el("langToggle").addEventListener("click", () => setLanguage(currentLanguage === "zh" ? "en" : "zh"));
+el("addAgentBtn").addEventListener("click", () => {
+  if (!el("llmEnabled")) {
+    return;
+  }
+  addAgentRow();
+});
+el("addCategoryMapBtn").addEventListener("click", addCategoryMappingRow);
+el("saveAgentsBtn").addEventListener("click", saveLlmConfig);
 window.addEventListener("hashchange", renderPage);
 document.addEventListener("click", (event) => {
   const wikiPageButton = event.target.closest("[data-wiki-page-path]");
   if (wikiPageButton) {
     loadWikiPage(wikiPageButton.dataset.wikiPagePath || "");
+    return;
+  }
+  const removeAgentBtn = event.target.closest("[data-remove-agent]");
+  if (removeAgentBtn) {
+    removeAgentRow(removeAgentBtn);
+    return;
+  }
+  const removeCategoryBtn = event.target.closest("[data-remove-category]");
+  if (removeCategoryBtn) {
+    removeCategoryMapping(removeCategoryBtn);
     return;
   }
   const button = event.target.closest("[data-source-status]");
@@ -903,5 +1301,6 @@ el("questionInput").addEventListener("keydown", (event) => {
 });
 
 el("tokenInput").value = localStorage.getItem("llmWikiApiToken") || "";
+setLanguage(currentLanguage);
 renderPage();
 refreshAll();

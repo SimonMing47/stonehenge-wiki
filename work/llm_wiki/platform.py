@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 from .answerer import QuestionAnswerer
 from .cli_io import load_questions, output_path_for_question_file, resolve_question_files, write_result_log
-from .config import PlatformConfig, load_config
+from .config import LLMConfig, PlatformConfig, llm_config_to_dict, load_config
 from .evaluation import build_evaluation_report
 from .indexer import WikiIndex
 from .importer import SourceImportError, import_source
@@ -31,14 +31,17 @@ class LLMWikiPlatform:
         self.wiki_root = self.config.wiki_root
         self.full_index = WikiIndex(self.wiki_root).build()
         self.guard = PermissionGuard(self.wiki_root)
-        self.llm_client = LLMClient(self.config.llm) if self.config.llm.enabled else None
+        self.llm_default_agent = self.config.llm_default_agent
+        self.llm_category_agents = dict(self.config.llm_category_agents)
+        self.llm_clients = self.build_llm_clients()
+        self.llm_client = self.llm_clients.get(self.llm_default_agent) or self.llm_clients.get("default")
         self.store = SQLiteStore(self.config.database_path)
         policy_result: dict[str, Any] = {"quarantined": []}
         if self.config.persist_index:
             self.store.save_index(self.full_index)
             policy_result = self.apply_source_policy_quarantine()
         self.index = self.active_index()
-        self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
+        self.answerer = self._build_answerer()
         if self.config.persist_index:
             if policy_result.get("quarantined"):
                 self.compiler.compile()
@@ -51,6 +54,37 @@ class LLMWikiPlatform:
     @classmethod
     def from_wiki_root(cls, wiki_root: Path) -> "LLMWikiPlatform":
         return cls(wiki_root)
+
+    def build_llm_clients(self) -> dict[str, LLMClient]:
+        clients: dict[str, LLMClient] = {}
+        for name, agent in self.config.llm_agents.items():
+            clients[name] = LLMClient(agent)
+        return clients
+
+    def _build_answerer(self) -> QuestionAnswerer:
+        return QuestionAnswerer(
+            self.index,
+            self.guard,
+            llm_client=self.llm_client,
+            llm_clients=self.llm_clients,
+            default_agent=self.llm_default_agent,
+            source_agent_map=self.llm_category_agents,
+        )
+
+    def default_llm_config(self) -> LLMConfig:
+        return self.config.llm_agents.get(self.llm_default_agent, self.config.llm)
+
+    def _coerce_int(self, value: Any, fallback: int) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return fallback
+
+    def _coerce_float(self, value: Any, fallback: float) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return fallback
 
     def rebuild_index(self) -> dict[str, Any]:
         self.full_index.build()
@@ -559,6 +593,142 @@ class LLMWikiPlatform:
             "sections": self.store.search_wiki_sections(query, limit=limit),
         }
 
+    def llm_config(self) -> dict[str, Any]:
+        default_config = self.default_llm_config()
+        return {
+            "llm": {
+                "enabled": bool(default_config.enabled if isinstance(default_config, LLMConfig) else self.config.llm.enabled),
+                "default_agent": self.llm_default_agent,
+                "agents": {
+                    name: llm_config_to_dict(name, agent)
+                    for name, agent in sorted(self.config.llm_agents.items())
+                },
+                "category_agents": self.llm_category_agents,
+                "provider": default_config.provider,
+                "model": default_config.model,
+            },
+            "source_categories": sorted({
+                source.get("category", "uncategorized")
+                for source in self.list_sources(include_missing=True)
+            }),
+        }
+
+    def update_llm_config(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            return {"status": "error", "error": "invalid_payload"}
+
+        enabled = bool(payload.get("enabled", self.config.llm.enabled))
+        default_agent = str(payload.get("default_agent", self.config.llm_default_agent) or self.config.llm_default_agent)
+        category_agents = payload.get("category_agents", self.config.llm_category_agents)
+        if not isinstance(category_agents, dict):
+            return {"status": "error", "error": "invalid_category_agents"}
+
+        normalized_category_agents: dict[str, str] = {}
+        for raw_category, raw_agent in category_agents.items():
+            if not isinstance(raw_category, str) or not isinstance(raw_agent, str):
+                continue
+            category = raw_category.strip()
+            agent = raw_agent.strip()
+            if not category or not agent:
+                continue
+            normalized_category_agents[category] = agent
+
+        agents = payload.get("agents")
+        if not isinstance(agents, dict) or not agents:
+            return {"status": "error", "error": "invalid_agents"}
+        serialized_agents: dict[str, dict[str, Any]] = {}
+        for agent_name, agent_body in agents.items():
+            if not isinstance(agent_name, str) or not isinstance(agent_body, dict):
+                continue
+            raw_enabled = bool(agent_body.get("enabled", enabled))
+            raw_env_file = agent_body.get("env_file", "")
+            serialized = llm_config_to_dict(
+                agent_name,
+                LLMConfig(
+                    enabled=raw_enabled,
+                    provider=str(agent_body.get("provider", "")),
+                    model=str(agent_body.get("model", "")),
+                    base_url=str(agent_body.get("base_url", "")),
+                    api_key_env=str(agent_body.get("api_key_env", "")),
+                    env_file=Path(str(raw_env_file)).expanduser() if raw_env_file else None,
+                    timeout_seconds=self._coerce_int(agent_body.get("timeout_seconds", 60), 60),
+                    max_context_chars=self._coerce_int(agent_body.get("max_context_chars", 12000), 12000),
+                    max_tokens=self._coerce_int(agent_body.get("max_tokens", 800), 800),
+                    temperature=self._coerce_float(agent_body.get("temperature", 0.1), 0.1),
+                ),
+            )
+            serialized["enabled"] = bool(serialized.get("enabled"))
+            serialized_agents[agent_name] = serialized
+
+        if not serialized_agents:
+            return {"status": "error", "error": "invalid_agents"}
+
+        if default_agent not in serialized_agents:
+            if default_agent != "default" and "default" in serialized_agents:
+                default_agent = "default"
+            elif serialized_agents:
+                default_agent = next(iter(serialized_agents))
+            else:
+                return {"status": "error", "error": "no_valid_agents"}
+
+        normalized_category_agents = {
+            category: agent for category, agent in normalized_category_agents.items() if agent in serialized_agents
+        }
+
+        config_path = self.wiki_root / "config.json"
+        existing: dict[str, Any] = {}
+        if config_path.exists():
+            existing = json.loads(config_path.read_text(encoding="utf-8"))
+        if not isinstance(existing, dict):
+            existing = {}
+        base = dict(existing.get("llm", {})) if isinstance(existing.get("llm", {}), dict) else {}
+        cleaned_agents = {}
+        for name, data in serialized_agents.items():
+            cleaned_agents[name] = {
+                key: value
+                for key, value in data.items()
+                if key != "agent_name"
+            }
+        default_client = cleaned_agents.get(default_agent, {})
+        base.update({
+            "enabled": enabled,
+            "agents": cleaned_agents,
+            "default_agent": default_agent,
+            "category_agents": normalized_category_agents,
+            "provider": default_client.get("provider", base.get("provider", "")),
+            "model": default_client.get("model", base.get("model", "")),
+            "base_url": default_client.get("base_url", base.get("base_url", "")),
+            "api_key_env": default_client.get("api_key_env", base.get("api_key_env", "")),
+            "env_file": default_client.get("env_file", base.get("env_file", "")),
+            "timeout_seconds": default_client.get("timeout_seconds", base.get("timeout_seconds", 60)),
+            "max_context_chars": default_client.get("max_context_chars", base.get("max_context_chars", 12000)),
+            "max_tokens": default_client.get("max_tokens", base.get("max_tokens", 800)),
+            "temperature": default_client.get("temperature", base.get("temperature", 0.1)),
+        })
+        existing["llm"] = base
+        config_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        self.config = load_config(self.wiki_root)
+        self.llm_default_agent = self.config.llm_default_agent
+        self.llm_category_agents = dict(self.config.llm_category_agents)
+        self.llm_clients = self.build_llm_clients()
+        self.llm_client = self.llm_clients.get(self.llm_default_agent) or self.llm_clients.get("default")
+        self.refresh_runtime_index()
+        self.audit(
+            event_type="llm.config",
+            request_id=new_request_id(),
+            subject="llm",
+            status="ok",
+            payload={
+                "agent_count": len(self.llm_clients),
+                "default_agent": self.llm_default_agent,
+            },
+        )
+        return {
+            "status": "ok",
+            "llm": self.llm_config()["llm"],
+        }
+
     def list_wiki_pages(self, limit: int = 200) -> dict[str, Any]:
         compiled_root = self.wiki_root / "wiki"
         pages: list[dict[str, Any]] = []
@@ -694,6 +864,7 @@ class LLMWikiPlatform:
         return self.store.list_audit_events(limit)
 
     def health(self) -> dict[str, Any]:
+        default_llm = self.default_llm_config()
         return {
             "status": "ok",
             "wiki_root": str(self.wiki_root),
@@ -710,10 +881,12 @@ class LLMWikiPlatform:
             "comments": len(self.index.comments),
             "all_comments": len(self.full_index.comments),
             "llm": {
-                "enabled": self.config.llm.enabled,
+                "enabled": bool(default_llm.enabled),
                 "ready": bool(self.llm_client and self.llm_client.ready),
-                "provider": self.config.llm.provider,
-                "model": self.config.llm.model,
+                "provider": default_llm.provider,
+                "model": default_llm.model,
+                "agents": len(self.llm_clients),
+                "default_agent": self.llm_default_agent,
             },
             "auth": {
                 "enabled": self.config.auth_enabled,
@@ -734,7 +907,7 @@ class LLMWikiPlatform:
 
     def refresh_runtime_index(self) -> None:
         self.index = self.active_index()
-        self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
+        self.answerer = self._build_answerer()
 
     def audit(
         self,

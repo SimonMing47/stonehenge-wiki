@@ -114,6 +114,10 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if result.get("error") == "not_found":
                 return self.write_json(result, HTTPStatus.NOT_FOUND)
             return self.write_json(result)
+        if parsed.path == "/llm/config":
+            if not self.ensure_authorized("admin"):
+                return
+            return self.write_json(self.llm_wiki_platform.llm_config())
         if parsed.path == "/wiki/search":
             if not self.ensure_authorized("read"):
                 return
@@ -207,6 +211,8 @@ class PlatformHandler(BaseHTTPRequestHandler):
                     include_evaluation=include_evaluation,
                 )
             )
+        if parsed.path == "/llm/config":
+            return self.write_json(self.llm_wiki_platform.update_llm_config(body))
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def ensure_authorized(self, required_scope: str) -> bool:

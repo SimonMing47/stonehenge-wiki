@@ -17,12 +17,13 @@
           </span>
         </div>
         <nav class="nav">
-          <a href="#ask">Ask</a>
-          <a href="#wiki">Wiki</a>
-          <a href="#studio">Studio</a>
-          <a href="#sources">Sources</a>
-          <a href="#governance">Governance</a>
-          <a href="#audit">Audit</a>
+          <a href="#ask" id="navAsk" data-i18n="nav.ask">Ask</a>
+          <a href="#wiki" id="navWiki" data-i18n="nav.wiki">Wiki</a>
+          <a href="#studio" id="navStudio" data-i18n="nav.studio">Studio</a>
+          <a href="#sources" id="navSources" data-i18n="nav.raw">Raw</a>
+          <a href="#agents" id="navAgents" data-i18n="nav.agents">Agents</a>
+          <a href="#governance" id="navGovernance" data-i18n="nav.governance">Governance</a>
+          <a href="#audit" id="navAudit" data-i18n="nav.audit">Audit</a>
         </nav>
         <div class="rail-foot">
           <span id="apiState" class="state-dot">Offline</span>
@@ -32,52 +33,53 @@
       <main class="workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Knowledge Operations</p>
-            <h1>LLM Wiki Research Studio</h1>
+            <p id="appSubtitle" class="eyebrow" data-i18n="top.subtitle">Knowledge Operations</p>
+            <h1 id="appTitle" data-i18n="top.title">LLM Wiki Research Studio</h1>
           </div>
           <form id="tokenForm" class="toolbar">
-            <input id="tokenInput" class="secret-input" type="password" placeholder="API token" aria-label="API token" autocomplete="off" spellcheck="false" />
-            <button id="saveTokenBtn" type="button">Save</button>
-            <button id="refreshBtn" type="button">Refresh</button>
-            <button id="reindexBtn" type="button" class="primary">Reindex</button>
+            <button id="langToggle" type="button" data-i18n="toolbar.lang">English</button>
+            <input id="tokenInput" class="secret-input" type="password" placeholder="API token" aria-label="API token" autocomplete="off" spellcheck="false" data-placeholder-i18n="token.placeholder" />
+            <button id="saveTokenBtn" type="button" data-i18n="toolbar.save">Save</button>
+            <button id="refreshBtn" type="button" data-i18n="toolbar.refresh">Refresh</button>
+            <button id="reindexBtn" type="button" class="primary" data-i18n="toolbar.reindex">Reindex</button>
           </form>
         </header>
 
         <section class="metrics" aria-label="Platform status">
           <div>
-            <span>Files</span>
+            <span id="metricFilesLabel" data-i18n="metric.files">Files</span>
             <strong id="fileCount">0</strong>
           </div>
           <div>
-            <span>Comments</span>
+            <span id="metricCommentsLabel" data-i18n="metric.comments">Comments</span>
             <strong id="commentCount">0</strong>
           </div>
           <div>
-            <span>Audit Events</span>
+            <span id="metricAuditLabel" data-i18n="metric.audit">Audit Events</span>
             <strong id="auditCount">0</strong>
           </div>
           <div>
-            <span>Wiki Sections</span>
+            <span id="metricSectionsLabel" data-i18n="metric.wiki_sections">Wiki Sections</span>
             <strong id="wikiSectionCount">0</strong>
           </div>
           <div>
-            <span>Source Risks</span>
+            <span id="metricSourceRiskLabel" data-i18n="metric.source_risks">Source Risks</span>
             <strong id="sourceRiskCount">0</strong>
           </div>
           <div>
-            <span>Database</span>
+            <span id="metricDatabaseLabel" data-i18n="metric.database">Database</span>
             <strong id="dbName">wiki.sqlite</strong>
           </div>
           <div>
-            <span>LLM</span>
+            <span id="metricLLMLabel" data-i18n="metric.llm">LLM</span>
             <strong id="llmName">disabled</strong>
           </div>
           <div>
-            <span>Knowledge</span>
+            <span id="metricKnowledgeLabel" data-i18n="metric.knowledge">Knowledge</span>
             <strong id="knowledgeMode">wiki</strong>
           </div>
           <div>
-            <span>Auth</span>
+            <span id="metricAuthLabel" data-i18n="metric.auth">Auth</span>
             <strong id="authName">open</strong>
           </div>
         </section>
@@ -202,7 +204,7 @@
           <div class="source-page-grid">
             <div class="surface source-pane">
               <div class="section-head">
-                <h2>Sources</h2>
+                <h2 data-i18n="sources.title">Raw</h2>
                 <span id="fileScope">0 indexed</span>
               </div>
               <div class="source-import">
@@ -223,6 +225,48 @@
                 <span id="commentScope">0 found</span>
               </div>
               <div id="commentList" class="table-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="agents" class="page" data-page="agents" aria-label="LLM Agents">
+          <div class="surface agents-pane">
+            <div class="section-head">
+              <h2 data-i18n="agents.title">LLM Agents</h2>
+              <span id="llmConfigStatus">Ready</span>
+            </div>
+            <div class="agent-controls">
+              <label class="inline-field">
+                <span data-i18n="agents.enabled">LLM enabled</span>
+                <input id="llmEnabled" type="checkbox" checked />
+              </label>
+              <label class="inline-field">
+                <span data-i18n="agents.default_agent">Default agent</span>
+                <input id="llmDefaultAgent" placeholder="default" />
+              </label>
+            </div>
+
+            <div class="agents-layout">
+              <article class="surface">
+                <div class="section-head">
+                  <h3 data-i18n="agents.agent_list">Agents</h3>
+                  <div class="row-actions compact">
+                    <button id="addAgentBtn" type="button" data-i18n="agents.add">Add Agent</button>
+                    <button id="saveAgentsBtn" type="button" class="primary" data-i18n="agents.save">Save</button>
+                  </div>
+                </div>
+                <div id="llmAgentsList" class="agents-list"></div>
+              </article>
+
+              <article class="surface">
+                <div class="section-head">
+                  <h3 data-i18n="agents.category_map">Category Agents</h3>
+                  <div class="row-actions compact">
+                    <button id="addCategoryMapBtn" type="button" data-i18n="agents.add_mapping">Add Mapping</button>
+                  </div>
+                </div>
+                <div id="llmCategoryAgentMap" class="category-map-list"></div>
+              </article>
             </div>
           </div>
         </section>
