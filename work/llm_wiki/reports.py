@@ -176,7 +176,7 @@ def render_markdown(
         f"- Generated at: {summary['generated_at']}",
         f"- Status: {summary['status']}",
         f"- Files: {summary['files']}",
-        f"- Sources: {summary['sources']} active / {summary['missing_sources']} missing",
+        f"- Raw: {summary['sources']} active / {summary['missing_sources']} missing",
         f"- Comments: {summary['comments']}",
         f"- Audit events: {summary['audit_events']}",
         f"- Jobs: {summary['jobs']}",

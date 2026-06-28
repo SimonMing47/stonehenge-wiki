@@ -118,6 +118,81 @@ const I18N = {
     "governance.risk_title": "来源风险审核",
     "audit.title": "审计",
     "audit.subtitle": "最近事件",
+    "status.saving": "保存中",
+    "status.saved": "已保存",
+    "status.not_loaded": "未加载",
+    "status.loading": "加载中",
+    "status.preview": "预览",
+    "status.select_article": "选择文章",
+    "status.select_article_hint": "请先从列表选择一篇文章。",
+    "status.running": "运行中",
+    "status.complete": "完成",
+    "status.tracing": "追踪中",
+    "status.failed": "失败",
+    "status.blocked": "已拦截",
+    "status.importing": "导入中",
+    "status.imported": "已导入",
+    "status.updating": "更新中",
+    "status.searching": "搜索中",
+    "status.generating": "生成中",
+    "status.active": "活跃",
+    "status.total": "总数",
+    "status.found": "条",
+    "status.articles": "篇",
+    "status.comments": "条注释",
+    "status.questions": "问题",
+    "status.unknown": "未知",
+    "status.score": "得分",
+    "status.risks": "风险",
+    "status.sources": "来源",
+    "status.todos": "待办",
+    "status.readiness": "准备度",
+    "status.no_indexed_files": "尚无索引文件",
+    "status.no_comments": "暂无注释",
+    "status.no_audit_events": "暂无审计事件",
+    "status.no_readiness_report": "尚无准备度报告",
+    "status.no_readiness_gates": "尚无准备度门禁",
+    "status.no_source_risks": "暂无来源风险",
+    "status.no_evidence": "暂无证据",
+    "status.version": "版本",
+    "status.versions": "版本",
+    "status.section": "区段",
+    "status.sections": "区段",
+    "status.untagged": "未标记",
+    "status.sha_pending": "sha 待补",
+    "status.untracked": "未入库",
+    "status.disabled": "未启用",
+    "status.model": "模型",
+    "status.rag": "RAG",
+    "status.wiki": "编译库",
+    "status.open": "开放",
+    "status.answer": "回答",
+    "status.token_scopes": "令牌范围",
+    "status.route": "路由",
+    "status.safety": "安全",
+    "status.wiki_mode": "知识库模式",
+    "status.line": "行",
+    "status.evidence": "证据",
+    "status.download_pptx": "下载PPTX",
+    "status.no_answer": "无回答",
+    "status.no_configured_agents": "未配置 LLM 代理",
+    "status.no_category_mapping": "未设置分类映射",
+    "status.no_compiled_sections": "尚无编译 wiki 区段",
+    "status.no_compiled_articles": "尚无编译文章",
+    "status.download_report": "下载报告",
+    "status.download_readiness": "下载准备度报告",
+    "status.release_bundle": "发布包",
+    "status.download_release": "下载发布包",
+    "status.release_export_failed": "发布导出失败",
+    "status.export_failed": "导出失败",
+    "status.evaluation": "评估",
+    "status.evaluation_label": "评估",
+    "status.download_evaluation": "下载评估",
+    "status.policy_held": "策略持有",
+    "status.activate": "激活",
+    "status.quarantine": "隔离",
+    "status.online": "在线",
+    "status.offline": "离线",
     "status.ready": "就绪",
   },
   en: {
@@ -219,6 +294,81 @@ const I18N = {
     "governance.risk_title": "Source Risk Review",
     "audit.title": "Audit",
     "audit.subtitle": "latest events",
+    "status.saving": "Saving",
+    "status.saved": "Saved",
+    "status.not_loaded": "Not loaded",
+    "status.loading": "Loading",
+    "status.preview": "Preview",
+    "status.select_article": "Select an article",
+    "status.select_article_hint": "Select an article from the list.",
+    "status.running": "Running",
+    "status.complete": "Complete",
+    "status.tracing": "Tracing",
+    "status.failed": "Failed",
+    "status.blocked": "Blocked",
+    "status.importing": "Importing",
+    "status.imported": "Imported",
+    "status.updating": "Updating",
+    "status.searching": "Searching",
+    "status.generating": "Generating",
+    "status.active": "active",
+    "status.total": "total",
+    "status.found": "found",
+    "status.articles": "articles",
+    "status.comments": "comments",
+    "status.questions": "questions",
+    "status.unknown": "unknown",
+    "status.score": "score",
+    "status.risks": "risks",
+    "status.sources": "sources",
+    "status.todos": "todos",
+    "status.readiness": "readiness",
+    "status.no_indexed_files": "No indexed files",
+    "status.no_comments": "No comments",
+    "status.no_audit_events": "No audit events",
+    "status.no_readiness_report": "No readiness report",
+    "status.no_readiness_gates": "No readiness gates",
+    "status.no_source_risks": "No source risks",
+    "status.no_evidence": "No evidence",
+    "status.version": "version",
+    "status.versions": "versions",
+    "status.section": "section",
+    "status.sections": "sections",
+    "status.untagged": "untagged",
+    "status.sha_pending": "sha pending",
+    "status.untracked": "untracked",
+    "status.disabled": "disabled",
+    "status.model": "model",
+    "status.rag": "rag",
+    "status.wiki": "wiki",
+    "status.open": "open",
+    "status.answer": "answer",
+    "status.token_scopes": "token scopes",
+    "status.route": "Route",
+    "status.safety": "Safety",
+    "status.wiki_mode": "Wiki mode",
+    "status.line": "line",
+    "status.evidence": "Evidence",
+    "status.download_pptx": "Download PPTX",
+    "status.no_answer": "No answer",
+    "status.no_configured_agents": "No configured LLM agents",
+    "status.no_category_mapping": "No category mapping",
+    "status.no_compiled_sections": "No compiled wiki sections",
+    "status.no_compiled_articles": "No compiled wiki articles",
+    "status.download_report": "Download report",
+    "status.download_readiness": "Download readiness",
+    "status.release_bundle": "release bundle",
+    "status.download_release": "Download release",
+    "status.release_export_failed": "Release export failed",
+    "status.export_failed": "Export failed",
+    "status.evaluation": "Evaluation",
+    "status.evaluation_label": "Evaluation",
+    "status.download_evaluation": "Download evaluation",
+    "status.policy_held": "Policy held",
+    "status.activate": "Activate",
+    "status.quarantine": "Quarantine",
+    "status.online": "Online",
+    "status.offline": "Offline",
     "status.ready": "Ready",
   },
 };
@@ -298,11 +448,11 @@ function renderHealth() {
   el("dbName").textContent = (health.database_path || "wiki.sqlite").split("/").slice(-1)[0];
   const llm = health.llm || {};
   el("llmName").textContent = llm.enabled
-    ? `${llm.ready ? "ready" : "offline"} · ${llm.model || llm.provider || "model"}`
-    : "disabled";
-  el("knowledgeMode").textContent = health.rag?.enabled ? "rag" : health.knowledge_mode || "wiki";
+    ? `${llm.ready ? translate("status.online") : translate("status.offline")} · ${llm.model || llm.provider || translate("status.model")}`
+    : translate("status.disabled");
+  el("knowledgeMode").textContent = health.rag?.enabled ? translate("status.rag") : translate("status.wiki");
   const auth = health.auth || {};
-  el("authName").textContent = auth.enabled ? "token scopes" : "open";
+  el("authName").textContent = auth.enabled ? translate("status.token_scopes") : translate("status.open");
 }
 
 function renderLLMConfig() {
@@ -319,7 +469,7 @@ function renderLLMConfig() {
     ? agentNames.map((name) => llmAgentRow(name, agentMap[name] || {})).join("")
     : "";
   if (!agentNames.length) {
-    el("llmAgentsList").innerHTML = emptyRow("No configured LLM agents");
+    el("llmAgentsList").innerHTML = emptyRow(translate("status.no_configured_agents"));
   }
 
   renderLLMCategoryMappings(categoryMap, sourceCategories, agentNames);
@@ -328,7 +478,7 @@ function renderLLMConfig() {
 function renderLLMCategoryMappings(categoryMap, sourceCategories, agentNames) {
   const rows = [...new Set([...Object.keys(categoryMap), ...sourceCategories.filter(Boolean)])].sort();
   if (!rows.length) {
-    el("llmCategoryAgentMap").innerHTML = emptyRow("No category mapping");
+    el("llmCategoryAgentMap").innerHTML = emptyRow(translate("status.no_category_mapping"));
     return;
   }
   el("llmCategoryAgentMap").innerHTML = rows
@@ -463,7 +613,7 @@ function removeCategoryMapping(target) {
 
 async function saveLlmConfig() {
   setBusy("saveAgentsBtn", true);
-  el("llmConfigStatus").textContent = "Saving";
+  el("llmConfigStatus").textContent = translate("status.saving");
   try {
     const payload = collectLLMConfigPayload();
     const result = await api("/llm/config", {
@@ -471,15 +621,15 @@ async function saveLlmConfig() {
       body: JSON.stringify(payload),
     });
     if (result.error) {
-      el("llmConfigStatus").textContent = `failed · ${result.error}`;
+      el("llmConfigStatus").textContent = `${translate("status.failed")} · ${result.error}`;
       return;
     }
     state.llmConfig = result;
     renderLLMConfig();
-    el("llmConfigStatus").textContent = "Saved";
+    el("llmConfigStatus").textContent = translate("status.saved");
     await refreshAll();
   } catch (error) {
-    el("llmConfigStatus").textContent = `failed · ${error.message}`;
+    el("llmConfigStatus").textContent = `${translate("status.failed")} · ${error.message}`;
   } finally {
     setBusy("saveAgentsBtn", false);
   }
@@ -546,25 +696,25 @@ function renderIndex() {
   const registry = state.index.source_registry || [];
   const sourceByPath = Object.fromEntries(registry.map((source) => [source.rel_path, source]));
   const activeCount = registry.filter((source) => source.status === "active").length || files.length;
-  el("fileScope").textContent = `${activeCount} active · ${registry.length || files.length} total`;
-  el("commentScope").textContent = `${comments.length} found`;
+  el("fileScope").textContent = `${activeCount} ${translate("status.active")} · ${registry.length || files.length} ${translate("status.total")}`;
+  el("commentScope").textContent = `${comments.length} ${translate("status.found")}`;
   el("fileList").innerHTML = files.length
     ? files.map((file) => fileRow(file, sourceByPath[file.path])).join("")
-    : emptySourceRow("No indexed files");
+    : emptySourceRow(translate("status.no_indexed_files"));
   el("commentList").innerHTML = comments.length
     ? comments.slice(0, 80).map(commentRow).join("")
-    : emptyRow("No comments");
+    : emptyRow(translate("status.no_comments"));
   renderPresentations(presentations);
 }
 
 function fileRow(file, source) {
-  const tags = (file.tags || []).join(", ") || "untagged";
-  const size = source ? `${Math.round(Number(source.size || 0) / 1024)} KB` : "untracked";
-  const hash = source?.sha256 ? `sha ${String(source.sha256).slice(0, 10)}` : "sha pending";
+  const tags = (file.tags || []).join(", ") || translate("status.untagged");
+  const size = source ? `${Math.round(Number(source.size || 0) / 1024)} KB` : translate("status.untracked");
+  const hash = source?.sha256 ? `sha ${String(source.sha256).slice(0, 10)}` : translate("status.sha_pending");
   const versionCount = Number(source?.version_count || 0);
-  const versions = `${versionCount} ${versionCount === 1 ? "version" : "versions"}`;
+  const versions = `${versionCount} ${versionCount === 1 ? translate("status.version") : translate("status.versions")}`;
   const sectionCount = Number(source?.wiki_section_count || 0);
-  const sections = `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}`;
+  const sections = `${sectionCount} ${sectionCount === 1 ? translate("status.section") : translate("status.sections")}`;
   const origin = source?.origin_type || "local";
   const status = source?.status || "active";
   return `
@@ -579,7 +729,7 @@ function fileRow(file, source) {
         <span>${escapeHtml(sections)}</span>
         <span>${escapeHtml(file.suffix || "file")}</span>
         <span>${escapeHtml(tags)}</span>
-        <span>${Number(file.comment_count || 0)} comments</span>
+        <span>${Number(file.comment_count || 0)} ${translate("status.comments")}</span>
       </div>
     </div>
   `;
@@ -597,35 +747,36 @@ function renderAudit() {
   const events = state.audit || [];
   el("auditList").innerHTML = events.length
     ? events.map(auditRow).join("")
-    : emptyRow("No audit events");
+    : emptyRow(translate("status.no_audit_events"));
 }
 
 function renderGovernance() {
   const report = state.governance;
   if (!report) {
-    el("governanceSummary").textContent = "report not loaded";
+    el("governanceSummary").textContent = translate("governance.summary_placeholder");
     return;
   }
   const summary = report.summary || {};
   const riskCount = (report.risks || []).length;
   const readiness = state.readiness?.summary || {};
-  const readinessText = readiness.status ? ` · readiness ${readiness.status}` : "";
-  el("governanceSummary").textContent = `${summary.status || "unknown"} · ${riskCount} risks · ${summary.sources || 0} sources · ${report.todo?.total || 0} todos${readinessText}`;
+  const readinessText = readiness.status ? ` · ${translate("status.readiness")} ${readiness.status}` : "";
+  const summaryStatusText = summary.status || translate("status.unknown");
+  el("governanceSummary").textContent = `${summaryStatusText} · ${riskCount} ${translate("status.risks")} · ${summary.sources || 0} ${translate("status.sources")} · ${report.todo?.total || 0} ${translate("status.todos")}${readinessText}`;
 }
 
 function renderReadiness() {
   const report = state.readiness;
   if (!report) {
-    el("readinessStatus").textContent = "not loaded";
-    el("readinessList").innerHTML = emptyRow("No readiness report");
+    el("readinessStatus").textContent = translate("status.not_loaded");
+    el("readinessList").innerHTML = emptyRow(translate("status.no_readiness_report"));
     return;
   }
   const summary = report.summary || {};
   const gates = report.gates || [];
-  el("readinessStatus").textContent = `${summary.status || "unknown"} · score ${summary.score ?? 0} · ${summary.fail || 0} failing`;
+  el("readinessStatus").textContent = `${summary.status || translate("status.unknown")} · ${translate("status.score")} ${summary.score ?? 0} · ${summary.fail || 0} ${translate("status.failed")}`;
   el("readinessList").innerHTML = gates.length
     ? gates.map(readinessRow).join("")
-    : emptyRow("No readiness gates");
+    : emptyRow(translate("status.no_readiness_gates"));
 }
 
 function readinessRow(item) {
@@ -647,10 +798,10 @@ function renderSourceRisk() {
   const summary = report.summary || {};
   const findings = report.findings || [];
   el("sourceRiskCount").textContent = String(summary.risk_count ?? 0);
-  el("riskStatus").textContent = `${summary.status || "unknown"} · ${summary.sources_with_risks || 0} sources`;
+  el("riskStatus").textContent = `${summary.status || translate("status.unknown")} · ${summary.sources_with_risks || 0} ${translate("status.sources")}`;
   el("riskList").innerHTML = findings.length
     ? findings.slice(0, 80).map((finding) => riskRow(finding)).join("")
-    : emptyRow("No source risks");
+    : emptyRow(translate("status.no_source_risks"));
 }
 
 function riskRow(finding) {
@@ -663,7 +814,11 @@ function riskRow(finding) {
   const policyHeld = status === "quarantined" && sourceFindings.some((item) => {
     return item.source_path === finding.source_path && item.code === "permission_file_deny";
   });
-  const actionLabel = policyHeld ? "Policy held" : status === "quarantined" ? "Activate" : "Quarantine";
+  const actionLabel = policyHeld
+    ? translate("status.policy_held")
+    : status === "quarantined"
+      ? translate("status.activate")
+      : translate("status.quarantine");
   const disabled = policyHeld ? "disabled" : "";
   return `
     <div class="risk-row severity-${escapeHtml(finding.severity || "low")}">
@@ -685,18 +840,18 @@ function riskRow(finding) {
 
 function renderWikiSections(sections) {
   const list = sections || [];
-  el("wikiStatus").textContent = `${list.length} sections`;
+  el("wikiStatus").textContent = `${list.length} ${translate("status.sections")}`;
   el("wikiSectionList").innerHTML = list.length
     ? list.map(wikiSectionRow).join("")
-    : emptyRow("No compiled wiki sections");
+    : emptyRow(translate("status.no_compiled_sections"));
 }
 
 function renderWikiPageList() {
   const pages = state.wikiPages || [];
-  el("wikiPageStatus").textContent = `${pages.length} articles`;
+  el("wikiPageStatus").textContent = `${pages.length} ${translate("status.articles")}`;
   el("wikiPageList").innerHTML = pages.length
     ? pages.map(wikiPageRow).join("")
-    : emptyRow("No compiled wiki articles");
+    : emptyRow(translate("status.no_compiled_articles"));
 }
 
 function wikiPageRow(page) {
@@ -727,7 +882,7 @@ async function ensureWikiPagePreview() {
 async function loadWikiPage(path, options = {}) {
   if (!path) return;
   if (!options.quiet) {
-    el("wikiPageMeta").textContent = "Loading";
+    el("wikiPageMeta").textContent = translate("status.loading");
   }
   try {
     const result = await api(`/wiki/page?path=${encodeURIComponent(path)}`);
@@ -735,8 +890,8 @@ async function loadWikiPage(path, options = {}) {
     renderWikiPagePreview();
     renderWikiPageList();
   } catch (error) {
-    el("wikiPageTitle").textContent = "Preview";
-    el("wikiPageMeta").textContent = "Failed";
+    el("wikiPageTitle").textContent = translate("wiki.preview");
+    el("wikiPageMeta").textContent = translate("status.failed");
     el("wikiPagePreview").innerHTML = `<div class="answer-status blocked">${escapeHtml(error.message)}</div>`;
   }
 }
@@ -745,9 +900,9 @@ function renderWikiPagePreview() {
   const detail = state.wikiPage || {};
   const page = detail.page || {};
   if (!page.path) {
-    el("wikiPageTitle").textContent = "Preview";
-    el("wikiPageMeta").textContent = "Select an article";
-    el("wikiPagePreview").innerHTML = `<span class="muted">Select an article from the list.</span>`;
+    el("wikiPageTitle").textContent = translate("wiki.preview");
+    el("wikiPageMeta").textContent = translate("status.select_article");
+    el("wikiPagePreview").innerHTML = `<span class="muted">${translate("wiki.preview_hint")}</span>`;
     return;
   }
   const meta = [page.kind, page.file_type, page.source_path || page.path].filter(Boolean).join(" · ");
@@ -761,15 +916,15 @@ function wikiSectionRow(section) {
   return `
     <div class="wiki-section-row">
       <div class="wiki-section-title">
-        <strong>${escapeHtml(section.heading || section.page_title || "Section")}</strong>
+        <strong>${escapeHtml(section.heading || section.page_title || translate("status.section"))}</strong>
         <span>${escapeHtml(section.kind || "wiki")}</span>
       </div>
       <p>${escapeHtml(snippet.slice(0, 360))}</p>
       <div class="meta">
         <span>${escapeHtml(section.page_path || "")}</span>
-        <span>${escapeHtml(section.source_path || "topic")}</span>
-        <span>line ${Number(section.line_start || 0)}</span>
-        ${section.score ? `<span>score ${Number(section.score)}</span>` : ""}
+        <span>${escapeHtml(section.source_path || translate("status.untagged"))}</span>
+        <span>${translate("status.line")} ${Number(section.line_start || 0)}</span>
+        ${section.score ? `<span>${translate("status.score")} ${Number(section.score)}</span>` : ""}
       </div>
     </div>
   `;
@@ -777,7 +932,7 @@ function wikiSectionRow(section) {
 
 function renderPresentations(presentations) {
   if (!presentations.length) {
-    el("artifactOutput").innerHTML = '<span class="muted">No deck yet</span>';
+    el("artifactOutput").innerHTML = `<span class="muted">${translate("studio.hint")}</span>`;
     return;
   }
   el("artifactOutput").innerHTML = presentations
@@ -786,7 +941,7 @@ function renderPresentations(presentations) {
       <div class="artifact-card">
         <strong>${escapeHtml(item.name || item.deck)}</strong>
         <span>${Math.round(Number(item.size || 0) / 1024)} KB</span>
-        <a href="${escapeHtml(item.download_url)}" target="_blank" rel="noreferrer">Download PPTX</a>
+        <a href="${escapeHtml(item.download_url)}" target="_blank" rel="noreferrer">${translate("status.download_pptx")}</a>
       </div>
     `)
     .join("");
@@ -819,7 +974,7 @@ async function askQuestion() {
   const title = el("questionInput").value.trim();
   if (!title) return;
   setBusy("askBtn", true);
-  el("queryStatus").textContent = "Running";
+  el("queryStatus").textContent = translate("status.running");
   try {
     const answer = await api("/ask", {
       method: "POST",
@@ -830,11 +985,11 @@ async function askQuestion() {
       })
     });
     renderAnswer(answer);
-    el("queryStatus").textContent = answer.answer?.error_msg ? "Blocked" : "Complete";
+    el("queryStatus").textContent = answer.answer?.error_msg ? translate("status.blocked") : translate("status.complete");
     await refreshAll();
   } catch (error) {
     el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
-    el("queryStatus").textContent = "Failed";
+    el("queryStatus").textContent = translate("status.failed");
   } finally {
     setBusy("askBtn", false);
   }
@@ -844,7 +999,7 @@ async function explainQuestion() {
   const title = el("questionInput").value.trim();
   if (!title) return;
   setBusy("explainBtn", true);
-  el("explainStatus").textContent = "Tracing";
+  el("explainStatus").textContent = translate("status.tracing");
   try {
     const explanation = await api("/explain", {
       method: "POST",
@@ -857,11 +1012,11 @@ async function explainQuestion() {
     state.explanation = explanation;
     renderExplanation(explanation);
     renderWikiSections(explanation.wiki?.sections || []);
-    el("explainStatus").textContent = explanation.status || "Complete";
+    el("explainStatus").textContent = explanation.status || translate("status.complete");
     setPage("wiki");
   } catch (error) {
     el("explainOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
-    el("explainStatus").textContent = "Failed";
+    el("explainStatus").textContent = translate("status.failed");
   } finally {
     setBusy("explainBtn", false);
   }
@@ -874,28 +1029,28 @@ function renderExplanation(explanation) {
   const wiki = explanation.wiki || {};
   const safetyClass = safety.blocked ? "blocked" : "ok";
   el("explainOutput").innerHTML = `
-    <div class="trace-summary">
+      <div class="trace-summary">
       <div>
-        <span>Route</span>
+        <span>${translate("status.route")}</span>
         <strong>${escapeHtml(explanation.route || "knowledge")}</strong>
       </div>
       <div>
-        <span>Safety</span>
+        <span>${translate("status.safety")}</span>
         <strong class="${safetyClass}">${escapeHtml(safety.blocked ? "blocked" : "ok")}</strong>
       </div>
       <div>
-        <span>Wiki Mode</span>
+        <span>${translate("status.wiki_mode")}</span>
         <strong>${escapeHtml(wiki.mode || "compiled_wiki")}</strong>
       </div>
       <div>
-        <span>Sections</span>
+        <span>${translate("status.sections")}</span>
         <strong>${Number(wiki.section_count || 0)}</strong>
       </div>
     </div>
     ${safety.reason ? `<div class="answer-status blocked">${escapeHtml(safety.reason)}</div>` : ""}
-    <h3>Evidence</h3>
+    <h3>${translate("status.evidence")}</h3>
     <div class="trace-list">
-      ${(evidence.length ? evidence : records.slice(0, 6)).map(traceRow).join("") || emptyRow("No evidence")}
+      ${(evidence.length ? evidence : records.slice(0, 6)).map(traceRow).join("") || emptyRow(translate("status.no_evidence"))}
     </div>
   `;
 }
@@ -908,8 +1063,8 @@ function traceRow(item) {
       <strong>${escapeHtml(path)}</strong>
       <p>${escapeHtml(text)}</p>
       <div class="meta">
-        ${item.line ? `<span>line ${Number(item.line)}</span>` : ""}
-        ${item.score ? `<span>score ${Number(item.score)}</span>` : ""}
+        ${item.line ? `<span>${translate("status.line")} ${Number(item.line)}</span>` : ""}
+        ${item.score ? `<span>${translate("status.score")} ${Number(item.score)}</span>` : ""}
       </div>
     </div>
   `;
@@ -926,8 +1081,8 @@ function renderAnswer(answer) {
     .map((item) => `<p>${escapeHtml(item)}</p>`)
     .join("");
   el("answerOutput").innerHTML = `
-    <div class="answer-status ok">${escapeHtml(answer.id || "answer")}</div>
-    ${body || '<p class="muted">No answer</p>'}
+    <div class="answer-status ok">${escapeHtml(answer.id || translate("status.answer"))}</div>
+    ${body || `<p class="muted">${translate("status.no_answer")}</p>`}
   `;
 }
 
@@ -966,7 +1121,7 @@ async function importSource() {
   const source = el("importSource").value.trim();
   if (!source) return;
   setBusy("importBtn", true);
-  el("importStatus").textContent = "Importing";
+  el("importStatus").textContent = translate("status.importing");
   try {
     const result = await api("/sources/import", {
       method: "POST",
@@ -977,13 +1132,13 @@ async function importSource() {
       })
     });
     if (result.error_msg) {
-      el("importStatus").textContent = `Blocked · ${result.reason || result.error_msg}`;
+      el("importStatus").textContent = `${translate("status.blocked")} · ${result.reason || result.error_msg}`;
       return;
     }
-    el("importStatus").textContent = `Imported · ${result.path}`;
+    el("importStatus").textContent = `${translate("status.imported")} · ${result.path}`;
     await refreshAll();
   } catch (error) {
-    el("importStatus").textContent = `Failed · ${error.message}`;
+    el("importStatus").textContent = `${translate("status.failed")} · ${error.message}`;
   } finally {
     setBusy("importBtn", false);
   }
@@ -992,7 +1147,7 @@ async function importSource() {
 async function setSourceStatus(path, status, button) {
   if (!path || !status) return;
   if (button) button.disabled = true;
-  el("riskStatus").textContent = "Updating";
+  el("riskStatus").textContent = translate("status.updating");
   try {
     const result = await api("/sources/status", {
       method: "POST",
@@ -1004,12 +1159,12 @@ async function setSourceStatus(path, status, button) {
       })
     });
     if (result.error) {
-      el("riskStatus").textContent = `failed · ${result.error}`;
+      el("riskStatus").textContent = `${translate("status.failed")} · ${result.error}`;
       return;
     }
     await refreshAll();
   } catch (error) {
-    el("riskStatus").textContent = `failed · ${error.message}`;
+    el("riskStatus").textContent = `${translate("status.failed")} · ${error.message}`;
   } finally {
     if (button) button.disabled = false;
   }
@@ -1045,14 +1200,14 @@ async function searchWikiSections() {
   const query = el("wikiSearchInput").value.trim() || el("questionInput").value.trim();
   const path = query ? `/wiki/search?q=${encodeURIComponent(query)}&limit=14` : "/wiki/sections?limit=14";
   setBusy("wikiSearchBtn", true);
-  el("wikiStatus").textContent = "Searching";
+  el("wikiStatus").textContent = translate("status.searching");
   try {
     const result = await api(path);
     state.wikiSections = result.sections || [];
     renderWikiSections(state.wikiSections);
   } catch (error) {
     el("wikiSectionList").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
-    el("wikiStatus").textContent = "Failed";
+    el("wikiStatus").textContent = translate("status.failed");
   } finally {
     setBusy("wikiSearchBtn", false);
   }
@@ -1065,7 +1220,7 @@ async function refreshReport() {
     state.governance = result.report || null;
     renderGovernance();
   } catch (error) {
-    el("governanceSummary").textContent = `failed · ${error.message}`;
+    el("governanceSummary").textContent = `${translate("status.failed")} · ${error.message}`;
   } finally {
     setBusy("refreshReportBtn", false);
   }
@@ -1077,9 +1232,9 @@ async function exportReport() {
     const result = await api("/reports/governance/export", { method: "POST", body: "{}" });
     state.governance = result.report || null;
     renderGovernance();
-    el("governanceSummary").innerHTML = `${escapeHtml(result.report?.summary?.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download report</a>`;
+    el("governanceSummary").innerHTML = `${escapeHtml(result.report?.summary?.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">${translate("status.download_report")}</a>`;
   } catch (error) {
-    el("governanceSummary").textContent = `failed · ${error.message}`;
+    el("governanceSummary").textContent = `${translate("status.failed")} · ${error.message}`;
   } finally {
     setBusy("exportReportBtn", false);
   }
@@ -1093,7 +1248,7 @@ async function refreshReadiness() {
     renderGovernance();
     renderReadiness();
   } catch (error) {
-    el("readinessStatus").textContent = `failed · ${error.message}`;
+    el("readinessStatus").textContent = `${translate("status.failed")} · ${error.message}`;
   } finally {
     setBusy("refreshReadinessBtn", false);
   }
@@ -1106,9 +1261,9 @@ async function exportReadiness() {
     state.readiness = result.report || null;
     renderGovernance();
     renderReadiness();
-    el("readinessStatus").innerHTML = `${escapeHtml(result.report?.summary?.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download readiness</a>`;
+    el("readinessStatus").innerHTML = `${escapeHtml(result.report?.summary?.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">${translate("status.download_readiness")}</a>`;
   } catch (error) {
-    el("readinessStatus").textContent = `export failed · ${error.message}`;
+    el("readinessStatus").textContent = `${translate("status.export_failed")} · ${error.message}`;
   } finally {
     setBusy("exportReadinessBtn", false);
   }
@@ -1119,10 +1274,10 @@ async function exportRelease() {
   try {
     const result = await api("/reports/release/export", { method: "POST", body: selectedGroupsBody() });
     const readiness = result.manifest?.reports?.readiness || "readiness";
-    el("governanceSummary").innerHTML = `release bundle · ${escapeHtml(readiness)} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download release</a>`;
+    el("governanceSummary").innerHTML = `${translate("status.release_bundle")} · ${escapeHtml(readiness)} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">${translate("status.download_release")}</a>`;
     await refreshAll();
   } catch (error) {
-    el("governanceSummary").textContent = `release export failed · ${error.message}`;
+    el("governanceSummary").textContent = `${translate("status.release_export_failed")} · ${error.message}`;
   } finally {
     setBusy("exportReleaseBtn", false);
   }
@@ -1138,10 +1293,10 @@ async function runEvaluation() {
   try {
     const result = await api("/reports/evaluation", { method: "POST", body: selectedGroupsBody() });
     const summary = result.report?.summary || {};
-    el("governanceSummary").textContent = `evaluation ${summary.status || "unknown"} · ${summary.total_questions || 0} questions · score ${summary.score ?? 0}`;
+    el("governanceSummary").textContent = `${translate("status.evaluation")} ${summary.status || translate("status.unknown")} · ${summary.total_questions || 0} ${translate("status.questions")} · ${translate("status.score")} ${summary.score ?? 0}`;
     await refreshAll();
   } catch (error) {
-    el("governanceSummary").textContent = `evaluation failed · ${error.message}`;
+    el("governanceSummary").textContent = `${translate("status.evaluation")} ${translate("status.failed")} · ${error.message}`;
   } finally {
     setBusy("runEvaluationBtn", false);
   }
@@ -1152,9 +1307,9 @@ async function exportEvaluation() {
   try {
     const result = await api("/reports/evaluation/export", { method: "POST", body: selectedGroupsBody() });
     const summary = result.report?.summary || {};
-    el("governanceSummary").innerHTML = `evaluation ${escapeHtml(summary.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download evaluation</a>`;
+    el("governanceSummary").innerHTML = `${translate("status.evaluation")} ${escapeHtml(summary.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">${translate("status.download_evaluation")}</a>`;
   } catch (error) {
-    el("governanceSummary").textContent = `evaluation failed · ${error.message}`;
+    el("governanceSummary").textContent = `${translate("status.evaluation")} ${translate("status.failed")} · ${error.message}`;
   } finally {
     setBusy("exportEvaluationBtn", false);
   }
@@ -1164,7 +1319,7 @@ async function generateSlides() {
   const topic = el("slidesTopic").value.trim() || el("questionInput").value.trim();
   if (!topic) return;
   setBusy("generateSlidesBtn", true);
-  el("slidesStatus").textContent = "Generating";
+  el("slidesStatus").textContent = translate("status.generating");
   try {
     const result = await api("/slides/generate", {
       method: "POST",
@@ -1175,21 +1330,21 @@ async function generateSlides() {
     });
     if (result.error_msg) {
       el("artifactOutput").innerHTML = `<div class="answer-status blocked">${escapeHtml(result.error_msg)}</div>`;
-      el("slidesStatus").textContent = "Blocked";
+      el("slidesStatus").textContent = translate("status.blocked");
       return;
     }
     el("artifactOutput").innerHTML = `
       <div class="artifact-card">
         <strong>${escapeHtml(result.topic || "Presentation")}</strong>
         <span>${Number(result.slide_count || 0)} slides</span>
-        <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download PPTX</a>
+        <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">${translate("status.download_pptx")}</a>
       </div>
     `;
-    el("slidesStatus").textContent = "Complete";
+    el("slidesStatus").textContent = translate("status.complete");
     await refreshAll();
   } catch (error) {
     el("artifactOutput").innerHTML = `<div class="answer-status blocked">${escapeHtml(error.message)}</div>`;
-    el("slidesStatus").textContent = "Failed";
+    el("slidesStatus").textContent = translate("status.failed");
   } finally {
     setBusy("generateSlidesBtn", false);
   }
@@ -1198,7 +1353,7 @@ async function generateSlides() {
 function setApiState(online, detail = "") {
   const node = el("apiState");
   node.classList.toggle("online", online);
-  node.textContent = online ? "Online" : detail || "Offline";
+  node.textContent = online ? translate("status.online") : (detail || translate("status.offline"));
 }
 
 function currentPage() {

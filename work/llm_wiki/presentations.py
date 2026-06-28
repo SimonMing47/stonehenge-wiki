@@ -56,7 +56,7 @@ def build_slide_specs(
     slides: list[SlideSpec] = [
         SlideSpec(title=title[:72], kicker="LLM Wiki", bullets=["自动从知识库检索、汇总并生成", f"引用来源 {len(sources)} 个"]),
         SlideSpec(title="核心回答", kicker="Answer", bullets=points[:5] or ["暂无足够材料生成摘要"]),
-        SlideSpec(title="来源依据", kicker="Sources", bullets=sources[:6] or ["暂无匹配来源"]),
+        SlideSpec(title="来源依据", kicker="Raw", bullets=sources[:6] or ["暂无匹配来源"]),
     ]
     if comments:
         slides.append(SlideSpec(title="待办与批注", kicker="TODO", bullets=comments[:5]))
