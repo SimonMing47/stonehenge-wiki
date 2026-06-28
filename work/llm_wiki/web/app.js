@@ -3,6 +3,7 @@ const state = {
   index: { files: [], comments: [], store: {} },
   audit: [],
   governance: null,
+  readiness: null,
   wikiSections: [],
   sourceRisk: null,
   explanation: null
@@ -33,11 +34,12 @@ async function api(path, options = {}) {
 async function refreshAll() {
   setBusy("refreshBtn", true);
   try {
-    const [health, index, audit, governance, wikiSections, sourceRisk] = await Promise.all([
+    const [health, index, audit, governance, readiness, wikiSections, sourceRisk] = await Promise.all([
       api("/health"),
       api("/index"),
       api("/audit?limit=25"),
       api("/reports/governance"),
+      api("/reports/readiness"),
       api("/wiki/sections?limit=14"),
       api("/sources/risk")
     ]);
@@ -45,12 +47,14 @@ async function refreshAll() {
     state.index = index;
     state.audit = audit.events || [];
     state.governance = governance.report || null;
+    state.readiness = readiness.report || null;
     state.wikiSections = wikiSections.sections || [];
     state.sourceRisk = sourceRisk;
     renderHealth();
     renderIndex();
     renderAudit();
     renderGovernance();
+    renderReadiness();
     renderWikiSections(state.wikiSections);
     renderSourceRisk();
     setApiState(true);
@@ -148,7 +152,38 @@ function renderGovernance() {
   }
   const summary = report.summary || {};
   const riskCount = (report.risks || []).length;
-  el("governanceSummary").textContent = `${summary.status || "unknown"} · ${riskCount} risks · ${summary.sources || 0} sources · ${report.todo?.total || 0} todos`;
+  const readiness = state.readiness?.summary || {};
+  const readinessText = readiness.status ? ` · readiness ${readiness.status}` : "";
+  el("governanceSummary").textContent = `${summary.status || "unknown"} · ${riskCount} risks · ${summary.sources || 0} sources · ${report.todo?.total || 0} todos${readinessText}`;
+}
+
+function renderReadiness() {
+  const report = state.readiness;
+  if (!report) {
+    el("readinessStatus").textContent = "not loaded";
+    el("readinessList").innerHTML = emptyRow("No readiness report");
+    return;
+  }
+  const summary = report.summary || {};
+  const gates = report.gates || [];
+  el("readinessStatus").textContent = `${summary.status || "unknown"} · score ${summary.score ?? 0} · ${summary.fail || 0} failing`;
+  el("readinessList").innerHTML = gates.length
+    ? gates.map(readinessRow).join("")
+    : emptyRow("No readiness gates");
+}
+
+function readinessRow(item) {
+  const status = item.status || "unknown";
+  return `
+    <div class="gate-row gate-${escapeHtml(status)}">
+      <div class="gate-title">
+        <strong>${escapeHtml(item.title || item.id || "Gate")}</strong>
+        <span>${escapeHtml(status)}</span>
+      </div>
+      <p>${escapeHtml(item.evidence || "")}</p>
+      ${status === "pass" ? "" : `<div class="meta"><span>${escapeHtml(item.remediation || "")}</span></div>`}
+    </div>
+  `;
 }
 
 function renderSourceRisk() {
@@ -529,6 +564,35 @@ async function exportReport() {
   }
 }
 
+async function refreshReadiness() {
+  setBusy("refreshReadinessBtn", true);
+  try {
+    const result = await api("/reports/readiness");
+    state.readiness = result.report || null;
+    renderGovernance();
+    renderReadiness();
+  } catch (error) {
+    el("readinessStatus").textContent = `failed · ${error.message}`;
+  } finally {
+    setBusy("refreshReadinessBtn", false);
+  }
+}
+
+async function exportReadiness() {
+  setBusy("exportReadinessBtn", true);
+  try {
+    const result = await api("/reports/readiness/export", { method: "POST", body: selectedGroupsBody() });
+    state.readiness = result.report || null;
+    renderGovernance();
+    renderReadiness();
+    el("readinessStatus").innerHTML = `${escapeHtml(result.report?.summary?.status || "ok")} · <a href="${escapeHtml(result.download_url)}" target="_blank" rel="noreferrer">Download readiness</a>`;
+  } catch (error) {
+    el("readinessStatus").textContent = `export failed · ${error.message}`;
+  } finally {
+    setBusy("exportReadinessBtn", false);
+  }
+}
+
 function selectedGroupsBody() {
   const group = el("groupInput").value.trim();
   return group ? JSON.stringify({ groups: [group] }) : "{}";
@@ -656,6 +720,8 @@ el("lintWikiBtn").addEventListener("click", lintWiki);
 el("wikiSearchBtn").addEventListener("click", searchWikiSections);
 el("refreshReportBtn").addEventListener("click", refreshReport);
 el("exportReportBtn").addEventListener("click", exportReport);
+el("refreshReadinessBtn").addEventListener("click", refreshReadiness);
+el("exportReadinessBtn").addEventListener("click", exportReadiness);
 el("runEvaluationBtn").addEventListener("click", runEvaluation);
 el("exportEvaluationBtn").addEventListener("click", exportEvaluation);
 el("tokenForm").addEventListener("submit", (event) => event.preventDefault());

@@ -15,6 +15,7 @@ from .importer import SourceImportError, import_source
 from .llm import LLMClient
 from .models import Question
 from .presentations import create_presentation
+from .readiness import build_readiness_report
 from .reports import build_governance_report
 from .security import PermissionGuard
 from .source_risk import MANDATORY_QUARANTINE_CODES, scan_source_risks
@@ -292,6 +293,70 @@ class LLMWikiPlatform:
             report["summary"]["status"],
             report["summary"]["status"] != "ok",
             {"summary": report["summary"], "risks": report["risks"]},
+        )
+        return result
+
+    def readiness_report(
+        self,
+        explicit_files: list[Path] | None = None,
+        groups: list[str] | None = None,
+    ) -> dict[str, Any]:
+        question_files = resolve_question_files(self.wiki_root, explicit_files, groups)
+        report = build_readiness_report(
+            self.wiki_root,
+            self.health(),
+            self.list_sources(include_missing=True),
+            self.source_risk_report(),
+            self.compiler.lint(),
+            self.guard,
+            question_files,
+        )
+        return {"status": "ok", "report": without_markdown(report)}
+
+    def export_readiness_report(
+        self,
+        explicit_files: list[Path] | None = None,
+        groups: list[str] | None = None,
+    ) -> dict[str, Any]:
+        question_files = resolve_question_files(self.wiki_root, explicit_files, groups)
+        report = build_readiness_report(
+            self.wiki_root,
+            self.health(),
+            self.list_sources(include_missing=True),
+            self.source_risk_report(),
+            self.compiler.lint(),
+            self.guard,
+            question_files,
+        )
+        output_dir = self.wiki_root / "output" / "reports"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        target = output_dir / "readiness-report.md"
+        json_target = output_dir / "readiness-report.json"
+        target.write_text(report["markdown"], encoding="utf-8")
+        json_target.write_text(json.dumps(without_markdown(report), ensure_ascii=False, indent=2), encoding="utf-8")
+        rel = target.relative_to(self.wiki_root).as_posix()
+        json_rel = json_target.relative_to(self.wiki_root).as_posix()
+        result = {
+            "status": "ok",
+            "report": without_markdown(report),
+            "path": rel,
+            "json_path": json_rel,
+            "download_url": "/files/" + quote(rel, safe="/"),
+            "json_download_url": "/files/" + quote(json_rel, safe="/"),
+        }
+        self.store.record_job(
+            "readiness_report_export",
+            report["summary"]["status"],
+            {"question_files": [str(path) for path in question_files]},
+            result,
+        )
+        self.audit(
+            "readiness.report",
+            new_request_id(),
+            rel,
+            report["summary"]["status"],
+            report["summary"]["fail"] > 0,
+            {"summary": report["summary"]},
         )
         return result
 

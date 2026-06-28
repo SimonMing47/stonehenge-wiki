@@ -511,17 +511,20 @@ h2 {
   max-width: 190px;
 }
 
+.readiness-pane,
 .risk-pane {
   padding: 18px;
 }
 
+.readiness-pane,
 .risk-pane {
   margin-top: 18px;
 }
 
 .table-list,
 .audit-list,
-.risk-list {
+.risk-list,
+.gate-list {
   display: grid;
   gap: 1px;
   border: 1px solid var(--line);
@@ -532,7 +535,8 @@ h2 {
 
 .row,
 .audit-row,
-.risk-row {
+.risk-row,
+.gate-row {
   display: grid;
   gap: 6px;
   padding: 12px;
@@ -541,8 +545,44 @@ h2 {
 
 .row strong,
 .audit-row strong,
-.risk-row strong {
+.risk-row strong,
+.gate-row strong {
   overflow-wrap: anywhere;
+}
+
+.gate-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gate-title span {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.gate-row {
+  border-left: 3px solid transparent;
+}
+
+.gate-row p {
+  margin: 0;
+  color: #303744;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.gate-pass {
+  border-left-color: var(--ok);
+}
+
+.gate-warn {
+  border-left-color: #b54708;
+}
+
+.gate-fail {
+  border-left-color: var(--danger);
 }
 
 .risk-title {

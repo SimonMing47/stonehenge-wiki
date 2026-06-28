@@ -38,6 +38,17 @@ python3 work/main.py --lint-wiki
 - `wiki/topics/*.md`
 - `wiki/log.md`
 
+## 企业交付门禁
+
+运行：
+
+```bash
+python3 work/main.py --readiness-report --group group-demo
+python3 work/main.py --export-readiness-report --group group-demo
+```
+
+导出的 Markdown 和 JSON 报告位于 `output/reports/readiness-report.*`。该报告以 pass/warn/fail 方式检查题组数量、权限安全、compiled wiki、no-RAG 架构、来源隔离、修复输出、审计、LLM 和 API token scope。
+
 ## 批注/TODO
 
 结构化批注兼容中英文冒号、大小写和不规则空格：

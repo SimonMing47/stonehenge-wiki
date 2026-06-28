@@ -63,6 +63,7 @@ For audit review:
 python3 work/main.py --audit-log --audit-limit 20
 python3 work/main.py --governance-report
 python3 work/main.py --evaluation-report --group group-1
+python3 work/main.py --readiness-report --group group-demo
 ```
 
 To compile, inspect, search, and validate the persistent Markdown wiki layer:

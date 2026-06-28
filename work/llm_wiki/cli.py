@@ -47,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--export-governance-report", action="store_true", help="Write governance report Markdown")
     parser.add_argument("--evaluation-report", action="store_true", help="Evaluate question groups and print a quality report")
     parser.add_argument("--export-evaluation-report", action="store_true", help="Write question evaluation reports")
+    parser.add_argument("--readiness-report", action="store_true", help="Print enterprise readiness gates as JSON")
+    parser.add_argument("--export-readiness-report", action="store_true", help="Write enterprise readiness report files")
     parser.add_argument("--serve", action="store_true", help="Start the HTTP API service")
     parser.add_argument("--host", help="HTTP API host override")
     parser.add_argument("--port", type=int, help="HTTP API port override")
@@ -147,6 +149,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.export_evaluation_report:
         print_json(platform.export_evaluation_report(explicit_files=args.question, groups=args.group))
+        return 0
+
+    if args.readiness_report:
+        print_json(platform.readiness_report(explicit_files=args.question, groups=args.group))
+        return 0
+
+    if args.export_readiness_report:
+        print_json(platform.export_readiness_report(explicit_files=args.question, groups=args.group))
         return 0
 
     if args.ask:

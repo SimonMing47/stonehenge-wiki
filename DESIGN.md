@@ -58,6 +58,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - Markdown wiki 编译层把原始文档转成可读、可 lint、可被 agent 维护的知识页；章节搜索只读 `wiki/` 编译层，避免退回到原始文档切片。
 - 独立问答解释通道返回检索路由、匹配词、命中文件、证据片段和安全判定，不改变题组答案的严格 JSON schema。
 - 质量评估报告批量运行题组，检查严格答案 schema、证据覆盖、安全阻断、空答案、LLM 使用和来源引用，用于回归验收。
+- 企业 readiness report 把题目硬约束和生产交付项转成可审计门禁，覆盖运行时、目录结构、CLI/skill、题组数量、权限、安全、compiled wiki、no-RAG 架构、来源治理、修复输出、审计、LLM 和 token scope。
 
 ## 平台模块
 
@@ -66,6 +67,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - `platform.py`：企业级服务门面，统一 CLI、skill、API 调用路径。
 - `importer.py`：受控知识源导入，处理 URL/文件读取、扩展名白名单、目录规范化、去重命名和 SSRF 防护。
 - `reports.py`：治理报告生成器，输出 JSON 摘要和 Markdown 报告。
+- `readiness.py`：企业交付门禁，生成 pass/warn/fail 证据矩阵和 Markdown/JSON 报告。
 - `source_risk.py`：来源风险扫描器，检查提示注入、Permission 命中、密钥位置、危险代码、抽取失败和 TODO 风险。
 - `evaluation.py`：题组质量评估器，输出 schema、证据、安全和 LLM 使用指标。
 - `server.py`：标准库 HTTP API，适合评测环境零依赖运行。

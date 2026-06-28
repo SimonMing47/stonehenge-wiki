@@ -218,7 +218,10 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("wiki_sections", app_js)
             self.assertIn("sourceRisk", app_js)
             self.assertIn("Source Risk Review", index_html)
+            self.assertIn("Readiness Gates", index_html)
             self.assertIn("token scopes", app_js)
+            self.assertIn("readiness", app_js)
+            self.assertIn("refreshReadinessBtn", index_html)
             self.assertIn("runEvaluation", app_js)
             self.assertIn("runEvaluationBtn", index_html)
             self.assertIn(".page.active", styles_css)
@@ -285,6 +288,7 @@ class PlatformSmokeTest(unittest.TestCase):
                         http_get(base + "/wiki/search?q=auth", headers=read_headers)
                     )
                     read_report = json.loads(http_get(base + "/reports/governance", headers=read_headers))
+                    read_readiness = json.loads(http_get(base + "/reports/readiness", headers=read_headers))
                     read_ask = http_post_status(
                         base + "/ask",
                         {"id": "auth-ask", "title": "统计 md 文件数量", "level": "简单"},
@@ -304,6 +308,11 @@ class PlatformSmokeTest(unittest.TestCase):
                         headers=read_headers,
                     )
                     read_export = http_post_status(base + "/reports/governance/export", {}, headers=read_headers)
+                    read_readiness_export = http_post_status(
+                        base + "/reports/readiness/export",
+                        {"groups": ["group-auth"]},
+                        headers=read_headers,
+                    )
                     read_evaluation = http_post_status(
                         base + "/reports/evaluation",
                         {"groups": ["group-auth"]},
@@ -311,6 +320,13 @@ class PlatformSmokeTest(unittest.TestCase):
                     )
                     admin_reindex = http_post_status(base + "/reindex", {}, headers=admin_headers)
                     admin_export = http_post_status(base + "/reports/governance/export", {}, headers=admin_headers)
+                    admin_readiness = json.loads(
+                        http_post(
+                            base + "/reports/readiness",
+                            {"groups": ["group-auth"]},
+                            headers=admin_headers,
+                        )
+                    )
                     admin_evaluation = json.loads(
                         http_post(
                             base + "/reports/evaluation",
@@ -336,6 +352,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertTrue(read_wiki_search["sections"])
             self.assertEqual(read_report["status"], "ok")
             self.assertIn("summary", read_report["report"])
+            self.assertEqual(read_readiness["status"], "ok")
+            self.assertIn("gates", read_readiness["report"])
             self.assertEqual(read_ask, 200)
             self.assertEqual(read_explain["status"], "ok")
             self.assertEqual(read_explain["records"][0]["path"], "docs/00_inbox/auth.md")
@@ -343,9 +361,11 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(read_reindex, 403)
             self.assertEqual(read_source_status, 403)
             self.assertEqual(read_export, 403)
+            self.assertEqual(read_readiness_export, 403)
             self.assertEqual(read_evaluation, 403)
             self.assertEqual(admin_reindex, 200)
             self.assertEqual(admin_export, 200)
+            self.assertIn("summary", admin_readiness["report"])
             self.assertEqual(admin_evaluation["report"]["summary"]["total_questions"], 1)
 
     def test_source_risk_report_cli_api_and_governance(self) -> None:
@@ -604,6 +624,90 @@ class PlatformSmokeTest(unittest.TestCase):
 
             self.assertEqual(api_report["report"]["summary"]["schema_valid"], 4)
             self.assertIn(b"LLM Wiki Evaluation Report", report_bytes)
+
+    def test_readiness_report_cli_api_and_export(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="llm-wiki-ready-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "llm-wiki"
+            docs = wiki / "docs" / "04_常用命令"
+            docs.mkdir(parents=True)
+            (wiki / "question").mkdir()
+            (wiki / "output" / "fixed").mkdir(parents=True)
+            (root / "result").mkdir()
+            (wiki / "README.md").write_text("# rules\n", encoding="utf-8")
+            (wiki / "AGENTS.md").write_text("# schema\n", encoding="utf-8")
+            (wiki / "Permission.json").write_text(
+                json.dumps(
+                    {
+                        "dir": {"deny": ["*/etc"]},
+                        "command": {"deny": ["del"]},
+                        "file": {"deny": ["spark-*.env"]},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (docs / "sqlite.md").write_text(
+                "SQLite SELECT 命令用于查询表数据。\n"
+                "TODO: 补充 WHERE 示例,to:王五,end_date:20261231\n",
+                encoding="utf-8",
+            )
+            levels = ["简单", "中等", "困难"]
+            questions = [
+                {
+                    "id": f"ready-{idx}",
+                    "title": "统计 md 文件数量" if idx % 2 else "SQLite SELECT 命令是什么",
+                    "level": levels[idx % len(levels)],
+                }
+                for idx in range(1, 21)
+            ]
+            (wiki / "question" / "group-ready.md").write_text(
+                json.dumps(questions, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform.compile_wiki()
+            report = platform.readiness_report(groups=["group-ready"])
+            summary = report["report"]["summary"]
+            gates = {item["id"]: item for item in report["report"]["gates"]}
+
+            self.assertEqual(summary["fail"], 0)
+            self.assertEqual(gates["question_groups"]["status"], "pass")
+            self.assertEqual(gates["security_gateway"]["status"], "pass")
+            self.assertEqual(gates["compiled_wiki"]["status"], "pass")
+            self.assertEqual(gates["no_rag_architecture"]["status"], "pass")
+            self.assertEqual(gates["source_governance"]["status"], "pass")
+            self.assertIn(gates["api_auth"]["status"], {"pass", "warn"})
+
+            exported = platform.export_readiness_report(groups=["group-ready"])
+            self.assertEqual(exported["status"], "ok")
+            self.assertTrue((wiki / exported["path"]).exists())
+            self.assertTrue((wiki / exported["json_path"]).exists())
+            self.assertIn("LLM Wiki Readiness Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
+
+            cli_output = io.StringIO()
+            with contextlib.redirect_stdout(cli_output):
+                code = cli_main(["--wiki-root", str(wiki), "--readiness-report", "--group", "group-ready"])
+            cli_report = json.loads(cli_output.getvalue())
+            self.assertEqual(code, 0)
+            self.assertEqual(cli_report["report"]["summary"]["fail"], 0)
+
+            httpd = build_server(platform, "127.0.0.1", 0)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                api_report = json.loads(http_get(base + "/reports/readiness?group=group-ready"))
+                api_export = json.loads(http_post(base + "/reports/readiness/export", {"groups": ["group-ready"]}))
+                report_bytes = http_get_bytes(base + api_export["download_url"])
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+                thread.join(timeout=5)
+
+            self.assertEqual(api_report["report"]["summary"]["fail"], 0)
+            self.assertIn(b"LLM Wiki Readiness Report", report_bytes)
 
     def test_generate_presentation_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-slides-test-") as tmp:

@@ -110,6 +110,12 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if not self.ensure_authorized("read"):
                 return
             return self.write_json(self.llm_wiki_platform.governance_report())
+        if parsed.path == "/reports/readiness":
+            if not self.ensure_authorized("read"):
+                return
+            query = parse_qs(parsed.query)
+            groups = query.get("groups") or query.get("group")
+            return self.write_json(self.llm_wiki_platform.readiness_report(groups=groups))
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
@@ -165,6 +171,16 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if isinstance(groups, str):
                 groups = [groups]
             return self.write_json(self.llm_wiki_platform.export_evaluation_report(groups=groups))
+        if parsed.path == "/reports/readiness":
+            groups = body.get("groups")
+            if isinstance(groups, str):
+                groups = [groups]
+            return self.write_json(self.llm_wiki_platform.readiness_report(groups=groups))
+        if parsed.path == "/reports/readiness/export":
+            groups = body.get("groups")
+            if isinstance(groups, str):
+                groups = [groups]
+            return self.write_json(self.llm_wiki_platform.export_readiness_report(groups=groups))
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def ensure_authorized(self, required_scope: str) -> bool:

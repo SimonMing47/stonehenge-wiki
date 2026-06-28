@@ -127,6 +127,15 @@ python3 work/main.py --evaluation-report --group group-1
 python3 work/main.py --export-evaluation-report --group group-1
 ```
 
+企业交付门禁：
+
+```bash
+python3 work/main.py --readiness-report --group group-demo
+python3 work/main.py --export-readiness-report --group group-demo
+```
+
+readiness report 会检查 Python 运行时、`llm-wiki` 目录结构、CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。
+
 编译 Markdown wiki：
 
 ```bash

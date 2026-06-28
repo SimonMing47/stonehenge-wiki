@@ -216,9 +216,19 @@
             <div class="row-actions compact">
               <button id="refreshReportBtn" type="button">Refresh Report</button>
               <button id="exportReportBtn" type="button">Export Markdown</button>
+              <button id="refreshReadinessBtn" type="button">Refresh Readiness</button>
+              <button id="exportReadinessBtn" type="button">Export Readiness</button>
               <button id="runEvaluationBtn" type="button">Run Evaluation</button>
               <button id="exportEvaluationBtn" type="button">Export Evaluation</button>
             </div>
+          </div>
+
+          <div class="surface readiness-pane">
+            <div class="section-head">
+              <h2>Readiness Gates</h2>
+              <span id="readinessStatus">Ready</span>
+            </div>
+            <div id="readinessList" class="gate-list"></div>
           </div>
 
           <div class="surface risk-pane">
