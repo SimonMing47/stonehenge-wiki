@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Karpathy LLM Wiki Notes</title>
+  </head>
+  <body>
+    <article>
+      <h1>Karpathy LLM Wiki Notes</h1>
+      <p>
+        LLM Wiki 的核心是把知识库维护成三层：raw sources、LLM-generated wiki、schema。
+        原始资料保留在 sources 中，模型或 agent 把资料整理成可读、可链接、可审查的 wiki 页面，
+        schema 则定义页面结构、维护规则和质量边界。
+      </p>
+      <p>
+        企业实现不应把全部资料临时拼入一次问答上下文，而应把导入、编译、审计、权限、安全拦截、
+        问答和演示稿生成做成稳定工作流。每次回答都应能回到 wiki 页面和源文件路径。
+      </p>
+      <p>
+        TODO: 补充 LLM Wiki schema 样例,to:赵六,end_date:20261115
+      </p>
+    </article>
+  </body>
+</html>

@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from .chunks import ChunkRecord, build_chunks
 from .indexer import WikiIndex
 from .models import CommentRecord, DocumentRecord
+from .wiki_sections import WikiSection, build_wiki_sections
 
 
 class SQLiteStore:
@@ -104,19 +104,23 @@ class SQLiteStore:
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_source_versions_identity ON source_versions(rel_path, sha256);
                 CREATE INDEX IF NOT EXISTS idx_source_versions_rel_path ON source_versions(rel_path);
-                CREATE TABLE IF NOT EXISTS document_chunks (
-                  chunk_id TEXT PRIMARY KEY,
-                  rel_path TEXT NOT NULL,
-                  ordinal INTEGER NOT NULL,
-                  text TEXT NOT NULL,
+                DROP TABLE IF EXISTS document_chunks;
+                CREATE TABLE IF NOT EXISTS wiki_sections (
+                  section_id TEXT PRIMARY KEY,
+                  page_path TEXT NOT NULL,
+                  page_title TEXT NOT NULL,
+                  kind TEXT NOT NULL,
+                  heading TEXT NOT NULL,
+                  level INTEGER NOT NULL,
+                  source_path TEXT NOT NULL,
+                  body TEXT NOT NULL,
                   terms_json TEXT NOT NULL,
                   line_start INTEGER NOT NULL,
                   line_end INTEGER NOT NULL,
-                  char_count INTEGER NOT NULL,
                   indexed_at TEXT NOT NULL
                 );
-                CREATE INDEX IF NOT EXISTS idx_document_chunks_rel_path ON document_chunks(rel_path);
-                CREATE INDEX IF NOT EXISTS idx_document_chunks_ordinal ON document_chunks(rel_path, ordinal);
+                CREATE INDEX IF NOT EXISTS idx_wiki_sections_page_path ON wiki_sections(page_path);
+                CREATE INDEX IF NOT EXISTS idx_wiki_sections_source_path ON wiki_sections(source_path);
                 """
             )
 
@@ -125,7 +129,6 @@ class SQLiteStore:
         with self.connect() as con:
             con.execute("DELETE FROM comments")
             con.execute("DELETE FROM files")
-            con.execute("DELETE FROM document_chunks")
             con.executemany(
                 """
                 INSERT INTO files(rel_path, suffix, name, tags_json, text_preview, comment_count, indexed_at)
@@ -140,16 +143,23 @@ class SQLiteStore:
                 """,
                 [self._comment_row(comment, now) for comment in index.comments],
             )
+            self._sync_source_registry(con, index, now)
+
+    def save_wiki_sections(self, compiled_root: Path) -> None:
+        now = utc_now()
+        sections = build_wiki_sections(compiled_root)
+        with self.connect() as con:
+            con.execute("DELETE FROM wiki_sections")
             con.executemany(
                 """
-                INSERT INTO document_chunks(
-                    chunk_id, rel_path, ordinal, text, terms_json, line_start, line_end, char_count, indexed_at
+                INSERT INTO wiki_sections(
+                    section_id, page_path, page_title, kind, heading, level, source_path,
+                    body, terms_json, line_start, line_end, indexed_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                [self._chunk_row(chunk, now) for record in index.records for chunk in build_chunks(record)],
+                [self._wiki_section_row(section, now) for section in sections],
             )
-            self._sync_source_registry(con, index, now)
 
     def record_source_provenance(
         self,
@@ -290,7 +300,7 @@ class SQLiteStore:
                   s.size, s.status, s.imported_at, s.updated_at, s.last_indexed_at,
                   f.suffix, f.tags_json, f.comment_count,
                   (SELECT COUNT(*) FROM source_versions v WHERE v.rel_path = s.rel_path) AS version_count,
-                  (SELECT COUNT(*) FROM document_chunks c WHERE c.rel_path = s.rel_path) AS chunk_count
+                  (SELECT COUNT(*) FROM wiki_sections w WHERE w.source_path = s.rel_path) AS wiki_section_count
                 FROM source_registry s
                 LEFT JOIN files f ON f.rel_path = s.rel_path
                 {where}
@@ -304,58 +314,56 @@ class SQLiteStore:
             item["tags"] = json.loads(tags_json)
             item["comment_count"] = int(item["comment_count"] or 0)
             item["version_count"] = int(item["version_count"] or 0)
-            item["chunk_count"] = int(item["chunk_count"] or 0)
+            item["wiki_section_count"] = int(item["wiki_section_count"] or 0)
             sources.append(item)
         return sources
 
-    def list_chunks(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    def list_wiki_sections(self, source_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         params: tuple[Any, ...]
         where = ""
-        if rel_path:
-            where = "WHERE rel_path = ?"
-            params = (rel_path, limit)
+        if source_path:
+            where = "WHERE source_path = ?"
+            params = (source_path, limit)
         else:
             params = (limit,)
         with self.connect() as con:
             rows = con.execute(
                 f"""
-                SELECT chunk_id, rel_path, ordinal, text, terms_json, line_start, line_end, char_count, indexed_at
-                FROM document_chunks
+                SELECT section_id, page_path, page_title, kind, heading, level, source_path,
+                       body, terms_json, line_start, line_end, indexed_at
+                FROM wiki_sections
                 {where}
-                ORDER BY rel_path ASC, ordinal ASC
+                ORDER BY page_path ASC, line_start ASC
                 LIMIT ?
                 """,
                 params,
             ).fetchall()
-        return [decode_chunk_row(row) for row in rows]
+        return [decode_wiki_section_row(row) for row in rows]
 
-    def search_chunks(self, query: str, limit: int = 10, rel_path: str | None = None) -> list[dict[str, Any]]:
+    def search_wiki_sections(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         from .indexer import query_terms
 
         terms = query_terms(query)
         if not terms:
-            return self.list_chunks(rel_path=rel_path, limit=limit)
-        params: tuple[Any, ...] = (rel_path,) if rel_path else ()
-        where = "WHERE rel_path = ?" if rel_path else ""
+            return self.list_wiki_sections(limit=limit)
         with self.connect() as con:
             rows = con.execute(
-                f"""
-                SELECT chunk_id, rel_path, ordinal, text, terms_json, line_start, line_end, char_count, indexed_at
-                FROM document_chunks
-                {where}
-                """,
-                params,
+                """
+                SELECT section_id, page_path, page_title, kind, heading, level, source_path,
+                       body, terms_json, line_start, line_end, indexed_at
+                FROM wiki_sections
+                """
             ).fetchall()
         scored: list[tuple[int, dict[str, Any]]] = []
         for row in rows:
-            chunk = decode_chunk_row(row)
-            score = score_chunk(chunk, terms)
+            section = decode_wiki_section_row(row)
+            score = score_wiki_section(section, terms)
             if score:
-                chunk["score"] = score
-                chunk["snippet"] = chunk_snippet(str(chunk.get("text") or ""), terms)
-                scored.append((score, chunk))
-        scored.sort(key=lambda item: (-item[0], item[1]["rel_path"], item[1]["ordinal"]))
-        return [chunk for _, chunk in scored[:limit]]
+                section["score"] = score
+                section["snippet"] = section_snippet(section, terms)
+                scored.append((score, section))
+        scored.sort(key=lambda item: (-item[0], item[1]["page_path"], item[1]["line_start"]))
+        return [section for _, section in scored[:limit]]
 
     def list_source_versions(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         params: tuple[Any, ...]
@@ -384,7 +392,7 @@ class SQLiteStore:
             comment_count = con.execute("SELECT COUNT(*) FROM comments").fetchone()[0]
             audit_count = con.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0]
             job_count = con.execute("SELECT COUNT(*) FROM job_runs").fetchone()[0]
-            chunk_count = con.execute("SELECT COUNT(*) FROM document_chunks").fetchone()[0]
+            wiki_section_count = con.execute("SELECT COUNT(*) FROM wiki_sections").fetchone()[0]
             source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status != 'missing'").fetchone()[0]
             missing_source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status = 'missing'").fetchone()[0]
             source_version_count = con.execute("SELECT COUNT(*) FROM source_versions").fetchone()[0]
@@ -393,7 +401,7 @@ class SQLiteStore:
             "comments": comment_count,
             "audit_events": audit_count,
             "jobs": job_count,
-            "chunks": chunk_count,
+            "wiki_sections": wiki_section_count,
             "sources": source_count,
             "missing_sources": missing_source_count,
             "source_versions": source_version_count,
@@ -425,16 +433,19 @@ class SQLiteStore:
             indexed_at,
         )
 
-    def _chunk_row(self, chunk: ChunkRecord, indexed_at: str) -> tuple[Any, ...]:
+    def _wiki_section_row(self, section: WikiSection, indexed_at: str) -> tuple[Any, ...]:
         return (
-            chunk.chunk_id,
-            chunk.rel_path,
-            chunk.ordinal,
-            chunk.text,
-            json.dumps(chunk.terms, ensure_ascii=False),
-            chunk.line_start,
-            chunk.line_end,
-            chunk.char_count,
+            section.section_id,
+            section.page_path,
+            section.page_title,
+            section.kind,
+            section.heading,
+            section.level,
+            section.source_path,
+            section.body,
+            json.dumps(section.terms, ensure_ascii=False),
+            section.line_start,
+            section.line_end,
             indexed_at,
         )
 
@@ -525,32 +536,44 @@ def source_category(rel_path: str) -> str:
     return "uncategorized"
 
 
-def decode_chunk_row(row: sqlite3.Row) -> dict[str, Any]:
-    chunk = dict(row)
-    chunk["terms"] = json.loads(chunk.pop("terms_json") or "[]")
-    return chunk
+def decode_wiki_section_row(row: sqlite3.Row) -> dict[str, Any]:
+    section = dict(row)
+    section["terms"] = json.loads(section.pop("terms_json") or "[]")
+    return section
 
 
-def score_chunk(chunk: dict[str, Any], terms: list[str]) -> int:
-    hay_path = str(chunk.get("rel_path") or "").lower()
-    hay_text = str(chunk.get("text") or "").lower()
-    chunk_terms = {str(term).lower() for term in chunk.get("terms", [])}
+def score_wiki_section(section: dict[str, Any], terms: list[str]) -> int:
+    hay_page = str(section.get("page_path") or "").lower()
+    hay_heading = str(section.get("heading") or "").lower()
+    hay_body = str(section.get("body") or "").lower()
+    section_terms = {str(term).lower() for term in section.get("terms", [])}
     score = 0
     for term in terms:
         low = term.lower()
-        if low in hay_path:
-            score += 3
-        if low in chunk_terms:
-            score += 12
-        count = hay_text.count(low)
+        if low in hay_heading:
+            score += 20
+        if low in hay_page:
+            score += 4
+        if low in section_terms:
+            score += 10
+        count = hay_body.count(low)
         if count:
             score += min(count * 3, 12)
     return score
 
 
-def chunk_snippet(text: str, terms: list[str], radius: int = 180) -> str:
+def section_snippet(section: dict[str, Any], terms: list[str], radius: int = 180) -> str:
+    text = "\n".join(
+        value
+        for value in [str(section.get("heading") or ""), str(section.get("body") or "")]
+        if value
+    )
     low_text = text.lower()
-    positions = [low_text.find(term.lower()) for term in terms if low_text.find(term.lower()) >= 0]
+    positions = [
+        low_text.find(term.lower())
+        for term in terms
+        if low_text.find(term.lower()) >= 0
+    ]
     if not positions:
         return text[: radius * 2].strip()
     center = min(positions)

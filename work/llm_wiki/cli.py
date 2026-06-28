@@ -22,10 +22,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--list-source-versions", action="store_true", help="Print source version history records as JSON")
     parser.add_argument("--source-history", help="Print version history for one source registry path")
     parser.add_argument("--source-history-limit", type=int, default=50, help="Version record count for source history")
-    parser.add_argument("--list-chunks", action="store_true", help="Print persisted retrieval chunks as JSON")
-    parser.add_argument("--chunk-source", help="Restrict chunk listing/search to one source path")
-    parser.add_argument("--chunk-limit", type=int, default=20, help="Chunk count for listing/search")
-    parser.add_argument("--search-chunks", help="Search persisted retrieval chunks")
+    parser.add_argument("--list-wiki-sections", action="store_true", help="Print compiled wiki sections as JSON")
+    parser.add_argument("--wiki-section-source", help="Filter compiled wiki sections by source registry path")
+    parser.add_argument("--wiki-section-limit", type=int, default=50, help="Compiled wiki section count")
+    parser.add_argument("--search-wiki", help="Search the compiled Markdown wiki layer")
     parser.add_argument("--reindex", action="store_true", help="Rebuild and persist the wiki index")
     parser.add_argument("--import-source", help="Import a local file or public URL into docs/00_inbox")
     parser.add_argument("--import-title", default="", help="Optional title used for the imported filename")
@@ -88,12 +88,19 @@ def main(argv: list[str] | None = None) -> int:
         print_json({"versions": platform.list_source_versions(rel_path=args.source_history, limit=args.source_history_limit)})
         return 0
 
-    if args.list_chunks:
-        print_json({"chunks": platform.list_chunks(rel_path=args.chunk_source, limit=args.chunk_limit)})
+    if args.list_wiki_sections:
+        print_json(
+            {
+                "sections": platform.list_wiki_sections(
+                    source_path=args.wiki_section_source,
+                    limit=args.wiki_section_limit,
+                )
+            }
+        )
         return 0
 
-    if args.search_chunks:
-        print_json(platform.search_chunks(args.search_chunks, limit=args.chunk_limit, rel_path=args.chunk_source))
+    if args.search_wiki:
+        print_json(platform.search_wiki(args.search_wiki, limit=args.wiki_section_limit))
         return 0
 
     if args.audit_log:

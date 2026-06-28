@@ -56,8 +56,8 @@ function renderHealth() {
   const store = health.store || {};
   el("fileCount").textContent = String(health.files ?? store.files ?? 0);
   el("commentCount").textContent = String(health.comments ?? store.comments ?? 0);
-  el("chunkCount").textContent = String(store.chunks ?? 0);
   el("auditCount").textContent = String(store.audit_events ?? 0);
+  el("wikiSectionCount").textContent = String(store.wiki_sections ?? 0);
   el("dbName").textContent = (health.database_path || "wiki.sqlite").split("/").slice(-1)[0];
   const llm = health.llm || {};
   el("llmName").textContent = llm.enabled
@@ -90,8 +90,8 @@ function fileRow(file, source) {
   const hash = source?.sha256 ? `sha ${String(source.sha256).slice(0, 10)}` : "sha pending";
   const versionCount = Number(source?.version_count || 0);
   const versions = `${versionCount} ${versionCount === 1 ? "version" : "versions"}`;
-  const chunkCount = Number(source?.chunk_count || 0);
-  const chunks = `${chunkCount} ${chunkCount === 1 ? "chunk" : "chunks"}`;
+  const sectionCount = Number(source?.wiki_section_count || 0);
+  const sections = `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}`;
   const origin = source?.origin_type || "local";
   const status = source?.status || "active";
   return `
@@ -103,7 +103,7 @@ function fileRow(file, source) {
         <span>${escapeHtml(size)}</span>
         <span>${escapeHtml(hash)}</span>
         <span>${escapeHtml(versions)}</span>
-        <span>${escapeHtml(chunks)}</span>
+        <span>${escapeHtml(sections)}</span>
         <span>${escapeHtml(file.suffix || "file")}</span>
         <span>${escapeHtml(tags)}</span>
         <span>${Number(file.comment_count || 0)} comments</span>

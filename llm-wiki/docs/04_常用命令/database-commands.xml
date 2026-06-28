@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<commands>
+  <command name="gaussdb-connect">gsql -h gaussdb.demo.local -p 8000 -U wiki_reader -d knowledge</command>
+  <command name="sqlite-select">SELECT * FROM documents WHERE topic = 'wiki';</command>
+  <todo>TODO: 补充 PostgreSQL 只读连接命令,to:王五,end_date:20261130</todo>
+</commands>

@@ -32,6 +32,7 @@ class LLMWikiPlatform:
         self.store = SQLiteStore(self.config.database_path)
         if self.config.persist_index:
             self.store.save_index(self.index)
+            self.store.save_wiki_sections(self.wiki_root / "wiki")
 
     @property
     def compiler(self) -> WikiCompiler:
@@ -46,12 +47,16 @@ class LLMWikiPlatform:
         self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
         if self.config.persist_index:
             self.store.save_index(self.index)
+            self.store.save_wiki_sections(self.wiki_root / "wiki")
         result = self.health()
         self.store.record_job("reindex", "ok", {"wiki_root": str(self.wiki_root)}, result)
         return result
 
     def compile_wiki(self) -> dict[str, Any]:
         result = self.compiler.compile()
+        if self.config.persist_index:
+            self.store.save_wiki_sections(self.wiki_root / "wiki")
+            result["wiki_sections"] = self.store.stats()["wiki_sections"]
         self.store.record_job("wiki_compile", "ok", {"wiki_root": str(self.wiki_root)}, result)
         self.audit(
             event_type="wiki.compile",
@@ -294,14 +299,14 @@ class LLMWikiPlatform:
     def list_source_versions(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_source_versions(rel_path=rel_path, limit=limit)
 
-    def list_chunks(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-        return self.store.list_chunks(rel_path=rel_path, limit=limit)
+    def list_wiki_sections(self, source_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        return self.store.list_wiki_sections(source_path=source_path, limit=limit)
 
-    def search_chunks(self, query: str, limit: int = 10, rel_path: str | None = None) -> dict[str, Any]:
+    def search_wiki(self, query: str, limit: int = 10) -> dict[str, Any]:
         return {
             "status": "ok",
             "query": query,
-            "chunks": self.store.search_chunks(query=query, limit=limit, rel_path=rel_path),
+            "sections": self.store.search_wiki_sections(query, limit=limit),
         }
 
     def governance_report(self) -> dict[str, Any]:

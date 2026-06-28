@@ -65,21 +65,6 @@ class PlatformHandler(BaseHTTPRequestHandler):
             rel_path = query.get("path", [""])[0] or None
             limit = int(query.get("limit", ["50"])[0])
             return self.write_json({"versions": self.llm_wiki_platform.list_source_versions(rel_path=rel_path, limit=limit)})
-        if parsed.path == "/chunks":
-            if not self.ensure_authorized("read"):
-                return
-            query = parse_qs(parsed.query)
-            rel_path = query.get("path", [""])[0] or None
-            limit = int(query.get("limit", ["50"])[0])
-            return self.write_json({"chunks": self.llm_wiki_platform.list_chunks(rel_path=rel_path, limit=limit)})
-        if parsed.path == "/chunks/search":
-            if not self.ensure_authorized("read"):
-                return
-            query = parse_qs(parsed.query)
-            q = query.get("q", [""])[0]
-            rel_path = query.get("path", [""])[0] or None
-            limit = int(query.get("limit", ["10"])[0])
-            return self.write_json(self.llm_wiki_platform.search_chunks(q, limit=limit, rel_path=rel_path))
         if parsed.path == "/audit":
             if not self.ensure_authorized("read"):
                 return
@@ -89,6 +74,27 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if not self.ensure_authorized("read"):
                 return
             return self.write_json(self.llm_wiki_platform.lint_wiki())
+        if parsed.path == "/wiki/sections":
+            if not self.ensure_authorized("read"):
+                return
+            query = parse_qs(parsed.query)
+            source_path = query.get("source_path", query.get("path", [""]))[0] or None
+            limit = int(query.get("limit", ["50"])[0])
+            return self.write_json(
+                {
+                    "sections": self.llm_wiki_platform.list_wiki_sections(
+                        source_path=source_path,
+                        limit=limit,
+                    )
+                }
+            )
+        if parsed.path == "/wiki/search":
+            if not self.ensure_authorized("read"):
+                return
+            query = parse_qs(parsed.query)
+            title = query.get("q", query.get("query", [""]))[0]
+            limit = int(query.get("limit", ["10"])[0])
+            return self.write_json(self.llm_wiki_platform.search_wiki(title, limit=limit))
         if parsed.path == "/reports/governance":
             if not self.ensure_authorized("read"):
                 return

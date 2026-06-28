@@ -32,20 +32,21 @@ For an index inspection:
 python3 work/main.py --dump-index
 python3 work/main.py --list-sources
 python3 work/main.py --list-source-versions
-python3 work/main.py --source-history "docs/03_学习材料/RAG-Notes.md"
-python3 work/main.py --search-chunks "SQLite SELECT" --chunk-limit 5
+python3 work/main.py --source-history "docs/03_学习材料/Knowledge-Notes.md"
+python3 work/main.py --list-wiki-sections --wiki-section-limit 20
+python3 work/main.py --search-wiki "SQLite SELECT" --wiki-section-limit 5
 ```
 
 For source ingestion:
 
 ```bash
-python3 work/main.py --import-source ./docs/source.pdf --import-title "RAG 评估材料" --import-category 03_学习材料
+python3 work/main.py --import-source ./docs/source.pdf --import-title "知识库评估材料" --import-category 03_学习材料
 ```
 
 For a PowerPoint brief:
 
 ```bash
-python3 work/main.py --generate-ppt "RAG 知识库建设方案" --slide-count 6
+python3 work/main.py --generate-ppt "企业知识库建设方案" --slide-count 6
 ```
 
 For an API service:
@@ -64,10 +65,12 @@ python3 work/main.py --governance-report
 python3 work/main.py --evaluation-report --group group-1
 ```
 
-To compile and validate the persistent Markdown wiki layer:
+To compile, inspect, search, and validate the persistent Markdown wiki layer:
 
 ```bash
 python3 work/main.py --compile-wiki
+python3 work/main.py --list-wiki-sections --wiki-section-limit 20
+python3 work/main.py --search-wiki "SQLite SELECT" --wiki-section-limit 5
 python3 work/main.py --lint-wiki
 ```
 
@@ -77,7 +80,7 @@ Always let the CLI perform safety checks before reading, executing, or repairing
 
 ## Outputs
 
-Imported sources are copied under `llm-wiki/docs/<category>/` and reindexed. Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Governance and evaluation reports are written under `llm-wiki/output/reports/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index, source registry, metadata-only source version history, retrieval chunks, and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
+Imported sources are copied under `llm-wiki/docs/<category>/` and reindexed. Question group answers are written to `llm-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `llm-wiki/output/fixed/`. PowerPoint briefs are written under `llm-wiki/output/presentations/`. Governance reports are written under `llm-wiki/output/reports/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index, source registry, metadata-only source version history, compiled wiki section index, and audit data are stored in `llm-wiki/.state/wiki.sqlite`.
 
 ## Helper Script
 

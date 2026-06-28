@@ -30,15 +30,22 @@ class WikiCompiler:
             generated_sources.append(target)
 
         generated_topics = self.write_topic_pages()
+        removed_sources = remove_stale_pages(self.sources_dir, generated_sources)
+        removed_topics = remove_stale_pages(self.topics_dir, generated_topics)
         (self.compiled_root / "index.md").write_text(
             self.render_index_page(generated_sources, generated_topics),
             encoding="utf-8",
         )
-        self.append_log("compile", f"files={len(generated_sources)} topics={len(generated_topics)}")
+        self.append_log(
+            "compile",
+            f"files={len(generated_sources)} topics={len(generated_topics)} "
+            f"removed={removed_sources + removed_topics}",
+        )
         return {
             "wiki_dir": self.compiled_root.as_posix(),
             "source_pages": len(generated_sources),
             "topic_pages": len(generated_topics),
+            "removed_pages": removed_sources + removed_topics,
             "index": (self.compiled_root / "index.md").as_posix(),
             "log": (self.compiled_root / "log.md").as_posix(),
         }
@@ -223,6 +230,18 @@ def escape_yaml(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def remove_stale_pages(directory: Path, generated: list[Path]) -> int:
+    if not directory.exists():
+        return 0
+    keep = {path.resolve() for path in generated}
+    removed = 0
+    for path in directory.glob("*.md"):
+        if path.resolve() in keep:
+            continue
+        path.unlink()
+        removed += 1
+    return removed
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
-

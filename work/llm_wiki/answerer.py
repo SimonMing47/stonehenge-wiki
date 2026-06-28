@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import csv
 import re
+import zipfile
 from html import unescape
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree as ET
 
 from .execution import run_code_file
 from .extractors import SUPPORTED_EXTENSIONS
@@ -477,6 +480,13 @@ def records_from_comments(index: WikiIndex, comments: list[CommentRecord]) -> li
 
 
 def create_pivot_workbook(record: DocumentRecord, wiki_root: Path) -> str:
+    try:
+        return create_pivot_workbook_openpyxl(record, wiki_root)
+    except ModuleNotFoundError:
+        return create_pivot_summary_csv(record, wiki_root)
+
+
+def create_pivot_workbook_openpyxl(record: DocumentRecord, wiki_root: Path) -> str:
     from openpyxl import Workbook, load_workbook
     from openpyxl.chart import BarChart, Reference
 
@@ -509,3 +519,79 @@ def create_pivot_workbook(record: DocumentRecord, wiki_root: Path) -> str:
     ws.add_chart(chart, "D2")
     wb.save(target)
     return target_rel
+
+
+def create_pivot_summary_csv(record: DocumentRecord, wiki_root: Path) -> str:
+    rows = read_xlsx_rows_zip(record.full_path)
+    if len(rows) < 2:
+        raise ValueError("工作表数据不足")
+    header = [str(item) if item is not None else "" for item in rows[0]]
+    data_rows = [row for row in rows[1:] if any(cell not in {None, ""} for cell in row)]
+    group_idx = 0
+    counter: dict[str, int] = {}
+    for row in data_rows:
+        key = str(row[group_idx]).strip() if group_idx < len(row) and row[group_idx] not in {None, ""} else "空值"
+        counter[key] = counter.get(key, 0) + 1
+
+    target_rel = f"output/fixed/pivot_{record.full_path.stem}.csv"
+    target = wiki_root / target_rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow([header[group_idx] or "分组", "数量"])
+        for key, count in sorted(counter.items()):
+            writer.writerow([key, count])
+    return target_rel
+
+
+def read_xlsx_rows_zip(path: Path) -> list[list[str]]:
+    ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    with zipfile.ZipFile(path) as zf:
+        shared_strings = read_shared_strings(zf, ns)
+        sheet_names = sorted(name for name in zf.namelist() if name.startswith("xl/worksheets/") and name.endswith(".xml"))
+        if not sheet_names:
+            return []
+        root = ET.fromstring(zf.read(sheet_names[0]))
+    rows: list[list[str]] = []
+    for row_elem in root.findall(".//main:sheetData/main:row", ns):
+        row_values: list[str] = []
+        for cell in row_elem.findall("main:c", ns):
+            col_idx = column_index(cell.attrib.get("r", ""))
+            while len(row_values) <= col_idx:
+                row_values.append("")
+            row_values[col_idx] = cell_value(cell, shared_strings, ns)
+        rows.append(row_values)
+    return rows
+
+
+def read_shared_strings(zf: zipfile.ZipFile, ns: dict[str, str]) -> list[str]:
+    if "xl/sharedStrings.xml" not in zf.namelist():
+        return []
+    root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+    strings: list[str] = []
+    for item in root.findall("main:si", ns):
+        strings.append("".join(text.strip() for text in item.itertext() if text and text.strip()))
+    return strings
+
+
+def cell_value(cell: ET.Element, shared_strings: list[str], ns: dict[str, str]) -> str:
+    value_elem = cell.find("main:v", ns)
+    if value_elem is None or value_elem.text is None:
+        return ""
+    value = value_elem.text
+    if cell.attrib.get("t") == "s":
+        try:
+            return shared_strings[int(value)]
+        except (IndexError, ValueError):
+            return value
+    return value
+
+
+def column_index(ref: str) -> int:
+    letters = re.match(r"[A-Z]+", ref.upper())
+    if not letters:
+        return 0
+    index = 0
+    for char in letters.group(0):
+        index = index * 26 + ord(char) - ord("A") + 1
+    return max(0, index - 1)
