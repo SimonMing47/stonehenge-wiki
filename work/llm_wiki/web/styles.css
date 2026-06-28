@@ -154,6 +154,12 @@ textarea:focus {
   background: rgba(25, 27, 31, 0.06);
 }
 
+.nav a.active {
+  background: #e4e9ef;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .rail-foot {
   margin-top: auto;
 }
@@ -252,16 +258,30 @@ h2 {
   box-shadow: var(--shadow);
 }
 
-.studio-grid {
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}
+
+.page > .surface + .surface,
+.page > .answer-output {
+  margin-top: 18px;
+}
+
+.source-page-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(360px, 1.35fr) minmax(280px, 0.95fr);
+  grid-template-columns: minmax(420px, 1.15fr) minmax(340px, 0.85fr);
   gap: 18px;
-  align-items: stretch;
 }
 
 .source-pane,
 .ask-pane,
-.artifact-pane {
+.artifact-pane,
+.comments-pane,
+.audit-pane {
   padding: 18px;
 }
 
@@ -365,7 +385,6 @@ h2 {
   display: grid;
   grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.25fr);
   gap: 18px;
-  margin-top: 18px;
 }
 
 .explain-pane,
@@ -379,6 +398,10 @@ h2 {
 
 .wiki-search input {
   max-width: none;
+}
+
+.wiki-workspace + .surface {
+  margin-top: 18px;
 }
 
 .wiki-section-list,
@@ -482,27 +505,16 @@ h2 {
   align-items: center;
   gap: 16px;
   padding: 18px;
-  margin-top: 18px;
 }
 
 .compact input {
   max-width: 190px;
 }
 
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px;
-  margin-top: 18px;
-}
-
-.split .surface,
-#audit.surface,
 .risk-pane {
   padding: 18px;
 }
 
-#audit.surface,
 .risk-pane {
   margin-top: 18px;
 }
@@ -555,6 +567,17 @@ h2 {
   line-height: 1.45;
 }
 
+.risk-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.risk-actions button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
 .severity-critical {
   border-left-color: #7a271a;
 }
@@ -605,9 +628,8 @@ h2 {
     margin-left: auto;
   }
 
-  .studio-grid,
   .wiki-workspace,
-  .split,
+  .source-page-grid,
   .metrics {
     grid-template-columns: 1fr;
   }

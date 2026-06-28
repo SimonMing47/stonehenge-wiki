@@ -56,6 +56,12 @@ class WikiIndex:
             self.by_path[record.rel_path] = record
         return self
 
+    def with_records(self, records: list[DocumentRecord]) -> "WikiIndex":
+        view = WikiIndex(self.wiki_root)
+        view.records = list(records)
+        view.by_path = {record.rel_path: record for record in view.records}
+        return view
+
     @property
     def comments(self) -> list[CommentRecord]:
         result: list[CommentRecord] = []

@@ -8,6 +8,7 @@ const state = {
   explanation: null
 };
 
+const pages = new Set(["ask", "wiki", "studio", "sources", "governance", "audit"]);
 const el = (id) => document.getElementById(id);
 
 async function api(path, options = {}) {
@@ -84,7 +85,8 @@ function renderIndex() {
   const presentations = state.index.presentations || [];
   const registry = state.index.source_registry || [];
   const sourceByPath = Object.fromEntries(registry.map((source) => [source.rel_path, source]));
-  el("fileScope").textContent = `${registry.length || files.length} active`;
+  const activeCount = registry.filter((source) => source.status === "active").length || files.length;
+  el("fileScope").textContent = `${activeCount} active · ${registry.length || files.length} total`;
   el("commentScope").textContent = `${comments.length} found`;
   el("fileList").innerHTML = files.length
     ? files.map((file) => fileRow(file, sourceByPath[file.path])).join("")
@@ -156,22 +158,30 @@ function renderSourceRisk() {
   el("sourceRiskCount").textContent = String(summary.risk_count ?? 0);
   el("riskStatus").textContent = `${summary.status || "unknown"} · ${summary.sources_with_risks || 0} sources`;
   el("riskList").innerHTML = findings.length
-    ? findings.slice(0, 80).map(riskRow).join("")
+    ? findings.slice(0, 80).map((finding) => riskRow(finding)).join("")
     : emptyRow("No source risks");
 }
 
 function riskRow(finding) {
   const location = finding.line ? `${finding.source_path}:${finding.line}` : finding.source_path;
+  const registry = state.index.source_registry || [];
+  const source = registry.find((item) => item.rel_path === finding.source_path) || {};
+  const status = source.status || "active";
+  const nextStatus = status === "quarantined" ? "active" : "quarantined";
+  const actionLabel = status === "quarantined" ? "Activate" : "Quarantine";
   return `
     <div class="risk-row severity-${escapeHtml(finding.severity || "low")}">
       <div class="risk-title">
         <strong>${escapeHtml(finding.code || "risk")}</strong>
-        <span>${escapeHtml(finding.severity || "")}</span>
+        <span>${escapeHtml(finding.severity || "")} · ${escapeHtml(status)}</span>
       </div>
       <p>${escapeHtml(finding.message || "")}</p>
       <div class="meta">
         <span>${escapeHtml(location || "")}</span>
         ${finding.evidence ? `<span>${escapeHtml(finding.evidence)}</span>` : ""}
+      </div>
+      <div class="risk-actions">
+        <button type="button" data-source-path="${escapeHtml(finding.source_path)}" data-source-status="${escapeHtml(nextStatus)}">${actionLabel}</button>
       </div>
     </div>
   `;
@@ -287,6 +297,7 @@ async function explainQuestion() {
     renderExplanation(explanation);
     renderWikiSections(explanation.wiki?.sections || []);
     el("explainStatus").textContent = explanation.status || "Complete";
+    setPage("wiki");
   } catch (error) {
     el("explainOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
     el("explainStatus").textContent = "Failed";
@@ -417,14 +428,40 @@ async function importSource() {
   }
 }
 
+async function setSourceStatus(path, status, button) {
+  if (!path || !status) return;
+  if (button) button.disabled = true;
+  el("riskStatus").textContent = "Updating";
+  try {
+    const result = await api("/sources/status", {
+      method: "POST",
+      body: JSON.stringify({
+        path,
+        status,
+        reason: "console review action",
+        actor: "console"
+      })
+    });
+    if (result.error) {
+      el("riskStatus").textContent = `failed · ${result.error}`;
+      return;
+    }
+    await refreshAll();
+  } catch (error) {
+    el("riskStatus").textContent = `failed · ${error.message}`;
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function compileWiki() {
   setBusy("compileWikiBtn", true);
   try {
     const result = await api("/wiki/compile", { method: "POST", body: "{}" });
-    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+    writeWikiOutput(result);
     await refreshAll();
   } catch (error) {
-    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
+    writeWikiOutput({ error: error.message });
   } finally {
     setBusy("compileWikiBtn", false);
   }
@@ -434,10 +471,10 @@ async function lintWiki() {
   setBusy("lintWikiBtn", true);
   try {
     const result = await api("/wiki/lint");
-    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+    writeWikiOutput(result);
     await refreshAll();
   } catch (error) {
-    el("answerOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify({ error: error.message }, null, 2))}</pre>`;
+    writeWikiOutput({ error: error.message });
   } finally {
     setBusy("lintWikiBtn", false);
   }
@@ -560,9 +597,38 @@ function setApiState(online, detail = "") {
   node.textContent = online ? "Online" : detail || "Offline";
 }
 
+function currentPage() {
+  const id = window.location.hash.replace("#", "") || "ask";
+  return pages.has(id) ? id : "ask";
+}
+
+function setPage(page) {
+  const target = pages.has(page) ? page : "ask";
+  if (window.location.hash !== `#${target}`) {
+    window.location.hash = target;
+  } else {
+    renderPage();
+  }
+}
+
+function renderPage() {
+  const active = currentPage();
+  document.querySelectorAll("[data-page]").forEach((node) => {
+    node.classList.toggle("active", node.dataset.page === active);
+  });
+  document.querySelectorAll(".nav a").forEach((link) => {
+    const page = link.getAttribute("href")?.replace("#", "") || "";
+    link.classList.toggle("active", page === active);
+  });
+}
+
 function setBusy(id, busy) {
   const node = el(id);
   node.disabled = busy;
+}
+
+function writeWikiOutput(result) {
+  el("wikiOperationOutput").innerHTML = `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
 }
 
 function escapeHtml(value) {
@@ -588,6 +654,12 @@ el("exportReportBtn").addEventListener("click", exportReport);
 el("runEvaluationBtn").addEventListener("click", runEvaluation);
 el("exportEvaluationBtn").addEventListener("click", exportEvaluation);
 el("tokenForm").addEventListener("submit", (event) => event.preventDefault());
+window.addEventListener("hashchange", renderPage);
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-source-status]");
+  if (!button) return;
+  setSourceStatus(button.dataset.sourcePath, button.dataset.sourceStatus, button);
+});
 el("saveTokenBtn").addEventListener("click", () => {
   localStorage.setItem("llmWikiApiToken", el("tokenInput").value.trim());
   refreshAll();
@@ -599,4 +671,5 @@ el("questionInput").addEventListener("keydown", (event) => {
 });
 
 el("tokenInput").value = localStorage.getItem("llmWikiApiToken") || "";
+renderPage();
 refreshAll();

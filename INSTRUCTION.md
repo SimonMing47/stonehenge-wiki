@@ -106,6 +106,9 @@ python3 work/main.py --audit-log --audit-limit 20
 
 ```bash
 python3 work/main.py --source-risk-report
+python3 work/main.py --set-source-status docs/00_inbox/risky.md --source-status quarantined --source-status-reason "prompt injection review"
+python3 work/main.py --set-source-status docs/00_inbox/risky.md --source-status active --source-status-reason "review complete"
+python3 work/main.py --list-source-reviews --source-review-path docs/00_inbox/risky.md
 ```
 
 治理报告：
@@ -183,6 +186,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `GET /sources?include_missing=1`：来源注册表，包含 origin、hash、大小、状态和最后索引时间
 - `GET /sources/history?path=docs/03_学习材料/Knowledge-Notes.md`：来源版本历史，只记录路径、hash、大小和观测次数，不复制原始正文
 - `GET /sources/risk`：来源风险扫描，检查提示注入、权限黑名单、密钥位置、危险代码、抽取失败和 TODO 风险
+- `GET /sources/reviews?path=docs/00_inbox/risky.md`：来源审批/隔离历史
 - `GET /audit?limit=50`：审计事件
 - `GET /wiki/lint`：检查编译型 Markdown wiki
 - `GET /wiki/sections?source_path=docs/04_常用命令/sqlite.md&limit=20`：查看编译后的 wiki 章节
@@ -193,6 +197,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `POST /explain`：查看一次问题的检索证据、安全路由和匹配片段，JSON body 示例 `{"id":"trace-1","title":"SQLite SELECT 命令是什么","level":"中等"}`
 - `POST /groups/run`：运行题组，JSON body 示例 `{"groups":["group-1"]}`
 - `POST /sources/import`：导入本地文件或公开 URL，JSON body 示例 `{"source":"https://example.com/page.html","title":"网页资料","category":"00_inbox"}`
+- `POST /sources/status`：隔离或恢复来源，JSON body 示例 `{"path":"docs/00_inbox/risky.md","status":"quarantined","reason":"prompt injection review"}`
 - `POST /slides/generate`：生成 PPTX，JSON body 示例 `{"topic":"企业知识库建设方案","slide_count":6}`
 - `POST /reports/governance/export`：导出 Markdown 治理报告到 `output/reports/`
 - `POST /reports/evaluation`：运行题组质量评估，JSON body 示例 `{"groups":["group-1"]}`
@@ -202,7 +207,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 

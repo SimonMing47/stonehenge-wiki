@@ -69,6 +69,13 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if not self.ensure_authorized("read"):
                 return
             return self.write_json(self.llm_wiki_platform.source_risk_report())
+        if parsed.path == "/sources/reviews":
+            if not self.ensure_authorized("read"):
+                return
+            query = parse_qs(parsed.query)
+            rel_path = query.get("path", [""])[0] or None
+            limit = int(query.get("limit", ["50"])[0])
+            return self.write_json({"reviews": self.llm_wiki_platform.list_source_reviews(rel_path=rel_path, limit=limit)})
         if parsed.path == "/audit":
             if not self.ensure_authorized("read"):
                 return
@@ -128,6 +135,12 @@ class PlatformHandler(BaseHTTPRequestHandler):
             title = str(body.get("title", ""))
             category = str(body.get("category", "00_inbox"))
             return self.write_json(self.llm_wiki_platform.ingest_source(source, title=title, category=category))
+        if parsed.path == "/sources/status":
+            rel_path = str(body.get("path", body.get("rel_path", "")))
+            status = str(body.get("status", ""))
+            reason = str(body.get("reason", ""))
+            actor = str(body.get("actor", "api"))
+            return self.write_json(self.llm_wiki_platform.set_source_status(rel_path, status, reason=reason, actor=actor))
         if parsed.path == "/wiki/compile":
             return self.write_json(self.llm_wiki_platform.compile_wiki())
         if parsed.path == "/groups/run":

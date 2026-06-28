@@ -82,25 +82,8 @@
           </div>
         </section>
 
-        <section id="ask" class="studio-grid" aria-label="LLM Wiki workspace">
-          <div id="sources" class="surface source-pane">
-            <div class="section-head">
-              <h2>Sources</h2>
-              <span id="fileScope">0 indexed</span>
-            </div>
-            <div class="source-import">
-              <textarea id="importSource" rows="3" placeholder="Public URL or local file path"></textarea>
-              <div class="import-actions">
-                <input id="importTitle" placeholder="Title" aria-label="Import title" />
-                <input id="importCategory" value="00_inbox" aria-label="Import category" />
-                <button id="importBtn" type="button" class="primary">Import</button>
-              </div>
-              <div id="importStatus" class="import-status muted">Ready</div>
-            </div>
-            <div id="fileList" class="source-list"></div>
-          </div>
-
-          <div class="surface ask-pane">
+        <section id="ask" class="page" data-page="ask" aria-label="Ask workspace">
+          <div class="surface ask-pane page-surface">
             <div class="section-head">
               <h2>Ask</h2>
               <span id="queryStatus">Ready</span>
@@ -121,7 +104,61 @@
             </div>
           </div>
 
-          <div id="studio" class="surface artifact-pane">
+          <div class="surface run-row">
+            <div>
+              <h2>Question Groups</h2>
+              <p class="muted">question/group-*.md</p>
+            </div>
+            <div class="row-actions compact">
+              <input id="groupInput" placeholder="group-1" aria-label="Group name" />
+              <button id="runGroupBtn" type="button">Run Group</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="wiki" class="page" data-page="wiki" aria-label="Compiled wiki workspace">
+          <div class="wiki-workspace">
+            <div class="surface explain-pane">
+              <div class="section-head">
+                <h2>Explain</h2>
+                <span id="explainStatus">Ready</span>
+              </div>
+              <div id="explainOutput" class="explain-output">
+                <span class="muted">Ask a question, then inspect route, safety, and evidence.</span>
+              </div>
+            </div>
+
+            <div class="surface wiki-pane">
+              <div class="section-head">
+                <h2>Compiled Wiki</h2>
+                <span id="wikiStatus">Ready</span>
+              </div>
+              <div class="row-actions compact wiki-search">
+                <input id="wikiSearchInput" placeholder="Search compiled wiki sections" aria-label="Wiki section search" />
+                <button id="wikiSearchBtn" type="button">Search</button>
+              </div>
+              <div id="wikiSectionList" class="wiki-section-list"></div>
+            </div>
+          </div>
+
+          <div class="surface run-row">
+            <div>
+              <h2>Compiled Wiki</h2>
+              <p class="muted">wiki/index.md · wiki/sources · wiki/topics · wiki/log.md</p>
+            </div>
+            <div class="row-actions compact">
+              <button id="compileWikiBtn" type="button">Compile</button>
+              <button id="lintWikiBtn" type="button">Lint</button>
+            </div>
+          </div>
+
+          <div id="wikiOperationOutput" class="answer-output">
+            <span class="muted">Ready</span>
+          </div>
+        </section>
+
+        <section id="studio" class="page" data-page="studio" aria-label="PPT studio">
+          <div class="surface artifact-pane page-surface">
             <div class="section-head">
               <h2>PPT Studio</h2>
               <span id="slidesStatus">Ready</span>
@@ -141,89 +178,66 @@
           </div>
         </section>
 
-        <section id="wiki" class="wiki-workspace" aria-label="Compiled wiki workspace">
-          <div class="surface explain-pane">
+        <section id="sources" class="page" data-page="sources" aria-label="Sources">
+          <div class="source-page-grid">
+            <div class="surface source-pane">
+              <div class="section-head">
+                <h2>Sources</h2>
+                <span id="fileScope">0 indexed</span>
+              </div>
+              <div class="source-import">
+                <textarea id="importSource" rows="3" placeholder="Public URL or local file path"></textarea>
+                <div class="import-actions">
+                  <input id="importTitle" placeholder="Title" aria-label="Import title" />
+                  <input id="importCategory" value="00_inbox" aria-label="Import category" />
+                  <button id="importBtn" type="button" class="primary">Import</button>
+                </div>
+                <div id="importStatus" class="import-status muted">Ready</div>
+              </div>
+              <div id="fileList" class="source-list"></div>
+            </div>
+
+            <div class="surface comments-pane">
+              <div class="section-head">
+                <h2>Comments</h2>
+                <span id="commentScope">0 found</span>
+              </div>
+              <div id="commentList" class="table-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="governance" class="page" data-page="governance" aria-label="Governance">
+          <div class="surface run-row">
+            <div>
+              <h2>Governance</h2>
+              <p id="governanceSummary" class="muted">report not loaded</p>
+            </div>
+            <div class="row-actions compact">
+              <button id="refreshReportBtn" type="button">Refresh Report</button>
+              <button id="exportReportBtn" type="button">Export Markdown</button>
+              <button id="runEvaluationBtn" type="button">Run Evaluation</button>
+              <button id="exportEvaluationBtn" type="button">Export Evaluation</button>
+            </div>
+          </div>
+
+          <div class="surface risk-pane">
             <div class="section-head">
-              <h2>Explain</h2>
-              <span id="explainStatus">Ready</span>
+              <h2>Source Risk Review</h2>
+              <span id="riskStatus">Ready</span>
             </div>
-            <div id="explainOutput" class="explain-output">
-              <span class="muted">Ask a question, then inspect route, safety, and evidence.</span>
-            </div>
+            <div id="riskList" class="risk-list"></div>
           </div>
+        </section>
 
-          <div class="surface wiki-pane">
+        <section id="audit" class="page" data-page="audit" aria-label="Audit">
+          <div class="surface audit-pane">
             <div class="section-head">
-              <h2>Compiled Wiki</h2>
-              <span id="wikiStatus">Ready</span>
+              <h2>Audit</h2>
+              <span>latest events</span>
             </div>
-            <div class="row-actions compact wiki-search">
-              <input id="wikiSearchInput" placeholder="Search compiled wiki sections" aria-label="Wiki section search" />
-              <button id="wikiSearchBtn" type="button">Search</button>
-            </div>
-            <div id="wikiSectionList" class="wiki-section-list"></div>
+            <div id="auditList" class="audit-list"></div>
           </div>
-        </section>
-
-        <section class="surface run-row">
-          <div>
-            <h2>Question Groups</h2>
-            <p class="muted">question/group-*.md</p>
-          </div>
-          <div class="row-actions compact">
-            <input id="groupInput" placeholder="group-1" aria-label="Group name" />
-            <button id="runGroupBtn" type="button">Run Group</button>
-          </div>
-        </section>
-
-        <section class="surface run-row">
-          <div>
-            <h2>Compiled Wiki</h2>
-            <p class="muted">wiki/index.md · wiki/sources · wiki/topics · wiki/log.md</p>
-          </div>
-          <div class="row-actions compact">
-            <button id="compileWikiBtn" type="button">Compile</button>
-            <button id="lintWikiBtn" type="button">Lint</button>
-          </div>
-        </section>
-
-        <section id="governance" class="surface run-row">
-          <div>
-            <h2>Governance</h2>
-            <p id="governanceSummary" class="muted">report not loaded</p>
-          </div>
-          <div class="row-actions compact">
-            <button id="refreshReportBtn" type="button">Refresh Report</button>
-            <button id="exportReportBtn" type="button">Export Markdown</button>
-            <button id="runEvaluationBtn" type="button">Run Evaluation</button>
-            <button id="exportEvaluationBtn" type="button">Export Evaluation</button>
-          </div>
-        </section>
-
-        <section class="surface risk-pane">
-          <div class="section-head">
-            <h2>Source Risk Review</h2>
-            <span id="riskStatus">Ready</span>
-          </div>
-          <div id="riskList" class="risk-list"></div>
-        </section>
-
-        <section class="split">
-          <div class="surface">
-            <div class="section-head">
-              <h2>Comments</h2>
-              <span id="commentScope">0 found</span>
-            </div>
-            <div id="commentList" class="table-list"></div>
-          </div>
-        </section>
-
-        <section id="audit" class="surface">
-          <div class="section-head">
-            <h2>Audit</h2>
-            <span>latest events</span>
-          </div>
-          <div id="auditList" class="audit-list"></div>
         </section>
       </main>
     </div>

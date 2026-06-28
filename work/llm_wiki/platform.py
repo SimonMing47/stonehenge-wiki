@@ -26,14 +26,15 @@ class LLMWikiPlatform:
     def __init__(self, wiki_root: Path, config: PlatformConfig | None = None):
         self.config = config or load_config(wiki_root)
         self.wiki_root = self.config.wiki_root
-        self.index = WikiIndex(self.wiki_root).build()
+        self.full_index = WikiIndex(self.wiki_root).build()
         self.guard = PermissionGuard(self.wiki_root)
         self.llm_client = LLMClient(self.config.llm) if self.config.llm.enabled else None
-        self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
         self.store = SQLiteStore(self.config.database_path)
         if self.config.persist_index:
-            self.store.save_index(self.index)
+            self.store.save_index(self.full_index)
             self.store.save_wiki_sections(self.wiki_root / "wiki")
+        self.index = self.active_index()
+        self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
 
     @property
     def compiler(self) -> WikiCompiler:
@@ -44,11 +45,11 @@ class LLMWikiPlatform:
         return cls(wiki_root)
 
     def rebuild_index(self) -> dict[str, Any]:
-        self.index.build()
-        self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
+        self.full_index.build()
         if self.config.persist_index:
-            self.store.save_index(self.index)
+            self.store.save_index(self.full_index)
             self.store.save_wiki_sections(self.wiki_root / "wiki")
+        self.refresh_runtime_index()
         result = self.health()
         self.store.record_job("reindex", "ok", {"wiki_root": str(self.wiki_root)}, result)
         return result
@@ -295,7 +296,7 @@ class LLMWikiPlatform:
                     "comment_count": len(record.comments),
                     "risk": risk_by_path.get(record.rel_path, {"risk_count": 0, "max_severity": "none", "codes": []}),
                 }
-                for record in self.index.records
+                for record in self.full_index.records
             ],
             "comments": [comment.summary() for comment in self.index.comments],
             "presentations": self.list_presentations(),
@@ -310,6 +311,49 @@ class LLMWikiPlatform:
     def list_source_versions(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_source_versions(rel_path=rel_path, limit=limit)
 
+    def list_source_reviews(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        return self.store.list_source_reviews(rel_path=rel_path, limit=limit)
+
+    def set_source_status(
+        self,
+        rel_path: str,
+        status: str,
+        reason: str = "",
+        actor: str = "api",
+    ) -> dict[str, Any]:
+        request_id = new_request_id()
+        normalized_status = status.strip().lower()
+        if normalized_status not in {"active", "quarantined"}:
+            result = {"error": "invalid_status", "allowed": ["active", "quarantined"]}
+            self.audit("source.review", request_id, rel_path, "blocked", True, result)
+            return result
+        updated = self.store.update_source_status(rel_path, normalized_status, reason=reason, actor=actor)
+        if updated is None:
+            result = {"error": "not_found", "path": rel_path}
+            self.audit("source.review", request_id, rel_path, "blocked", True, result)
+            return result
+
+        self.refresh_runtime_index()
+        compile_result = self.compile_wiki()
+        result = {
+            "status": "ok",
+            "path": rel_path,
+            "source_status": normalized_status,
+            "reason": reason,
+            "actor": actor,
+            "active_files": len(self.index.records),
+            "all_files": len(self.full_index.records),
+            "wiki_sections": compile_result.get("wiki_sections", 0),
+        }
+        self.store.record_job(
+            "source_review",
+            "ok",
+            {"path": rel_path, "status": normalized_status, "reason": reason, "actor": actor},
+            result,
+        )
+        self.audit("source.review", request_id, rel_path, "ok", False, result)
+        return result
+
     def list_wiki_sections(self, source_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_wiki_sections(source_path=source_path, limit=limit)
 
@@ -321,14 +365,14 @@ class LLMWikiPlatform:
         }
 
     def source_risk_report(self) -> dict[str, Any]:
-        return scan_source_risks(self.index, self.guard)
+        return scan_source_risks(self.full_index, self.guard)
 
     def governance_report(self) -> dict[str, Any]:
         source_risk_report = self.source_risk_report()
         report = build_governance_report(
             self.health(),
             self.list_sources(include_missing=True),
-            self.index.comments,
+            self.full_index.comments,
             self.audit_events(100),
             self.store.list_jobs(50),
             source_risk_report=source_risk_report,
@@ -340,7 +384,7 @@ class LLMWikiPlatform:
         report = build_governance_report(
             self.health(),
             self.list_sources(include_missing=True),
-            self.index.comments,
+            self.full_index.comments,
             self.audit_events(100),
             self.store.list_jobs(50),
             source_risk_report=source_risk_report,
@@ -393,7 +437,9 @@ class LLMWikiPlatform:
                 "retrieval_surface": "wiki_sections",
             },
             "files": len(self.index.records),
+            "all_files": len(self.full_index.records),
             "comments": len(self.index.comments),
+            "all_comments": len(self.full_index.comments),
             "llm": {
                 "enabled": self.config.llm.enabled,
                 "ready": bool(self.llm_client and self.llm_client.ready),
@@ -407,6 +453,19 @@ class LLMWikiPlatform:
             },
             "store": self.store.stats(),
         }
+
+    def active_index(self) -> WikiIndex:
+        quarantined = {
+            source["rel_path"]
+            for source in self.store.list_sources(include_missing=True)
+            if source.get("status") == "quarantined"
+        }
+        records = [record for record in self.full_index.records if record.rel_path not in quarantined]
+        return self.full_index.with_records(records)
+
+    def refresh_runtime_index(self) -> None:
+        self.index = self.active_index()
+        self.answerer = QuestionAnswerer(self.index, self.guard, self.llm_client)
 
     def audit(
         self,

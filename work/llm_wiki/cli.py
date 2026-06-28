@@ -23,6 +23,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-history", help="Print version history for one source registry path")
     parser.add_argument("--source-history-limit", type=int, default=50, help="Version record count for source history")
     parser.add_argument("--source-risk-report", action="store_true", help="Print source risk scan report as JSON")
+    parser.add_argument("--list-source-reviews", action="store_true", help="Print source review events as JSON")
+    parser.add_argument("--source-review-path", help="Filter source review events by path")
+    parser.add_argument("--set-source-status", help="Set source status for one registry path")
+    parser.add_argument("--source-status", choices=["active", "quarantined"], help="Status for --set-source-status")
+    parser.add_argument("--source-status-reason", default="", help="Reason for --set-source-status")
+    parser.add_argument("--source-status-actor", default="cli", help="Actor for --set-source-status")
     parser.add_argument("--list-wiki-sections", action="store_true", help="Print compiled wiki sections as JSON")
     parser.add_argument("--wiki-section-source", help="Filter compiled wiki sections by source registry path")
     parser.add_argument("--wiki-section-limit", type=int, default=50, help="Compiled wiki section count")
@@ -91,6 +97,21 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.source_risk_report:
         print_json(platform.source_risk_report())
+        return 0
+
+    if args.list_source_reviews:
+        print_json({"reviews": platform.list_source_reviews(rel_path=args.source_review_path, limit=args.source_history_limit)})
+        return 0
+
+    if args.set_source_status:
+        print_json(
+            platform.set_source_status(
+                args.set_source_status,
+                args.source_status or "active",
+                reason=args.source_status_reason,
+                actor=args.source_status_actor,
+            )
+        )
         return 0
 
     if args.list_wiki_sections:

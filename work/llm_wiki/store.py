@@ -104,6 +104,15 @@ class SQLiteStore:
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_source_versions_identity ON source_versions(rel_path, sha256);
                 CREATE INDEX IF NOT EXISTS idx_source_versions_rel_path ON source_versions(rel_path);
+                CREATE TABLE IF NOT EXISTS source_review_events (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  created_at TEXT NOT NULL,
+                  rel_path TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  reason TEXT NOT NULL,
+                  actor TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_source_review_events_rel_path ON source_review_events(rel_path);
                 DROP TABLE IF EXISTS document_chunks;
                 CREATE TABLE IF NOT EXISTS wiki_sections (
                   section_id TEXT PRIMARY KEY,
@@ -251,6 +260,53 @@ class SQLiteStore:
                 ),
             )
 
+    def update_source_status(
+        self,
+        rel_path: str,
+        status: str,
+        reason: str = "",
+        actor: str = "system",
+    ) -> dict[str, Any] | None:
+        now = utc_now()
+        with self.connect() as con:
+            row = con.execute("SELECT * FROM source_registry WHERE rel_path = ?", (rel_path,)).fetchone()
+            if row is None:
+                return None
+            con.execute(
+                "UPDATE source_registry SET status = ?, updated_at = ? WHERE rel_path = ?",
+                (status, now, rel_path),
+            )
+            con.execute(
+                """
+                INSERT INTO source_review_events(created_at, rel_path, status, reason, actor)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (now, rel_path, status, reason, actor),
+            )
+            updated = con.execute("SELECT * FROM source_registry WHERE rel_path = ?", (rel_path,)).fetchone()
+        return dict(updated) if updated else None
+
+    def list_source_reviews(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        params: tuple[Any, ...]
+        where = ""
+        if rel_path:
+            where = "WHERE rel_path = ?"
+            params = (rel_path, limit)
+        else:
+            params = (limit,)
+        with self.connect() as con:
+            rows = con.execute(
+                f"""
+                SELECT id, created_at, rel_path, status, reason, actor
+                FROM source_review_events
+                {where}
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def list_audit_events(self, limit: int = 50) -> list[dict[str, Any]]:
         with self.connect() as con:
             rows = con.execute(
@@ -395,7 +451,9 @@ class SQLiteStore:
             wiki_section_count = con.execute("SELECT COUNT(*) FROM wiki_sections").fetchone()[0]
             source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status != 'missing'").fetchone()[0]
             missing_source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status = 'missing'").fetchone()[0]
+            quarantined_source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status = 'quarantined'").fetchone()[0]
             source_version_count = con.execute("SELECT COUNT(*) FROM source_versions").fetchone()[0]
+            source_review_count = con.execute("SELECT COUNT(*) FROM source_review_events").fetchone()[0]
         return {
             "files": file_count,
             "comments": comment_count,
@@ -404,7 +462,9 @@ class SQLiteStore:
             "wiki_sections": wiki_section_count,
             "sources": source_count,
             "missing_sources": missing_source_count,
+            "quarantined_sources": quarantined_source_count,
             "source_versions": source_version_count,
+            "source_reviews": source_review_count,
         }
 
     def _file_row(self, record: DocumentRecord, indexed_at: str) -> tuple[Any, ...]:
@@ -461,17 +521,22 @@ class SQLiteStore:
             if sha256:
                 self._record_source_version(con, record.rel_path, sha256, size, indexed_at)
             imported_at = str(previous.get("imported_at") or indexed_at)
+            previous_status = str(previous.get("status") or "active")
+            registry_status = "quarantined" if previous_status == "quarantined" else "active"
             con.execute(
                 """
                 INSERT INTO source_registry(
                     rel_path, origin_type, origin, title, category, sha256, size, status,
                     imported_at, updated_at, last_indexed_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(rel_path) DO UPDATE SET
                     sha256 = excluded.sha256,
                     size = excluded.size,
-                    status = 'active',
+                    status = CASE
+                      WHEN source_registry.status = 'quarantined' THEN 'quarantined'
+                      ELSE 'active'
+                    END,
                     updated_at = excluded.updated_at,
                     last_indexed_at = excluded.last_indexed_at
                 """,
@@ -483,6 +548,7 @@ class SQLiteStore:
                     str(previous.get("category") or source_category(record.rel_path)),
                     sha256,
                     size,
+                    registry_status,
                     imported_at,
                     indexed_at,
                     indexed_at,

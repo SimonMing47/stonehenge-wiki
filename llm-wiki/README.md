@@ -20,6 +20,8 @@ llm-wiki/.state/wiki.sqlite
 
 该数据库包含可重建索引、批注元数据、审计事件和任务记录；不应手工编辑，也不需要提交到 Git。
 
+来源注册表支持 `active`、`quarantined`、`missing` 状态。`quarantined` 来源仍保留路径、hash、版本和风险记录，但不会进入问答、PPT 生成和编译后的 `wiki/` 知识面。
+
 ## 编译型 Wiki
 
 `AGENTS.md` 定义 wiki schema。运行：
