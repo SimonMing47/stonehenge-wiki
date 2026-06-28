@@ -100,6 +100,15 @@ class LLMWikiPlatform:
             self.store.record_job("source_import", "blocked", {"source": source, "title": title, "category": category}, result)
             return result
 
+        self.store.record_source_provenance(
+            imported.rel_path,
+            imported.source_type,
+            imported.source,
+            title or Path(imported.rel_path).stem,
+            category,
+            imported.sha256,
+            imported.size,
+        )
         health = self.rebuild_index()
         result = {
             "status": "ok",
@@ -110,6 +119,7 @@ class LLMWikiPlatform:
             "sha256": imported.sha256,
             "files": health["files"],
             "comments": health["comments"],
+            "registry_status": "active",
         }
         self.store.record_job("source_import", "ok", {"source": source, "title": title, "category": category}, result)
         self.audit("source.import", request_id, imported.rel_path, "ok", False, result)
@@ -179,8 +189,12 @@ class LLMWikiPlatform:
             ],
             "comments": [comment.summary() for comment in self.index.comments],
             "presentations": self.list_presentations(),
+            "source_registry": self.list_sources(),
             "store": self.store.stats(),
         }
+
+    def list_sources(self, include_missing: bool = False) -> list[dict[str, Any]]:
+        return self.store.list_sources(include_missing=include_missing)
 
     def list_presentations(self) -> list[dict[str, Any]]:
         output_dir = self.wiki_root / "output" / "presentations"

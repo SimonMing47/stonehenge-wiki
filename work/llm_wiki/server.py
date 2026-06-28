@@ -53,6 +53,11 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if not self.ensure_authorized("read"):
                 return
             return self.write_json(self.llm_wiki_platform.dump_index())
+        if parsed.path == "/sources":
+            if not self.ensure_authorized("read"):
+                return
+            include_missing = parse_qs(parsed.query).get("include_missing", ["0"])[0] in {"1", "true", "yes"}
+            return self.write_json({"sources": self.llm_wiki_platform.list_sources(include_missing=include_missing)})
         if parsed.path == "/audit":
             if not self.ensure_authorized("read"):
                 return

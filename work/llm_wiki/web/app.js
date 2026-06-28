@@ -66,10 +66,12 @@ function renderIndex() {
   const files = state.index.files || [];
   const comments = state.index.comments || [];
   const presentations = state.index.presentations || [];
-  el("fileScope").textContent = `${files.length} indexed`;
+  const registry = state.index.source_registry || [];
+  const sourceByPath = Object.fromEntries(registry.map((source) => [source.rel_path, source]));
+  el("fileScope").textContent = `${registry.length || files.length} active`;
   el("commentScope").textContent = `${comments.length} found`;
   el("fileList").innerHTML = files.length
-    ? files.map(fileRow).join("")
+    ? files.map((file) => fileRow(file, sourceByPath[file.path])).join("")
     : emptySourceRow("No indexed files");
   el("commentList").innerHTML = comments.length
     ? comments.slice(0, 80).map(commentRow).join("")
@@ -77,12 +79,20 @@ function renderIndex() {
   renderPresentations(presentations);
 }
 
-function fileRow(file) {
+function fileRow(file, source) {
   const tags = (file.tags || []).join(", ") || "untagged";
+  const size = source ? `${Math.round(Number(source.size || 0) / 1024)} KB` : "untracked";
+  const hash = source?.sha256 ? `sha ${String(source.sha256).slice(0, 10)}` : "sha pending";
+  const origin = source?.origin_type || "local";
+  const status = source?.status || "active";
   return `
     <div class="source-row">
       <strong>${escapeHtml(file.path)}</strong>
       <div class="meta">
+        <span class="${status === "active" ? "ok" : "blocked"}">${escapeHtml(status)}</span>
+        <span>${escapeHtml(origin)}</span>
+        <span>${escapeHtml(size)}</span>
+        <span>${escapeHtml(hash)}</span>
         <span>${escapeHtml(file.suffix || "file")}</span>
         <span>${escapeHtml(tags)}</span>
         <span>${Number(file.comment_count || 0)} comments</span>

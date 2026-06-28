@@ -128,6 +128,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 index_html = http_get(base + "/")
                 app_js = http_get(base + "/assets/app.js")
                 health = json.loads(http_get(base + "/health"))
+                sources = json.loads(http_get(base + "/sources"))
                 lint = json.loads(http_get(base + "/wiki/lint"))
                 favicon_status = http_get_status(base + "/favicon.ico")
             finally:
@@ -142,6 +143,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("importSource", app_js)
             self.assertIn("token scopes", app_js)
             self.assertEqual(health["status"], "ok")
+            self.assertEqual(sources["sources"], [])
             self.assertIn(lint["status"], {"ok", "error"})
             self.assertEqual(favicon_status, 204)
 
@@ -188,6 +190,7 @@ class PlatformSmokeTest(unittest.TestCase):
                     unauth_index = http_get_status(base + "/index")
                     bad_index = http_get_status(base + "/index", headers=bad_headers)
                     read_index = json.loads(http_get(base + "/index", headers=read_headers))
+                    read_sources = json.loads(http_get(base + "/sources", headers=read_headers))
                     read_ask = http_post_status(
                         base + "/ask",
                         {"id": "auth-ask", "title": "统计 md 文件数量", "level": "简单"},
@@ -204,6 +207,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(unauth_index, 401)
             self.assertEqual(bad_index, 401)
             self.assertEqual(len(read_index["files"]), 1)
+            self.assertEqual(len(read_sources["sources"]), 1)
             self.assertEqual(read_ask, 200)
             self.assertEqual(read_reindex, 403)
             self.assertEqual(admin_reindex, 200)
@@ -290,6 +294,23 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertTrue(imported.exists())
             self.assertEqual(platform.health()["files"], 1)
             self.assertEqual(platform.health()["comments"], 1)
+            registry = platform.list_sources()
+            self.assertEqual(len(registry), 1)
+            self.assertEqual(registry[0]["rel_path"], "docs/03_学习材料/RAG-Notes.md")
+            self.assertEqual(registry[0]["origin_type"], "file")
+            self.assertEqual(registry[0]["status"], "active")
+            self.assertEqual(len(registry[0]["sha256"]), 64)
+
+            imported.unlink()
+            platform.rebuild_index()
+            missing_registry = platform.list_sources(include_missing=True)
+            self.assertEqual(missing_registry[0]["status"], "missing")
+            source_output = io.StringIO()
+            with contextlib.redirect_stdout(source_output):
+                code = cli_main(["--wiki-root", str(wiki), "--list-sources", "--include-missing-sources"])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(source_output.getvalue())["sources"][0]["status"], "missing")
+
             blocked = platform.ingest_source("http://127.0.0.1/private.md")
             self.assertEqual(blocked["reason"], "private_url")
 
@@ -307,14 +328,19 @@ class PlatformSmokeTest(unittest.TestCase):
                     )
                 )
                 index = json.loads(http_get(base + "/index"))
+                source_list = json.loads(http_get(base + "/sources?include_missing=1"))
             finally:
                 httpd.shutdown()
                 httpd.server_close()
                 thread.join(timeout=5)
 
             self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["registry_status"], "active")
             self.assertEqual(result["path"], "docs/00_inbox/Ops-Console.html")
-            self.assertEqual(len(index["files"]), 2)
+            self.assertEqual(len(index["files"]), 1)
+            self.assertEqual(len(index["source_registry"]), 1)
+            self.assertEqual(len(source_list["sources"]), 2)
+            self.assertEqual({item["status"] for item in source_list["sources"]}, {"active", "missing"})
 
     def test_knowledge_answers_use_llm_without_sending_password_queries(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-llm-test-") as tmp:

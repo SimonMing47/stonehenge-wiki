@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import hashlib
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -76,6 +77,21 @@ class SQLiteStore:
                   input_json TEXT NOT NULL,
                   output_json TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS source_registry (
+                  rel_path TEXT PRIMARY KEY,
+                  origin_type TEXT NOT NULL,
+                  origin TEXT NOT NULL,
+                  title TEXT NOT NULL,
+                  category TEXT NOT NULL,
+                  sha256 TEXT NOT NULL,
+                  size INTEGER NOT NULL,
+                  status TEXT NOT NULL,
+                  imported_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  last_indexed_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_source_registry_status ON source_registry(status);
+                CREATE INDEX IF NOT EXISTS idx_source_registry_sha256 ON source_registry(sha256);
                 """
             )
 
@@ -97,6 +113,55 @@ class SQLiteStore:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [self._comment_row(comment, now) for comment in index.comments],
+            )
+            self._sync_source_registry(con, index, now)
+
+    def record_source_provenance(
+        self,
+        rel_path: str,
+        origin_type: str,
+        origin: str,
+        title: str,
+        category: str,
+        sha256: str,
+        size: int,
+    ) -> None:
+        now = utc_now()
+        with self.connect() as con:
+            existing = con.execute(
+                "SELECT imported_at, last_indexed_at FROM source_registry WHERE rel_path = ?",
+                (rel_path,),
+            ).fetchone()
+            con.execute(
+                """
+                INSERT INTO source_registry(
+                    rel_path, origin_type, origin, title, category, sha256, size, status,
+                    imported_at, updated_at, last_indexed_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+                ON CONFLICT(rel_path) DO UPDATE SET
+                    origin_type = excluded.origin_type,
+                    origin = excluded.origin,
+                    title = excluded.title,
+                    category = excluded.category,
+                    sha256 = excluded.sha256,
+                    size = excluded.size,
+                    status = 'active',
+                    updated_at = excluded.updated_at,
+                    last_indexed_at = excluded.last_indexed_at
+                """,
+                (
+                    rel_path,
+                    origin_type,
+                    origin,
+                    title or Path(rel_path).stem,
+                    category or source_category(rel_path),
+                    sha256,
+                    size,
+                    existing["imported_at"] if existing else now,
+                    now,
+                    existing["last_indexed_at"] if existing else now,
+                ),
             )
 
     def record_audit(
@@ -161,12 +226,44 @@ class SQLiteStore:
             events.append(event)
         return events
 
+    def list_sources(self, include_missing: bool = False) -> list[dict[str, Any]]:
+        where = "" if include_missing else "WHERE s.status != 'missing'"
+        with self.connect() as con:
+            rows = con.execute(
+                f"""
+                SELECT
+                  s.rel_path, s.origin_type, s.origin, s.title, s.category, s.sha256,
+                  s.size, s.status, s.imported_at, s.updated_at, s.last_indexed_at,
+                  f.suffix, f.tags_json, f.comment_count
+                FROM source_registry s
+                LEFT JOIN files f ON f.rel_path = s.rel_path
+                {where}
+                ORDER BY s.status ASC, s.updated_at DESC, s.rel_path ASC
+                """
+            ).fetchall()
+        sources: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            tags_json = item.pop("tags_json") or "[]"
+            item["tags"] = json.loads(tags_json)
+            item["comment_count"] = int(item["comment_count"] or 0)
+            sources.append(item)
+        return sources
+
     def stats(self) -> dict[str, Any]:
         with self.connect() as con:
             file_count = con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
             comment_count = con.execute("SELECT COUNT(*) FROM comments").fetchone()[0]
             audit_count = con.execute("SELECT COUNT(*) FROM audit_events").fetchone()[0]
-        return {"files": file_count, "comments": comment_count, "audit_events": audit_count}
+            source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status != 'missing'").fetchone()[0]
+            missing_source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status = 'missing'").fetchone()[0]
+        return {
+            "files": file_count,
+            "comments": comment_count,
+            "audit_events": audit_count,
+            "sources": source_count,
+            "missing_sources": missing_source_count,
+        }
 
     def _file_row(self, record: DocumentRecord, indexed_at: str) -> tuple[Any, ...]:
         preview = "\n".join(record.text.splitlines()[:30])[:4000]
@@ -194,6 +291,73 @@ class SQLiteStore:
             indexed_at,
         )
 
+    def _sync_source_registry(self, con: sqlite3.Connection, index: WikiIndex, indexed_at: str) -> None:
+        rows = con.execute("SELECT * FROM source_registry").fetchall()
+        existing = {row["rel_path"]: dict(row) for row in rows}
+        seen: set[str] = set()
+        for record in index.records:
+            seen.add(record.rel_path)
+            previous = existing.get(record.rel_path, {})
+            size = safe_size(record.full_path)
+            sha256 = file_sha256(record.full_path) if size else ""
+            imported_at = str(previous.get("imported_at") or indexed_at)
+            con.execute(
+                """
+                INSERT INTO source_registry(
+                    rel_path, origin_type, origin, title, category, sha256, size, status,
+                    imported_at, updated_at, last_indexed_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+                ON CONFLICT(rel_path) DO UPDATE SET
+                    sha256 = excluded.sha256,
+                    size = excluded.size,
+                    status = 'active',
+                    updated_at = excluded.updated_at,
+                    last_indexed_at = excluded.last_indexed_at
+                """,
+                (
+                    record.rel_path,
+                    str(previous.get("origin_type") or "local"),
+                    str(previous.get("origin") or record.rel_path),
+                    str(previous.get("title") or record.name),
+                    str(previous.get("category") or source_category(record.rel_path)),
+                    sha256,
+                    size,
+                    imported_at,
+                    indexed_at,
+                    indexed_at,
+                ),
+            )
+        for rel_path, previous in existing.items():
+            if rel_path in seen or previous.get("status") == "missing":
+                continue
+            con.execute(
+                "UPDATE source_registry SET status = 'missing', updated_at = ? WHERE rel_path = ?",
+                (indexed_at, rel_path),
+            )
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def safe_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def source_category(rel_path: str) -> str:
+    parts = rel_path.split("/")
+    if len(parts) >= 3 and parts[0] == "docs":
+        return parts[1]
+    return "uncategorized"

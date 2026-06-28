@@ -29,6 +29,7 @@ For an index inspection:
 
 ```bash
 python3 work/main.py --dump-index
+python3 work/main.py --list-sources
 ```
 
 For source ingestion:

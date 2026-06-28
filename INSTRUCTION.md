@@ -74,6 +74,13 @@ python3 work/main.py --ask "统计 docx 文件数量"
 python3 work/main.py --dump-index
 ```
 
+来源注册表：
+
+```bash
+python3 work/main.py --list-sources
+python3 work/main.py --list-sources --include-missing-sources
+```
+
 重建并持久化索引：
 
 ```bash
@@ -142,6 +149,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `GET /health`：健康检查和索引统计
 - `GET /`：浏览器控制台
 - `GET /index`：文件、批注和持久化状态
+- `GET /sources?include_missing=1`：来源注册表，包含 origin、hash、大小、状态和最后索引时间
 - `GET /audit?limit=50`：审计事件
 - `GET /wiki/lint`：检查编译型 Markdown wiki
 - `GET /files/output/...`：下载生成物，例如 PPTX
