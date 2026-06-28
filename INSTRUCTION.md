@@ -40,7 +40,7 @@ result/
 - `SQLiteStore` 将可重建索引、批注表、审计事件、任务运行记录持久化到 `llm-wiki/.state/wiki.sqlite`。
 - `wiki/` 是参考 Karpathy LLM Wiki 思路新增的编译型 Markdown 知识层：`docs/` 保留原始来源，`wiki/` 保存可维护知识页，`AGENTS.md` 定义 schema。
 - CLI、Codex skill、HTTP API、浏览器控制台共用同一套平台核心，避免规则分叉。
-- API 可通过环境变量 `LLM_WIKI_API_TOKEN` 开启 `X-LLM-WIKI-TOKEN` 鉴权。
+- API 可通过 `llm-wiki/.env` 或环境变量配置 `LLM_WIKI_API_TOKEN` / `LLM_WIKI_READ_TOKEN`，开启 `X-LLM-WIKI-TOKEN` 分级鉴权。
 
 ## CLI 入口
 
@@ -138,6 +138,14 @@ python3 work/main.py --export-release-bundle --group group-demo
 
 readiness report 会检查 Python 运行时、`llm-wiki` 目录结构、CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。`--readiness-fail-on fail|warn` 适合 CI 使用，命中对应级别时返回退出码 2。release bundle 会打包报告、题组、答案和 compiled wiki，不打包原始 `docs/` 文件或 `.state/wiki.sqlite`。
 
+本地受保护运行可复制示例文件并填入真实 token：
+
+```bash
+cp llm-wiki/.env.example llm-wiki/.env
+```
+
+`llm-wiki/.env` 会在 CLI、HTTP API、skill wrapper 和 readiness 入口启动时自动加载；shell 中已经设置的同名环境变量优先，不会被 `.env` 覆盖。`.env` 不应提交到 Git。
+
 编译 Markdown wiki：
 
 ```bash
@@ -222,7 +230,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/pages`、`/wiki/page`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 

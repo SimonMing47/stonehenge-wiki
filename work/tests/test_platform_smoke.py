@@ -406,6 +406,72 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("summary", admin_readiness["report"])
             self.assertEqual(admin_evaluation["report"]["summary"]["total_questions"], 1)
 
+    def test_wiki_env_file_enables_api_auth_readiness(self) -> None:
+        env_keys = ["LLM_WIKI_ENV_TEST_ADMIN_TOKEN", "LLM_WIKI_ENV_TEST_READ_TOKEN"]
+        old_values = {key: os.environ.get(key) for key in env_keys}
+        for key in env_keys:
+            os.environ.pop(key, None)
+        try:
+            with tempfile.TemporaryDirectory(prefix="llm-wiki-env-auth-test-") as tmp:
+                root = Path(tmp)
+                wiki = root / "llm-wiki"
+                docs = wiki / "docs" / "04_常用命令"
+                docs.mkdir(parents=True)
+                (wiki / "question").mkdir()
+                (wiki / "output" / "fixed").mkdir(parents=True)
+                (root / "result").mkdir()
+                (wiki / "README.md").write_text("# rules\n", encoding="utf-8")
+                (wiki / "AGENTS.md").write_text("# schema\n", encoding="utf-8")
+                (wiki / "Permission.json").write_text(
+                    json.dumps(
+                        {
+                            "dir": {"deny": ["*/etc"]},
+                            "command": {"deny": ["del"]},
+                            "file": {"deny": ["spark-*.env"]},
+                        },
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8",
+                )
+                (wiki / "config.json").write_text(
+                    json.dumps(
+                        {
+                            "api": {
+                                "token_env": env_keys[0],
+                                "read_token_env": env_keys[1],
+                            }
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                (wiki / ".env").write_text(
+                    f"{env_keys[0]}=env-admin-secret\n{env_keys[1]}=env-read-secret\n",
+                    encoding="utf-8",
+                )
+                (docs / "sqlite.md").write_text("SQLite SELECT 命令用于查询表数据。\n", encoding="utf-8")
+                questions = [
+                    {"id": f"env-ready-{idx}", "title": "统计 md 文件数量", "level": "简单"}
+                    for idx in range(1, 21)
+                ]
+                (wiki / "question" / "group-ready.md").write_text(json.dumps(questions, ensure_ascii=False), encoding="utf-8")
+
+                platform = LLMWikiPlatform.from_wiki_root(wiki)
+                platform.compile_wiki()
+                health = platform.health()
+                report = platform.readiness_report(groups=["group-ready"])
+                gates = {item["id"]: item for item in report["report"]["gates"]}
+
+                self.assertTrue(health["auth"]["enabled"])
+                self.assertEqual(health["auth"]["admin_token_env"], env_keys[0])
+                self.assertEqual(health["auth"]["read_token_env"], env_keys[1])
+                self.assertEqual(gates["api_auth"]["status"], "pass")
+        finally:
+            for key, old_value in old_values.items():
+                if old_value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = old_value
+
     def test_source_risk_report_cli_api_and_governance(self) -> None:
         with tempfile.TemporaryDirectory(prefix="llm-wiki-risk-test-") as tmp:
             root = Path(tmp)

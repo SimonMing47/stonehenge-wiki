@@ -57,10 +57,12 @@ def load_config(wiki_root: Path) -> PlatformConfig:
     if config_path.exists():
         data = json.loads(config_path.read_text(encoding="utf-8"))
 
+    api = data.get("api", {}) if isinstance(data.get("api", {}), dict) else {}
+    load_env_files(wiki_root, data, api)
+
     state_dir = resolve_under_wiki(wiki_root, data.get("state_dir", ".state"))
     database_path = resolve_under_wiki(wiki_root, data.get("database_path", str(state_dir / "wiki.sqlite")))
 
-    api = data.get("api", {}) if isinstance(data.get("api", {}), dict) else {}
     llm = data.get("llm", {}) if isinstance(data.get("llm", {}), dict) else {}
     return PlatformConfig(
         wiki_root=wiki_root,
@@ -86,6 +88,38 @@ def load_config(wiki_root: Path) -> PlatformConfig:
             temperature=float(llm.get("temperature", 0.1)),
         ),
     )
+
+
+def load_env_files(wiki_root: Path, data: dict[str, Any], api: dict[str, Any]) -> None:
+    env_files = [wiki_root / ".env"]
+    for value in [data.get("env_file"), api.get("env_file")]:
+        if value:
+            env_files.append(resolve_config_path(wiki_root, value))
+    for path in env_files:
+        load_env_file(path)
+
+
+def load_env_file(path: Path) -> None:
+    try:
+        lines = path.expanduser().read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip().removeprefix("export ").strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def resolve_config_path(wiki_root: Path, value: str | Path) -> Path:
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    return wiki_root / path
 
 
 def resolve_under_wiki(wiki_root: Path, value: str | Path) -> Path:

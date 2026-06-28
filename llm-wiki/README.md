@@ -20,6 +20,8 @@ llm-wiki/.state/wiki.sqlite
 
 该数据库包含可重建索引、批注元数据、审计事件和任务记录；不应手工编辑，也不需要提交到 Git。
 
+受保护 API 可通过 `llm-wiki/.env` 启用。复制 `.env.example` 为 `.env`，填入 `LLM_WIKI_API_TOKEN` 和 `LLM_WIKI_READ_TOKEN` 后，CLI、HTTP API、skill wrapper 和 readiness 检查都会自动加载；shell 中已经存在的同名环境变量优先。
+
 来源注册表支持 `active`、`quarantined`、`missing` 状态。`quarantined` 来源仍保留路径、hash、版本和风险记录，但不会进入问答、PPT 生成和编译后的 `wiki/` 知识面。命中 `Permission.json.file.deny` 的来源会被策略自动隔离。
 
 ## 编译型 Wiki

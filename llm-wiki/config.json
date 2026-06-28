@@ -7,7 +7,8 @@
   "api": {
     "host": "127.0.0.1",
     "port": 8765,
-    "token_env": "LLM_WIKI_API_TOKEN"
+    "token_env": "LLM_WIKI_API_TOKEN",
+    "read_token_env": "LLM_WIKI_READ_TOKEN"
   },
   "llm": {
     "enabled": true,
