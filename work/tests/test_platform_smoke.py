@@ -223,6 +223,7 @@ class PlatformSmokeTest(unittest.TestCase):
 
             self.assertIn("LLM Wiki Research Studio", index_html)
             self.assertIn("authName", index_html)
+            self.assertIn('id="tokenInput" class="secret-input" type="password"', index_html)
             self.assertIn("wikiSectionCount", index_html)
             self.assertIn('data-page="audit"', index_html)
             self.assertIn('data-page="sources"', index_html)
