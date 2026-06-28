@@ -191,6 +191,7 @@ class PlatformSmokeTest(unittest.TestCase):
                     bad_index = http_get_status(base + "/index", headers=bad_headers)
                     read_index = json.loads(http_get(base + "/index", headers=read_headers))
                     read_sources = json.loads(http_get(base + "/sources", headers=read_headers))
+                    read_source_history = json.loads(http_get(base + "/sources/history", headers=read_headers))
                     read_report = json.loads(http_get(base + "/reports/governance", headers=read_headers))
                     read_ask = http_post_status(
                         base + "/ask",
@@ -211,6 +212,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(bad_index, 401)
             self.assertEqual(len(read_index["files"]), 1)
             self.assertEqual(len(read_sources["sources"]), 1)
+            self.assertEqual(len(read_source_history["versions"]), 1)
             self.assertEqual(read_report["status"], "ok")
             self.assertIn("summary", read_report["report"])
             self.assertEqual(read_ask, 200)
@@ -298,15 +300,39 @@ class PlatformSmokeTest(unittest.TestCase):
 
             platform = LLMWikiPlatform.from_wiki_root(wiki)
             imported = wiki / "docs" / "03_学习材料" / "RAG-Notes.md"
+            imported_rel = "docs/03_学习材料/RAG-Notes.md"
             self.assertTrue(imported.exists())
             self.assertEqual(platform.health()["files"], 1)
             self.assertEqual(platform.health()["comments"], 1)
             registry = platform.list_sources()
             self.assertEqual(len(registry), 1)
-            self.assertEqual(registry[0]["rel_path"], "docs/03_学习材料/RAG-Notes.md")
+            self.assertEqual(registry[0]["rel_path"], imported_rel)
             self.assertEqual(registry[0]["origin_type"], "file")
             self.assertEqual(registry[0]["status"], "active")
             self.assertEqual(len(registry[0]["sha256"]), 64)
+            self.assertEqual(registry[0]["version_count"], 1)
+
+            versions = platform.list_source_versions(imported_rel)
+            self.assertEqual(len(versions), 1)
+            self.assertEqual(versions[0]["rel_path"], imported_rel)
+            self.assertEqual(versions[0]["sha256"], registry[0]["sha256"])
+            self.assertGreaterEqual(versions[0]["observation_count"], 1)
+
+            imported.write_text(
+                imported.read_text(encoding="utf-8") + "\n新增一条验收约束。\n",
+                encoding="utf-8",
+            )
+            platform.rebuild_index()
+            changed_versions = platform.list_source_versions(imported_rel)
+            self.assertEqual(len(changed_versions), 2)
+            self.assertEqual(len({item["sha256"] for item in changed_versions}), 2)
+            self.assertEqual(platform.list_sources()[0]["version_count"], 2)
+
+            version_output = io.StringIO()
+            with contextlib.redirect_stdout(version_output):
+                code = cli_main(["--wiki-root", str(wiki), "--source-history", imported_rel])
+            self.assertEqual(code, 0)
+            self.assertEqual(len(json.loads(version_output.getvalue())["versions"]), 2)
 
             imported.unlink()
             platform.rebuild_index()
@@ -345,6 +371,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 )
                 index = json.loads(http_get(base + "/index"))
                 source_list = json.loads(http_get(base + "/sources?include_missing=1"))
+                source_history = json.loads(http_get(base + "/sources/history?path=docs/00_inbox/Ops-Console.html"))
                 governance = json.loads(http_get(base + "/reports/governance"))
                 exported_api = json.loads(http_post(base + "/reports/governance/export", {}))
                 report_bytes = http_get_bytes(base + exported_api["download_url"])
@@ -358,7 +385,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(result["path"], "docs/00_inbox/Ops-Console.html")
             self.assertEqual(len(index["files"]), 1)
             self.assertEqual(len(index["source_registry"]), 1)
+            self.assertGreaterEqual(index["source_registry"][0]["version_count"], 1)
             self.assertEqual(len(source_list["sources"]), 2)
+            self.assertEqual(len(source_history["versions"]), 1)
             self.assertEqual({item["status"] for item in source_list["sources"]}, {"active", "missing"})
             self.assertEqual(governance["report"]["summary"]["status"], "attention")
             self.assertIn(b"LLM Wiki Governance Report", report_bytes)

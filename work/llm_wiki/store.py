@@ -92,6 +92,17 @@ class SQLiteStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_source_registry_status ON source_registry(status);
                 CREATE INDEX IF NOT EXISTS idx_source_registry_sha256 ON source_registry(sha256);
+                CREATE TABLE IF NOT EXISTS source_versions (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  rel_path TEXT NOT NULL,
+                  sha256 TEXT NOT NULL,
+                  size INTEGER NOT NULL,
+                  first_seen_at TEXT NOT NULL,
+                  last_seen_at TEXT NOT NULL,
+                  observation_count INTEGER NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_source_versions_identity ON source_versions(rel_path, sha256);
+                CREATE INDEX IF NOT EXISTS idx_source_versions_rel_path ON source_versions(rel_path);
                 """
             )
 
@@ -253,7 +264,8 @@ class SQLiteStore:
                 SELECT
                   s.rel_path, s.origin_type, s.origin, s.title, s.category, s.sha256,
                   s.size, s.status, s.imported_at, s.updated_at, s.last_indexed_at,
-                  f.suffix, f.tags_json, f.comment_count
+                  f.suffix, f.tags_json, f.comment_count,
+                  (SELECT COUNT(*) FROM source_versions v WHERE v.rel_path = s.rel_path) AS version_count
                 FROM source_registry s
                 LEFT JOIN files f ON f.rel_path = s.rel_path
                 {where}
@@ -266,8 +278,30 @@ class SQLiteStore:
             tags_json = item.pop("tags_json") or "[]"
             item["tags"] = json.loads(tags_json)
             item["comment_count"] = int(item["comment_count"] or 0)
+            item["version_count"] = int(item["version_count"] or 0)
             sources.append(item)
         return sources
+
+    def list_source_versions(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        params: tuple[Any, ...]
+        where = ""
+        if rel_path:
+            where = "WHERE rel_path = ?"
+            params = (rel_path, limit)
+        else:
+            params = (limit,)
+        with self.connect() as con:
+            rows = con.execute(
+                f"""
+                SELECT id, rel_path, sha256, size, first_seen_at, last_seen_at, observation_count
+                FROM source_versions
+                {where}
+                ORDER BY last_seen_at DESC, id DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def stats(self) -> dict[str, Any]:
         with self.connect() as con:
@@ -277,6 +311,7 @@ class SQLiteStore:
             job_count = con.execute("SELECT COUNT(*) FROM job_runs").fetchone()[0]
             source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status != 'missing'").fetchone()[0]
             missing_source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status = 'missing'").fetchone()[0]
+            source_version_count = con.execute("SELECT COUNT(*) FROM source_versions").fetchone()[0]
         return {
             "files": file_count,
             "comments": comment_count,
@@ -284,6 +319,7 @@ class SQLiteStore:
             "jobs": job_count,
             "sources": source_count,
             "missing_sources": missing_source_count,
+            "source_versions": source_version_count,
         }
 
     def _file_row(self, record: DocumentRecord, indexed_at: str) -> tuple[Any, ...]:
@@ -321,6 +357,8 @@ class SQLiteStore:
             previous = existing.get(record.rel_path, {})
             size = safe_size(record.full_path)
             sha256 = file_sha256(record.full_path) if size else ""
+            if sha256:
+                self._record_source_version(con, record.rel_path, sha256, size, indexed_at)
             imported_at = str(previous.get("imported_at") or indexed_at)
             con.execute(
                 """
@@ -356,6 +394,19 @@ class SQLiteStore:
                 "UPDATE source_registry SET status = 'missing', updated_at = ? WHERE rel_path = ?",
                 (indexed_at, rel_path),
             )
+
+    def _record_source_version(self, con: sqlite3.Connection, rel_path: str, sha256: str, size: int, observed_at: str) -> None:
+        con.execute(
+            """
+            INSERT INTO source_versions(rel_path, sha256, size, first_seen_at, last_seen_at, observation_count)
+            VALUES (?, ?, ?, ?, ?, 1)
+            ON CONFLICT(rel_path, sha256) DO UPDATE SET
+                size = excluded.size,
+                last_seen_at = excluded.last_seen_at,
+                observation_count = source_versions.observation_count + 1
+            """,
+            (rel_path, sha256, size, observed_at, observed_at),
+        )
 
 
 def utc_now() -> str:

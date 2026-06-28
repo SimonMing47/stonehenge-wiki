@@ -197,6 +197,9 @@ class LLMWikiPlatform:
     def list_sources(self, include_missing: bool = False) -> list[dict[str, Any]]:
         return self.store.list_sources(include_missing=include_missing)
 
+    def list_source_versions(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        return self.store.list_source_versions(rel_path=rel_path, limit=limit)
+
     def governance_report(self) -> dict[str, Any]:
         report = build_governance_report(
             self.health(),

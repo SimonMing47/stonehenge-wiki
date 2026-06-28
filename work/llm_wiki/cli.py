@@ -18,6 +18,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dump-index", action="store_true", help="Print indexed paths/comments as JSON")
     parser.add_argument("--list-sources", action="store_true", help="Print source registry records as JSON")
     parser.add_argument("--include-missing-sources", action="store_true", help="Include missing source registry records")
+    parser.add_argument("--list-source-versions", action="store_true", help="Print source version history records as JSON")
+    parser.add_argument("--source-history", help="Print version history for one source registry path")
+    parser.add_argument("--source-history-limit", type=int, default=50, help="Version record count for source history")
     parser.add_argument("--reindex", action="store_true", help="Rebuild and persist the wiki index")
     parser.add_argument("--import-source", help="Import a local file or public URL into docs/00_inbox")
     parser.add_argument("--import-title", default="", help="Optional title used for the imported filename")
@@ -68,6 +71,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_sources:
         print_json({"sources": platform.list_sources(include_missing=args.include_missing_sources)})
+        return 0
+
+    if args.list_source_versions:
+        print_json({"versions": platform.list_source_versions(limit=args.source_history_limit)})
+        return 0
+
+    if args.source_history:
+        print_json({"versions": platform.list_source_versions(rel_path=args.source_history, limit=args.source_history_limit)})
         return 0
 
     if args.audit_log:

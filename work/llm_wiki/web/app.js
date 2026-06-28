@@ -87,6 +87,8 @@ function fileRow(file, source) {
   const tags = (file.tags || []).join(", ") || "untagged";
   const size = source ? `${Math.round(Number(source.size || 0) / 1024)} KB` : "untracked";
   const hash = source?.sha256 ? `sha ${String(source.sha256).slice(0, 10)}` : "sha pending";
+  const versionCount = Number(source?.version_count || 0);
+  const versions = `${versionCount} ${versionCount === 1 ? "version" : "versions"}`;
   const origin = source?.origin_type || "local";
   const status = source?.status || "active";
   return `
@@ -97,6 +99,7 @@ function fileRow(file, source) {
         <span>${escapeHtml(origin)}</span>
         <span>${escapeHtml(size)}</span>
         <span>${escapeHtml(hash)}</span>
+        <span>${escapeHtml(versions)}</span>
         <span>${escapeHtml(file.suffix || "file")}</span>
         <span>${escapeHtml(tags)}</span>
         <span>${Number(file.comment_count || 0)} comments</span>

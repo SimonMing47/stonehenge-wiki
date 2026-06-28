@@ -58,6 +58,13 @@ class PlatformHandler(BaseHTTPRequestHandler):
                 return
             include_missing = parse_qs(parsed.query).get("include_missing", ["0"])[0] in {"1", "true", "yes"}
             return self.write_json({"sources": self.llm_wiki_platform.list_sources(include_missing=include_missing)})
+        if parsed.path == "/sources/history":
+            if not self.ensure_authorized("read"):
+                return
+            query = parse_qs(parsed.query)
+            rel_path = query.get("path", [""])[0] or None
+            limit = int(query.get("limit", ["50"])[0])
+            return self.write_json({"versions": self.llm_wiki_platform.list_source_versions(rel_path=rel_path, limit=limit)})
         if parsed.path == "/audit":
             if not self.ensure_authorized("read"):
                 return
