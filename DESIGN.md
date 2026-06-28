@@ -56,6 +56,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - 受控导入通道把本地文件或公开 URL 复制到 `docs/<category>/` 后重建索引，阻断私网 URL、超大文件、未知扩展和权限配置拒绝的路径。
 - 治理报告汇总来源状态、TODO 到期风险、阻断审计和任务历史，可通过 API/CLI 查看并导出 Markdown。
 - Markdown wiki 编译层把原始文档转成可读、可 lint、可被 agent 维护的知识页，降低每次查询都从原始文件临时拼上下文的脆弱性。
+- 独立问答解释通道返回检索路由、匹配词、命中文件、证据片段和安全判定，不改变题组答案的严格 JSON schema。
 
 ## 平台模块
 

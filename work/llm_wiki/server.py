@@ -82,7 +82,7 @@ class PlatformHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        required_scope = "read" if parsed.path == "/ask" else "admin"
+        required_scope = "read" if parsed.path in {"/ask", "/explain"} else "admin"
         if not self.ensure_authorized(required_scope):
             return
         body = self.read_json()
@@ -91,6 +91,11 @@ class PlatformHandler(BaseHTTPRequestHandler):
             q_id = str(body.get("id", "api-1"))
             level = str(body.get("level", ""))
             return self.write_json(self.llm_wiki_platform.ask(title, q_id=q_id, level=level))
+        if parsed.path == "/explain":
+            title = str(body.get("title", ""))
+            q_id = str(body.get("id", "explain-1"))
+            level = str(body.get("level", ""))
+            return self.write_json(self.llm_wiki_platform.explain_question(title, q_id=q_id, level=level))
         if parsed.path == "/reindex":
             return self.write_json(self.llm_wiki_platform.rebuild_index())
         if parsed.path == "/sources/import":

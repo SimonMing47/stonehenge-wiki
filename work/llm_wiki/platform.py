@@ -91,6 +91,24 @@ class LLMWikiPlatform:
     def ask(self, title: str, q_id: str = "adhoc-1", level: str = "") -> dict[str, Any]:
         return self.answer_question(Question(id=q_id, title=title, level=level))
 
+    def explain_question(self, title: str, q_id: str = "explain-1", level: str = "") -> dict[str, Any]:
+        result = self.answerer.explain(Question(id=q_id, title=title, level=level))
+        self.store.record_job(
+            "question_explain",
+            result["status"],
+            {"id": q_id, "title": title, "level": level},
+            result,
+        )
+        self.audit(
+            event_type="question.explain",
+            request_id=new_request_id(),
+            subject=q_id,
+            status=result["status"],
+            blocked=result["status"] == "blocked",
+            payload={"title": title, "route": result.get("route"), "records": result.get("records", [])[:5]},
+        )
+        return result
+
     def ingest_source(self, source: str, title: str = "", category: str = "00_inbox") -> dict[str, Any]:
         request_id = new_request_id()
         try:

@@ -66,6 +66,7 @@ python3 work/main.py --wiki-root /path/to/llm-wiki --group group-1
 
 ```bash
 python3 work/main.py --ask "统计 docx 文件数量"
+python3 work/main.py --explain-ask "SQLite SELECT 命令是什么"
 ```
 
 索引检查：
@@ -165,6 +166,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 - `GET /reports/governance`：治理报告 JSON，包含来源状态、TODO 风险、审计阻断和任务历史
 - `GET /files/output/...`：下载生成物，例如 PPTX
 - `POST /ask`：单问，JSON body 示例 `{"id":"api-1","title":"统计 docx 文件数量","level":"简单"}`
+- `POST /explain`：查看一次问题的检索证据、安全路由和匹配片段，JSON body 示例 `{"id":"trace-1","title":"SQLite SELECT 命令是什么","level":"中等"}`
 - `POST /groups/run`：运行题组，JSON body 示例 `{"groups":["group-1"]}`
 - `POST /sources/import`：导入本地文件或公开 URL，JSON body 示例 `{"source":"https://example.com/page.html","title":"网页资料","category":"00_inbox"}`
 - `POST /slides/generate`：生成 PPTX，JSON body 示例 `{"topic":"RAG 知识库建设方案","slide_count":6}`
@@ -174,7 +176,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/audit`、`/wiki/lint`、`/reports/governance`、`/files/...` 和 `/ask`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、重建索引、编译 wiki、运行题组、生成 PPT 和导出治理报告。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/audit`、`/wiki/lint`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、重建索引、编译 wiki、运行题组、生成 PPT 和导出治理报告。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 

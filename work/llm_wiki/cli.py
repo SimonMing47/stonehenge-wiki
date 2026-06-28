@@ -15,6 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--question", type=Path, action="append", help="Question group file path")
     parser.add_argument("--group", action="append", help="Group stem such as group-1")
     parser.add_argument("--ask", help="Answer one ad-hoc question and print JSON to stdout")
+    parser.add_argument("--explain-ask", help="Print retrieval and safety evidence for one ad-hoc question")
     parser.add_argument("--dump-index", action="store_true", help="Print indexed paths/comments as JSON")
     parser.add_argument("--list-sources", action="store_true", help="Print source registry records as JSON")
     parser.add_argument("--include-missing-sources", action="store_true", help="Include missing source registry records")
@@ -95,6 +96,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.ask:
         print_json(platform.ask(args.ask))
+        return 0
+
+    if args.explain_ask:
+        print_json(platform.explain_question(args.explain_ask))
         return 0
 
     if args.generate_ppt:

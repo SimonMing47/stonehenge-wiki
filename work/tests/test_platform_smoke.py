@@ -198,6 +198,13 @@ class PlatformSmokeTest(unittest.TestCase):
                         {"id": "auth-ask", "title": "统计 md 文件数量", "level": "简单"},
                         headers=read_headers,
                     )
+                    read_explain = json.loads(
+                        http_post(
+                            base + "/explain",
+                            {"id": "auth-explain", "title": "认证分级是什么", "level": "中等"},
+                            headers=read_headers,
+                        )
+                    )
                     read_reindex = http_post_status(base + "/reindex", {}, headers=read_headers)
                     read_export = http_post_status(base + "/reports/governance/export", {}, headers=read_headers)
                     admin_reindex = http_post_status(base + "/reindex", {}, headers=admin_headers)
@@ -216,6 +223,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(read_report["status"], "ok")
             self.assertIn("summary", read_report["report"])
             self.assertEqual(read_ask, 200)
+            self.assertEqual(read_explain["status"], "ok")
+            self.assertEqual(read_explain["records"][0]["path"], "docs/00_inbox/auth.md")
+            self.assertTrue(read_explain["evidence"])
             self.assertEqual(read_reindex, 403)
             self.assertEqual(read_export, 403)
             self.assertEqual(admin_reindex, 200)
@@ -333,6 +343,18 @@ class PlatformSmokeTest(unittest.TestCase):
                 code = cli_main(["--wiki-root", str(wiki), "--source-history", imported_rel])
             self.assertEqual(code, 0)
             self.assertEqual(len(json.loads(version_output.getvalue())["versions"]), 2)
+
+            ask_answer = platform.ask("RAG Notes 验收清单是什么")
+            self.assertEqual(set(ask_answer.keys()), {"id", "title", "level", "answer"})
+            self.assertEqual(set(ask_answer["answer"].keys()), {"datas"})
+            explain_output = io.StringIO()
+            with contextlib.redirect_stdout(explain_output):
+                code = cli_main(["--wiki-root", str(wiki), "--explain-ask", "RAG Notes 验收清单是什么"])
+            explain_payload = json.loads(explain_output.getvalue())
+            self.assertEqual(code, 0)
+            self.assertEqual(explain_payload["status"], "ok")
+            self.assertEqual(explain_payload["records"][0]["path"], imported_rel)
+            self.assertTrue(explain_payload["evidence"])
 
             imported.unlink()
             platform.rebuild_index()

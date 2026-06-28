@@ -77,10 +77,18 @@ class WikiIndex:
         return result
 
     def search(self, query: str, limit: int = 8, records: list[DocumentRecord] | None = None) -> list[DocumentRecord]:
+        return [record for _, record in self.search_with_scores(query, limit=limit, records=records)]
+
+    def search_with_scores(
+        self,
+        query: str,
+        limit: int = 8,
+        records: list[DocumentRecord] | None = None,
+    ) -> list[tuple[int, DocumentRecord]]:
         pool = records if records is not None else self.records
         terms = query_terms(query)
         if not terms:
-            return pool[:limit]
+            return [(0, record) for record in pool[:limit]]
         scored: list[tuple[int, DocumentRecord]] = []
         for record in pool:
             hay_path = record.rel_path.lower()
@@ -102,7 +110,7 @@ class WikiIndex:
             if score:
                 scored.append((score, record))
         scored.sort(key=lambda item: (-item[0], item[1].rel_path))
-        return [record for _, record in scored[:limit]]
+        return scored[:limit]
 
 
 def query_terms(query: str) -> list[str]:

@@ -23,6 +23,7 @@ For an ad-hoc question:
 
 ```bash
 python3 work/main.py --ask "统计 docx 文件数量"
+python3 work/main.py --explain-ask "SQLite SELECT 命令是什么"
 ```
 
 For an index inspection:
