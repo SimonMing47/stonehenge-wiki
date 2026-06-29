@@ -221,7 +221,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 httpd.server_close()
                 thread.join(timeout=5)
 
-            self.assertIn("K 神 LLM Wiki", index_html)
+            self.assertIn("LLM Wiki", index_html)
             self.assertIn("authName", index_html)
             self.assertIn('id="tokenInput" class="secret-input" type="password"', index_html)
             self.assertIn("wikiSectionCount", index_html)

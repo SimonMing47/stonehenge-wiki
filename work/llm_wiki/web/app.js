@@ -1,6 +1,9 @@
 const state = {
   health: null,
   index: { files: [], comments: [], store: {} },
+  sources: [],
+  indexError: null,
+  sourcesError: null,
   audit: [],
   governance: null,
   readiness: null,
@@ -22,15 +25,15 @@ const I18N = {
   zh: {
     "nav.ask": "问答",
     "nav.wiki": "知识库",
-    "nav.studio": "PPT",
+    "nav.studio": "工作台",
     "nav.raw": "原始源",
     "nav.agents": "LLM配置",
     "nav.governance": "治理",
     "nav.audit": "审计",
     "top.subtitle": "知识运营",
-    "top.title": "K 神 LLM Wiki",
-    "title": "K 神 LLM Wiki",
-    "brand.title": "K 神 LLM Wiki",
+    "top.title": "LLM Wiki",
+    "title": "LLM Wiki",
+    "brand.title": "LLM Wiki",
     "brand.subtitle": "LLM Wiki",
     "ask.title": "问答",
     "ask.placeholder": "输入你的问题",
@@ -98,13 +101,13 @@ const I18N = {
     "agents.name": "名称",
     "agents.category": "分类",
     "agents.agent": "代理",
-    "studio.title": "PPT 工作室",
+    "studio.title": "工作台",
     "studio.topic_placeholder": "输入你的演讲主题",
     "studio.slides_4": "4 页",
     "studio.slides_6": "6 页",
     "studio.slides_8": "8 页",
-    "studio.generate": "生成 PPT",
-    "studio.hint": "还没有演示文稿",
+    "studio.generate": "生成演示稿",
+    "studio.hint": "暂无输出内容",
     "governance.title": "治理",
     "governance.summary_placeholder": "未加载报告",
     "governance.refresh_report": "刷新报告",
@@ -173,7 +176,7 @@ const I18N = {
     "status.wiki_mode": "知识库模式",
     "status.line": "行",
     "status.evidence": "证据",
-    "status.download_pptx": "下载PPTX",
+    "status.download_pptx": "下载文件",
     "status.no_answer": "无回答",
     "status.no_configured_agents": "未配置 LLM 代理",
     "status.no_category_mapping": "未设置分类映射",
@@ -198,15 +201,15 @@ const I18N = {
   en: {
     "nav.ask": "Ask",
     "nav.wiki": "Wiki",
-    "nav.studio": "Studio",
+    "nav.studio": "Workbench",
     "nav.raw": "Raw",
     "nav.agents": "Agents",
     "nav.governance": "Governance",
     "nav.audit": "Audit",
     "top.subtitle": "Knowledge Operations",
-    "top.title": "K 神 LLM Wiki",
-    "title": "K 神 LLM Wiki",
-    "brand.title": "K 神 LLM Wiki",
+    "top.title": "LLM Wiki",
+    "title": "LLM Wiki",
+    "brand.title": "LLM Wiki",
     "brand.subtitle": "LLM Wiki",
     "ask.title": "Ask",
     "ask.placeholder": "Ask your question",
@@ -274,13 +277,13 @@ const I18N = {
     "agents.name": "Name",
     "agents.category": "Category",
     "agents.agent": "Agent",
-    "studio.title": "PPT Studio",
+    "studio.title": "Workbench",
     "studio.topic_placeholder": "Enter your speaking topic",
     "studio.slides_4": "4 slides",
     "studio.slides_6": "6 slides",
     "studio.slides_8": "8 slides",
-    "studio.generate": "Generate PPT",
-    "studio.hint": "No deck yet",
+    "studio.generate": "Generate Brief",
+    "studio.hint": "No artifact yet",
     "governance.title": "Governance",
     "governance.summary_placeholder": "report not loaded",
     "governance.refresh_report": "Refresh Report",
@@ -349,7 +352,7 @@ const I18N = {
     "status.wiki_mode": "Wiki mode",
     "status.line": "line",
     "status.evidence": "Evidence",
-    "status.download_pptx": "Download PPTX",
+    "status.download_pptx": "Download file",
     "status.no_answer": "No answer",
     "status.no_configured_agents": "No configured LLM agents",
     "status.no_category_mapping": "No category mapping",
@@ -394,31 +397,82 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function safeApiCall(path) {
+  try {
+    return { ok: true, data: await api(path), error: null };
+  } catch (error) {
+    return { ok: false, data: null, error: error.message };
+  }
+}
+
+function buildSourcesFallback(sources) {
+  return {
+    files: (sources || [])
+      .map((source) => ({
+        path: source.rel_path || "",
+        suffix: source.suffix || "file",
+        tags: source.tags || [],
+        comment_count: Number(source.comment_count || 0),
+        risk: {
+          risk_count: source.risk_count || 0,
+          max_severity: source.max_severity || "none",
+          reasons: [],
+        },
+        size: source.size,
+      }))
+      .sort((a, b) => String(a.path).localeCompare(String(b.path))),
+    comments: [],
+    presentations: [],
+    store: {
+      files: sources.length,
+      comments: 0,
+      audit_events: 0,
+      wiki_sections: 0,
+    },
+    source_registry: sources.map((source) => ({
+      ...source,
+      rel_path: source.rel_path,
+    })),
+  };
+}
+
 async function refreshAll() {
   setBusy("refreshBtn", true);
   try {
-    const [health, index, audit, governance, readiness, wikiSections, wikiPages, sourceRisk] = await Promise.all([
-      api("/health"),
-      api("/index"),
-      api("/audit?limit=25"),
-      api("/reports/governance"),
-      api("/reports/readiness"),
-      api("/wiki/sections?limit=14"),
-      api("/wiki/pages?limit=200"),
-      api("/sources/risk")
+    const [health, index, audit, governance, readiness, wikiSections, wikiPages, sourceRisk, sources, llmConfig] = await Promise.all([
+      safeApiCall("/health"),
+      safeApiCall("/index"),
+      safeApiCall("/audit?limit=25"),
+      safeApiCall("/reports/governance"),
+      safeApiCall("/reports/readiness"),
+      safeApiCall("/wiki/sections?limit=14"),
+      safeApiCall("/wiki/pages?limit=200"),
+      safeApiCall("/sources/risk"),
+      safeApiCall("/sources?include_missing=1"),
+      safeApiCall("/llm/config"),
     ]);
-    const llmConfig = await api("/llm/config").catch(() => null);
-    state.health = health;
-    state.index = index;
-    state.audit = audit.events || [];
-    state.governance = governance.report || null;
-    state.readiness = readiness.report || null;
-    state.wikiSections = wikiSections.sections || [];
-    state.wikiPages = wikiPages.pages || [];
-    state.sourceRisk = sourceRisk;
-    if (llmConfig) {
-      state.llmConfig = llmConfig;
+
+    const sourceItems = sources.ok ? (sources.data?.sources || []) : [];
+    const fallbackIndex = sourceItems.length ? buildSourcesFallback(sourceItems) : null;
+    const indexPayload = index.ok ? index.data : fallbackIndex || state.index;
+    const healthPayload = health.ok ? health.data : state.health || { files: 0, comments: 0, store: {} };
+    const readinessPayload = readiness.ok ? readiness.data : null;
+
+    state.health = healthPayload;
+    state.sources = sourceItems;
+    state.index = indexPayload || { files: [], comments: [], store: {} };
+    state.indexError = index.ok ? null : index.error;
+    state.sourcesError = sources.ok ? null : sources.error;
+    state.audit = audit.ok ? (audit.data.events || []) : [];
+    state.governance = governance.ok ? (governance.data.report || null) : null;
+    state.readiness = readinessPayload ? (readinessPayload.report || null) : null;
+    state.wikiSections = wikiSections.ok ? (wikiSections.data.sections || []) : [];
+    state.wikiPages = wikiPages.ok ? (wikiPages.data.pages || []) : [];
+    state.sourceRisk = sourceRisk.ok ? sourceRisk.data : state.sourceRisk;
+    if (llmConfig.ok) {
+      state.llmConfig = llmConfig.data;
     }
+
     renderHealth();
     renderIndex();
     renderAudit();
@@ -429,9 +483,7 @@ async function refreshAll() {
     renderLLMConfig();
     renderSourceRisk();
     await ensureWikiPagePreview();
-    setApiState(true);
-  } catch (error) {
-    setApiState(false, error.message);
+    setApiState(health.ok, health.error || "");
   } finally {
     setBusy("refreshBtn", false);
   }
@@ -693,14 +745,16 @@ function renderIndex() {
   const files = state.index.files || [];
   const comments = state.index.comments || [];
   const presentations = state.index.presentations || [];
-  const registry = state.index.source_registry || [];
-  const sourceByPath = Object.fromEntries(registry.map((source) => [source.rel_path, source]));
+  const registry = state.index.source_registry || state.sources || [];
+  const sourceByPath = Object.fromEntries(
+    registry.map((source) => [source.rel_path || source.path || source.source_path, source])
+  );
   const activeCount = registry.filter((source) => source.status === "active").length || files.length;
   el("fileScope").textContent = `${activeCount} ${translate("status.active")} · ${registry.length || files.length} ${translate("status.total")}`;
   el("commentScope").textContent = `${comments.length} ${translate("status.found")}`;
   el("fileList").innerHTML = files.length
     ? files.map((file) => fileRow(file, sourceByPath[file.path])).join("")
-    : emptySourceRow(translate("status.no_indexed_files"));
+    : emptySourceRow(state.sourcesError || state.indexError || translate("status.no_indexed_files"));
   el("commentList").innerHTML = comments.length
     ? comments.slice(0, 80).map(commentRow).join("")
     : emptyRow(translate("status.no_comments"));
