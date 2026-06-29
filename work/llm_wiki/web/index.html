@@ -122,10 +122,14 @@
           <div class="wiki-reader">
             <div class="surface wiki-page-list-pane">
               <div class="section-head">
-                <h2 data-i18n="wiki.articles">Articles</h2>
+                <h2 data-i18n="wiki.tree">知识树</h2>
                 <span id="wikiPageStatus" data-i18n="status.ready">Ready</span>
               </div>
-              <div id="wikiPageList" class="wiki-page-list"></div>
+              <div class="wiki-tree-controls row-actions compact">
+                <input id="wikiTreeSearch" data-placeholder-i18n="wiki.tree_search" aria-label="Search tree" />
+                <button id="wikiTreeSearchClear" type="button" data-i18n="status.reset">Reset</button>
+              </div>
+              <div id="wikiTreeList" class="wiki-tree-list"></div>
             </div>
 
             <article class="surface wiki-page-preview-pane">
@@ -135,6 +139,13 @@
               </div>
               <div id="wikiPagePreview" class="wiki-page-preview">
                 <span class="muted" id="wikiPagePreviewHint" data-i18n="wiki.preview_hint">Select an article from the list.</span>
+              </div>
+              <div id="wikiGraphPanel" class="wiki-graph-panel">
+                <div class="section-head">
+                  <h3 data-i18n="wiki.graph">Knowledge Graph</h3>
+                  <span id="wikiGraphStatus" data-i18n="status.ready">Ready</span>
+                </div>
+                <div id="wikiGraph" class="wiki-graph"></div>
               </div>
             </article>
           </div>

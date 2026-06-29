@@ -14,6 +14,8 @@ const state = {
   explanation: null,
   llm: null,
   llmConfig: null,
+  wikiTreeFilter: "",
+  wikiPageIndex: null,
 };
 
 const pages = new Set(["ask", "wiki", "studio", "sources", "agents", "governance", "audit"]);
@@ -67,6 +69,20 @@ const I18N = {
     "question_groups.placeholder": "group-1",
     "question_groups.run": "运行组",
     "wiki.articles": "文章",
+    "wiki.tree": "知识树",
+    "wiki.tree_search": "搜索知识节点",
+    "wiki.graph": "知识图谱",
+    "wiki.no_relations": "暂无可视化关联",
+    "wiki.relation": "关联",
+    "wiki.node_kind_index": "总览",
+    "wiki.node_kind_source": "来源库",
+    "wiki.node_kind_topic": "主题",
+    "wiki.node_kind_log": "日志",
+    "wiki.node_kind_other": "其他",
+    "wiki.graph_source": "共享来源",
+    "wiki.graph_kind": "同类型",
+    "wiki.graph_folder": "同目录",
+    "wiki.graph_link": "内链",
     "wiki.preview": "预览",
     "wiki.preview_hint": "从列表中选择一篇文章。",
     "wiki.explain": "解释",
@@ -135,6 +151,7 @@ const I18N = {
     "status.blocked": "已拦截",
     "status.importing": "导入中",
     "status.imported": "已导入",
+    "status.reset": "重置",
     "status.updating": "更新中",
     "status.searching": "搜索中",
     "status.generating": "生成中",
@@ -243,6 +260,20 @@ const I18N = {
     "question_groups.placeholder": "group-1",
     "question_groups.run": "Run Group",
     "wiki.articles": "Articles",
+    "wiki.tree": "Knowledge Tree",
+    "wiki.tree_search": "Search knowledge node",
+    "wiki.graph": "Knowledge Graph",
+    "wiki.no_relations": "No linked knowledge yet",
+    "wiki.relation": "Related",
+    "wiki.node_kind_index": "Index",
+    "wiki.node_kind_source": "Sources",
+    "wiki.node_kind_topic": "Topics",
+    "wiki.node_kind_log": "Log",
+    "wiki.node_kind_other": "Other",
+    "wiki.graph_source": "Same source",
+    "wiki.graph_kind": "Same kind",
+    "wiki.graph_folder": "Same folder",
+    "wiki.graph_link": "Wikilink",
     "wiki.preview": "Preview",
     "wiki.preview_hint": "Select an article from the list.",
     "wiki.explain": "Explain",
@@ -311,6 +342,7 @@ const I18N = {
     "status.blocked": "Blocked",
     "status.importing": "Importing",
     "status.imported": "Imported",
+    "status.reset": "Reset",
     "status.updating": "Updating",
     "status.searching": "Searching",
     "status.generating": "Generating",
@@ -377,9 +409,19 @@ const I18N = {
 };
 
 let currentLanguage = lang;
+const URL_TOKEN_KEY = "llmWikiApiToken";
+
+{
+  const tokenFromQuery = new URLSearchParams(window.location.search).get("token");
+  if (tokenFromQuery) {
+    localStorage.setItem(URL_TOKEN_KEY, tokenFromQuery);
+    const cleanUrl = `${window.location.pathname}${window.location.hash || ""}`;
+    window.history.replaceState({}, "", cleanUrl);
+  }
+}
 
 async function api(path, options = {}) {
-  const token = localStorage.getItem("llmWikiApiToken") || "";
+  const token = localStorage.getItem(URL_TOKEN_KEY) || "";
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { "X-LLM-WIKI-TOKEN": token } : {}),
@@ -469,6 +511,7 @@ async function refreshAll() {
     state.wikiSections = wikiSections.ok ? (wikiSections.data.sections || []) : [];
     state.wikiPages = wikiPages.ok ? (wikiPages.data.pages || []) : [];
     state.sourceRisk = sourceRisk.ok ? sourceRisk.data : state.sourceRisk;
+    state.wikiPageIndex = buildWikiPageIndex(state.wikiPages);
     if (llmConfig.ok) {
       state.llmConfig = llmConfig.data;
     }
@@ -902,23 +945,290 @@ function renderWikiSections(sections) {
 
 function renderWikiPageList() {
   const pages = state.wikiPages || [];
-  el("wikiPageStatus").textContent = `${pages.length} ${translate("status.articles")}`;
-  el("wikiPageList").innerHTML = pages.length
-    ? pages.map(wikiPageRow).join("")
+  const filter = (state.wikiTreeFilter || "").trim().toLowerCase();
+  const groups = buildWikiTreeGroups(pages, filter);
+  const visibleCount = countVisibleTreePages(groups);
+  el("wikiPageStatus").textContent = `${visibleCount} / ${pages.length} ${translate("status.articles")}`;
+  el("wikiTreeList").innerHTML = pages.length
+    ? renderWikiTreeGroups(groups, filter)
     : emptyRow(translate("status.no_compiled_articles"));
 }
 
-function wikiPageRow(page) {
-  const selectedPath = state.wikiPage?.page?.path || "";
-  const active = selectedPath === page.path ? " active" : "";
-  const meta = [page.kind, page.file_type, page.source_path].filter(Boolean).join(" · ");
-  return `
-    <button type="button" class="wiki-page-row${active}" data-wiki-page-path="${escapeHtml(page.path)}">
-      <strong>${escapeHtml(page.title || page.path)}</strong>
-      <span>${escapeHtml(meta || page.path)}</span>
-      ${page.excerpt ? `<small>${escapeHtml(page.excerpt)}</small>` : ""}
-    </button>
-  `;
+function buildWikiTreeGroups(pages, filter) {
+  const matchTerm = (filter || "").trim().toLowerCase();
+  const groupOrder = ["index", "source", "topic", "log", "other"];
+  const groups = {
+    index: { key: "index", title: translate("wiki.node_kind_index"), folders: new Map(), pages: [] },
+    source: { key: "source", title: translate("wiki.node_kind_source"), folders: new Map(), pages: [] },
+    topic: { key: "topic", title: translate("wiki.node_kind_topic"), folders: new Map(), pages: [] },
+    log: { key: "log", title: translate("wiki.node_kind_log"), folders: new Map(), pages: [] },
+    other: { key: "other", title: translate("wiki.node_kind_other"), folders: new Map(), pages: [] },
+  };
+  const getKind = (kind) => {
+    const normalized = String(kind || "").trim().toLowerCase();
+    return normalized === "index" || normalized === "source" || normalized === "topic" || normalized === "log"
+      ? normalized
+      : "other";
+  };
+  const matchesFilter = (page) => {
+    if (!matchTerm) {
+      return true;
+    }
+    return [page.title, page.path, page.excerpt, page.kind, page.file_type, page.source_path]
+      .some((value) => String(value || "").toLowerCase().includes(matchTerm));
+  };
+  const normalizeSegments = (path) => String(path || "").replace(/\.md$/i, "").split("/").filter(Boolean);
+  const insertFolder = (node, segments, pageNode) => {
+    if (!segments.length) {
+      node.pages.push(pageNode);
+      return;
+    }
+    const [head, ...rest] = segments;
+    const bucketKey = `folder:${head}`;
+    if (!node.folders.has(bucketKey)) {
+      node.folders.set(bucketKey, {
+        label: head,
+        folders: new Map(),
+        pages: [],
+      });
+    }
+    insertFolder(node.folders.get(bucketKey), rest, pageNode);
+  };
+  for (const page of pages || []) {
+    const pageKind = getKind(page.kind);
+    const group = groups[pageKind];
+    const matched = matchesFilter(page);
+    const pageNode = {
+      path: page.path,
+      title: page.title || page.path,
+      kind: page.kind || pageKind,
+      source_path: page.source_path || "",
+      file_type: page.file_type || "",
+      excerpt: page.excerpt || "",
+      match: matched,
+    };
+    let segments = normalizeSegments(page.path);
+    if (pageKind === "source" && segments[0] === "sources") {
+      segments = segments.slice(1);
+    }
+    if (pageKind === "topic" && segments[0] === "topics") {
+      segments = segments.slice(1);
+    }
+    if (segments.length > 1) {
+      insertFolder(group, segments.slice(0, -1), pageNode);
+    } else {
+      group.pages.push(pageNode);
+    }
+  }
+  return groupOrder.map((kind) => groups[kind]);
+}
+
+function countVisibleNodePages(node) {
+  let count = 0;
+  for (const page of node.pages || []) {
+    if (page.match) {
+      count += 1;
+    }
+  }
+  for (const folder of node.folders.values()) {
+    count += countVisibleNodePages(folder);
+  }
+  return count;
+}
+
+function countVisibleTreePages(groups) {
+  return groups.reduce((total, group) => total + countVisibleNodePages(group), 0);
+}
+
+function renderWikiTreeGroups(groups, filter) {
+  const showAllFolders = !filter || (filter || "").trim().length <= 2;
+  const renderNode = (node, depth) => {
+    const indent = Math.min(8 + depth * 16, 52);
+    const pageRows = [];
+    for (const page of node.pages || []) {
+      if (!page.match) {
+        continue;
+      }
+      const selectedPath = state.wikiPage?.page?.path || "";
+      const active = selectedPath === page.path ? " active" : "";
+      const meta = [page.kind, page.file_type, page.source_path].filter(Boolean).join(" · ");
+      pageRows.push(`
+        <button type="button" class="wiki-tree-page${active}" style="padding-left:${indent}px" data-wiki-page-path="${escapeHtml(page.path)}">
+          <span class="wiki-tree-page-title">${escapeHtml(page.title || page.path)}</span>
+          <span class="wiki-tree-page-meta">${escapeHtml(meta || page.path)}</span>
+        </button>
+      `);
+    }
+
+    const folderRows = [];
+    for (const folder of [...node.folders.values()].sort((a, b) => a.label.localeCompare(b.label))) {
+      const nested = renderNode(folder, depth + 1);
+      const childCount = countVisibleNodePages(folder);
+      if (!nested && !childCount) continue;
+      const open = showAllFolders || depth <= 1 ? "open" : "";
+      folderRows.push(`
+        <details class="wiki-tree-folder" ${open}>
+          <summary style="padding-left:${indent}px">
+            ${escapeHtml(folder.label)} <span>${childCount}</span>
+          </summary>
+          <div class="wiki-tree-folder-children">
+            ${nested}
+          </div>
+        </details>
+      `);
+    }
+
+    return pageRows.concat(folderRows).join("");
+  };
+
+  const items = groups
+    .map((group) => {
+      const child = renderNode(group, 0);
+      const count = countVisibleNodePages(group);
+      if (!count) {
+        return "";
+      }
+      return `
+        <details class="wiki-tree-group" open>
+          <summary style="padding-left:6px">
+            <span>${escapeHtml(group.title)}</span>
+            <span>${count}</span>
+          </summary>
+          <div class="wiki-tree-group-children">
+            ${child || emptyRow(translate("wiki.no_relations"))}
+          </div>
+        </details>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+
+  if (items) {
+    return items;
+  }
+
+  if (filter) {
+    return emptyRow(translate("status.no_compiled_articles"));
+  }
+
+  return emptyRow(translate("status.no_compiled_articles"));
+}
+
+function buildWikiPageIndex(pages) {
+  const byPath = {};
+  const byPathStem = {};
+  const byTitle = {};
+  for (const page of pages || []) {
+    if (!page?.path) {
+      continue;
+    }
+    byPath[page.path] = page;
+    const stem = normalizeWikiPath(page.path);
+    byPathStem[stem] = byPathStem[stem] || [];
+    byPathStem[stem].push(page);
+    const titleKey = String(page.title || page.path).trim().toLowerCase();
+    byTitle[titleKey] = byTitle[titleKey] || [];
+    byTitle[titleKey].push(page);
+  }
+  return {
+    byPath,
+    byPathStem,
+    byTitle,
+  };
+}
+
+function normalizeWikiPath(value) {
+  return String(value || "").replace(/\.md$/i, "").replace(/^\/+/, "").toLowerCase();
+}
+
+function resolveWikiPathCandidate(candidate) {
+  if (!candidate) return "";
+  const raw = String(candidate).trim().replace(/\.md$/i, "");
+  if (!raw) return "";
+  return raw.includes("/") || raw.includes(".") ? raw : raw.replace(/\s+/g, "-");
+}
+
+function parseWikiLinksFromMarkdown(markdown) {
+  const found = [];
+  const pattern = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+  let match;
+  while ((match = pattern.exec(markdown || "")) !== null) {
+    const target = String(match[1] || "").trim();
+    if (!target || target.startsWith("http")) {
+      continue;
+    }
+    const normalized = target.split("#", 1)[0].trim();
+    if (normalized) {
+      found.push(normalized);
+    }
+  }
+  return found;
+}
+
+function findWikiPageByLink(candidate, currentPage) {
+  const lookup = state.wikiPageIndex || {};
+  const raw = resolveWikiPathCandidate(candidate);
+  if (!raw) return "";
+  if (lookup.byPath?.[candidate]) {
+    return candidate;
+  }
+  if (lookup.byPath?.[`${raw}.md`]) {
+    return `${raw}.md`;
+  }
+  if (lookup.byPathStem?.[raw]) {
+    return lookup.byPathStem[raw][0]?.path || "";
+  }
+  const currentSource = String(currentPage?.source_path || "");
+  if (currentSource) {
+    for (const item of Object.values(lookup.byPath || {})) {
+      if (item.source_path === currentSource && item.path.endsWith(`/${raw}.md`)) {
+        return item.path;
+      }
+    }
+  }
+  const titleMatches = lookup.byTitle?.[raw.toLowerCase()];
+  return titleMatches?.[0]?.path || "";
+}
+
+function extractGraphRelations(page, markdown) {
+  const current = page || {};
+  const relations = [];
+  const existing = new Set();
+  const addRelation = (targetPath, reason) => {
+    if (!targetPath || targetPath === current.path) return;
+    if (existing.has(targetPath)) return;
+    const target = (state.wikiPageIndex?.byPath || {})[targetPath];
+    if (!target) return;
+    existing.add(targetPath);
+    relations.push({
+      path: target.path,
+      title: target.title || target.path,
+      reason,
+    });
+  };
+
+  const linkTargets = parseWikiLinksFromMarkdown(markdown || "");
+  linkTargets.forEach((target) => {
+    const resolved = findWikiPageByLink(target, current);
+    addRelation(resolved, translate("wiki.graph_link"));
+  });
+
+  for (const candidate of state.wikiPages || []) {
+    if (candidate.path === current.path) continue;
+    if (current.source_path && candidate.source_path && current.source_path === candidate.source_path) {
+      addRelation(candidate.path, translate("wiki.graph_source"));
+    }
+    if (candidate.kind === current.kind && current.kind) {
+      addRelation(candidate.path, translate("wiki.graph_kind"));
+    }
+    const currentFolder = String(candidate.path).split("/")[0];
+    const currentSelfFolder = String(current.path).split("/")[0];
+    if (currentFolder && currentFolder === currentSelfFolder) {
+      addRelation(candidate.path, translate("wiki.graph_folder"));
+    }
+  }
+
+  return relations.slice(0, 12);
 }
 
 async function ensureWikiPagePreview() {
@@ -957,12 +1267,36 @@ function renderWikiPagePreview() {
     el("wikiPageTitle").textContent = translate("wiki.preview");
     el("wikiPageMeta").textContent = translate("status.select_article");
     el("wikiPagePreview").innerHTML = `<span class="muted">${translate("wiki.preview_hint")}</span>`;
+    el("wikiGraph").innerHTML = emptyRow(translate("wiki.no_relations"));
+    el("wikiGraphStatus").textContent = translate("status.select_article");
     return;
   }
   const meta = [page.kind, page.file_type, page.source_path || page.path].filter(Boolean).join(" · ");
   el("wikiPageTitle").textContent = page.title || page.path;
   el("wikiPageMeta").textContent = meta;
   el("wikiPagePreview").innerHTML = markdownToHtml(detail.markdown || "");
+  renderWikiRelations(detail);
+}
+
+function renderWikiRelations(detail) {
+  const page = detail.page || {};
+  const relations = extractGraphRelations(page, detail.markdown || "");
+  el("wikiGraphStatus").textContent = `${relations.length} ${translate("wiki.relation")}`;
+  el("wikiGraph").innerHTML = relations.length
+    ? relations
+        .map((relation) => {
+          return `
+            <div class="wiki-graph-row">
+              <button type="button" class="wiki-graph-node" data-wiki-page-path="${escapeHtml(relation.path)}">
+                ${escapeHtml(relation.title || relation.path)}
+              </button>
+              <span class="wiki-graph-arrow">↔</span>
+              <span class="wiki-graph-reason muted">${escapeHtml(relation.reason || "")}</span>
+            </div>
+          `;
+        })
+        .join("")
+    : `<div class="wiki-graph-empty muted">${translate("wiki.no_relations")}</div>`;
 }
 
 function wikiSectionRow(section) {
@@ -1563,6 +1897,15 @@ el("reindexBtn").addEventListener("click", reindex);
 el("compileWikiBtn").addEventListener("click", compileWiki);
 el("lintWikiBtn").addEventListener("click", lintWiki);
 el("wikiSearchBtn").addEventListener("click", searchWikiSections);
+el("wikiTreeSearch").addEventListener("input", () => {
+  state.wikiTreeFilter = el("wikiTreeSearch").value || "";
+  renderWikiPageList();
+});
+el("wikiTreeSearchClear").addEventListener("click", () => {
+  state.wikiTreeFilter = "";
+  el("wikiTreeSearch").value = "";
+  renderWikiPageList();
+});
 el("refreshReportBtn").addEventListener("click", refreshReport);
 el("exportReportBtn").addEventListener("click", exportReport);
 el("refreshReadinessBtn").addEventListener("click", refreshReadiness);
@@ -1602,7 +1945,7 @@ document.addEventListener("click", (event) => {
   setSourceStatus(button.dataset.sourcePath, button.dataset.sourceStatus, button);
 });
 el("saveTokenBtn").addEventListener("click", () => {
-  localStorage.setItem("llmWikiApiToken", el("tokenInput").value.trim());
+  localStorage.setItem(URL_TOKEN_KEY, el("tokenInput").value.trim());
   refreshAll();
 });
 el("questionInput").addEventListener("keydown", (event) => {
@@ -1611,7 +1954,7 @@ el("questionInput").addEventListener("keydown", (event) => {
   }
 });
 
-el("tokenInput").value = localStorage.getItem("llmWikiApiToken") || "";
+el("tokenInput").value = localStorage.getItem(URL_TOKEN_KEY) || "";
 setLanguage(currentLanguage);
 renderPage();
 refreshAll();

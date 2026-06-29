@@ -3,6 +3,7 @@ __pycache__/
 .pytest_cache/
 .playwright-cli/
 tmp/
+rust-cli/target/
 llm-wiki/.env
 work/.venv/
 llm-wiki/.state/

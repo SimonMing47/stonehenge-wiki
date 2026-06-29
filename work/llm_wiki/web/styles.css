@@ -561,7 +561,7 @@ h3 {
 .wiki-page-preview-pane,
 .wiki-pane,
 .explain-pane,
-.wiki-page-list,
+.wiki-tree-list,
 .wiki-section-list,
 .table-list,
 .audit-list,
@@ -573,7 +573,7 @@ h3 {
   /* consistent container styling follows below */
 }
 
-.wiki-page-list,
+.wiki-tree-list,
 .wiki-section-list,
 .trace-list,
 .table-list,
@@ -591,6 +591,8 @@ h3 {
 }
 
 .wiki-page-row,
+.wiki-tree-page,
+.wiki-graph-node,
 .wiki-section-row,
 .trace-row,
 .source-row,
@@ -608,6 +610,7 @@ h3 {
 }
 
 .wiki-page-row:hover,
+.wiki-tree-page:hover,
 .wiki-section-row:hover,
 .trace-row:hover,
 .source-row:hover,
@@ -618,6 +621,7 @@ h3 {
 }
 
 .wiki-page-row:first-of-type,
+.wiki-tree-page:first-of-type,
 .wiki-section-row:first-of-type,
 .trace-row:first-of-type,
 .source-row:first-of-type,
@@ -629,6 +633,7 @@ h3 {
 }
 
 .wiki-page-row:last-child,
+.wiki-tree-page:last-child,
 .wiki-section-row:last-child,
 .trace-row:last-child,
 .source-row:last-child,
@@ -641,30 +646,171 @@ h3 {
   border-bottom-right-radius: 10px;
 }
 
-.wiki-page-row {
+.wiki-tree-page,
+.wiki-tree-page-title,
+.wiki-tree-page-meta {
   text-align: left;
-  border-left: 3px solid transparent;
+  overflow-wrap: anywhere;
 }
 
-.wiki-page-row.active {
+.wiki-tree-page {
+  text-align: left;
+  border-left: 3px solid transparent;
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 10px 10px var(--tree-indent, 10px);
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.wiki-tree-page:hover {
+  background: #fbfdff;
+}
+
+.wiki-tree-page.active {
   border-left-color: var(--accent);
   background: #f1f6ff;
 }
 
-.wiki-page-list {
-  max-height: 560px;
+.wiki-tree-list {
+  max-height: 760px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 2px;
 }
 
-.wiki-page-row strong,
-.wiki-page-row span,
-.wiki-page-row small {
+.wiki-tree-page-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wiki-tree-page-meta,
+.wiki-tree-page small {
   overflow-wrap: anywhere;
-}
-
-.wiki-page-row span,
-.wiki-page-row small {
   color: var(--muted);
   font-size: 12px;
+}
+
+.wiki-tree-controls {
+  margin-bottom: 8px;
+}
+
+.wiki-tree-controls input {
+  min-width: 160px;
+}
+
+.wiki-tree-kind,
+.wiki-tree-folder {
+  border-bottom: 1px solid var(--line);
+}
+
+.wiki-tree-kind summary,
+.wiki-tree-folder summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  list-style: none;
+  padding: 10px var(--tree-indent, 10px);
+  color: #1f2937;
+  font-size: 12px;
+  font-weight: 700;
+  background: #f8fbff;
+  border-left: 1px solid transparent;
+}
+
+.wiki-tree-kind summary::marker,
+.wiki-tree-folder summary::marker {
+  display: none;
+}
+
+.wiki-tree-kind[open] summary,
+.wiki-tree-folder[open] summary {
+  color: var(--accent);
+}
+
+.wiki-tree-kind-children,
+.wiki-tree-folder-children {
+  border-left: 1px solid var(--line);
+}
+
+.wiki-tree-group > summary > span:last-child,
+.wiki-tree-folder > summary > span:last-child {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.wiki-page-list-pane .section-head + .wiki-tree-list {
+  margin-top: 8px;
+}
+
+.wiki-graph-panel {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.wiki-graph {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.wiki-graph-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.wiki-graph-empty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wiki-graph-node {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  min-height: 0;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wiki-graph-node:hover {
+  color: #1e40af;
+}
+
+.wiki-graph-arrow {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.wiki-graph-reason {
+  justify-self: end;
+  text-align: right;
 }
 
 .wiki-page-preview {

@@ -9,6 +9,13 @@ description: Run the repository-local LLM-wiki system for deterministic document
 
 Use the platform CLI as the source of truth. From the repository root:
 
+You may also call the Rust CLI entry from this repo root:
+
+```bash
+./rust-cli/target/release/llm-wiki-linux --group group-1      # Linux
+./rust-cli/target/release/llm-wiki-windows.exe --group group-1  # Windows
+```
+
 ```bash
 python3 work/main.py --group group-1
 ```
