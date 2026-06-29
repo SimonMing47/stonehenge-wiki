@@ -44,6 +44,40 @@ result/
 
 ## CLI 入口
 
+### Rust CLI（新增）
+
+除了 Python CLI 外，项目新增 Rust 封装 CLI（仅做调用透传）：
+
+- Linux：`rust-cli/target/release/llm-wiki-linux`
+- Windows：`rust-cli/target/release/llm-wiki-windows.exe`
+
+构建方式：
+
+```bash
+cd rust-cli
+cargo build --release --bin llm-wiki-linux    # Linux
+```
+
+```powershell
+cd rust-cli
+cargo build --release --bin llm-wiki-windows  # Windows
+```
+
+Rust CLI 会调用 `work/main.py`，参数与 Python CLI 兼容：
+
+```bash
+./rust-cli/target/release/llm-wiki-linux --group group-1
+./rust-cli/target/release/llm-wiki-windows.exe --ask "统计 docx 文件数量"
+```
+
+可选环境变量：
+
+- `LLM_WIKI_MAIN_PY`: 指定主入口脚本路径（默认按运行路径自动查找 `work/main.py`）
+- `LLM_WIKI_ROOT`: 指定 `llm-wiki/` 根目录
+- `LLM_WIKI_PYTHON`: 指定 Python 可执行路径
+
+如果不使用 Rust CLI，可直接继续使用：
+
 处理 `llm-wiki/question/` 下全部 `group-*.md`：
 
 ```bash

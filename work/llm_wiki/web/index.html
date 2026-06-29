@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title data-i18n="title">K 神 LLM Wiki</title>
+    <title data-i18n="title">LLM Wiki</title>
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body>
@@ -12,14 +12,14 @@
         <div class="brand">
           <span class="mark" aria-hidden="true">LW</span>
           <span>
-            <strong data-i18n="brand.title">K 神 LLM Wiki</strong>
+            <strong data-i18n="brand.title">LLM Wiki</strong>
             <small data-i18n="brand.subtitle">LLM Wiki</small>
           </span>
         </div>
         <nav class="nav">
           <a href="#ask" id="navAsk" data-i18n="nav.ask">Ask</a>
           <a href="#wiki" id="navWiki" data-i18n="nav.wiki">Wiki</a>
-          <a href="#studio" id="navStudio" data-i18n="nav.studio">Studio</a>
+          <a href="#studio" id="navStudio" data-i18n="nav.studio">Workbench</a>
           <a href="#sources" id="navSources" data-i18n="nav.raw">Raw</a>
           <a href="#agents" id="navAgents" data-i18n="nav.agents">Agents</a>
           <a href="#governance" id="navGovernance" data-i18n="nav.governance">Governance</a>
@@ -34,7 +34,7 @@
         <header class="topbar">
           <div>
             <p id="appSubtitle" class="eyebrow" data-i18n="top.subtitle">Knowledge Operations</p>
-            <h1 id="appTitle" data-i18n="top.title">K 神 LLM Wiki</h1>
+            <h1 id="appTitle" data-i18n="top.title">LLM Wiki</h1>
           </div>
           <form id="tokenForm" class="toolbar">
             <button id="langToggle" type="button" data-i18n="toolbar.lang">English</button>
@@ -122,10 +122,14 @@
           <div class="wiki-reader">
             <div class="surface wiki-page-list-pane">
               <div class="section-head">
-                <h2 data-i18n="wiki.articles">Articles</h2>
+                <h2 data-i18n="wiki.tree">知识树</h2>
                 <span id="wikiPageStatus" data-i18n="status.ready">Ready</span>
               </div>
-              <div id="wikiPageList" class="wiki-page-list"></div>
+              <div class="wiki-tree-controls row-actions compact">
+                <input id="wikiTreeSearch" data-placeholder-i18n="wiki.tree_search" aria-label="Search tree" />
+                <button id="wikiTreeSearchClear" type="button" data-i18n="status.reset">Reset</button>
+              </div>
+              <div id="wikiTreeList" class="wiki-tree-list"></div>
             </div>
 
             <article class="surface wiki-page-preview-pane">
@@ -135,6 +139,13 @@
               </div>
               <div id="wikiPagePreview" class="wiki-page-preview">
                 <span class="muted" id="wikiPagePreviewHint" data-i18n="wiki.preview_hint">Select an article from the list.</span>
+              </div>
+              <div id="wikiGraphPanel" class="wiki-graph-panel">
+                <div class="section-head">
+                  <h3 data-i18n="wiki.graph">Knowledge Graph</h3>
+                  <span id="wikiGraphStatus" data-i18n="status.ready">Ready</span>
+                </div>
+                <div id="wikiGraph" class="wiki-graph"></div>
               </div>
             </article>
           </div>
@@ -179,10 +190,10 @@
           </div>
         </section>
 
-        <section id="studio" class="page" data-page="studio" aria-label="PPT studio">
+        <section id="studio" class="page" data-page="studio" aria-label="Content workbench">
           <div class="surface artifact-pane page-surface">
             <div class="section-head">
-              <h2 data-i18n="studio.title">PPT Studio</h2>
+              <h2 data-i18n="studio.title">工作台</h2>
               <span id="slidesStatus" data-i18n="status.ready">Ready</span>
             </div>
             <textarea id="slidesTopic" rows="5" data-i18n="studio.topic_placeholder" data-placeholder-i18n="studio.topic_placeholder"></textarea>
@@ -192,10 +203,10 @@
                 <option value="6" data-i18n="studio.slides_6" selected>6 slides</option>
                 <option value="8" data-i18n="studio.slides_8">8 slides</option>
               </select>
-              <button id="generateSlidesBtn" type="button" class="primary" data-i18n="studio.generate">Generate PPT</button>
+              <button id="generateSlidesBtn" type="button" class="primary" data-i18n="studio.generate">Generate Brief</button>
             </div>
             <div id="artifactOutput" class="artifact-output">
-              <span class="muted" id="artifactHint" data-i18n="studio.hint">No deck yet</span>
+              <span class="muted" id="artifactHint" data-i18n="studio.hint">No artifact yet</span>
             </div>
           </div>
         </section>

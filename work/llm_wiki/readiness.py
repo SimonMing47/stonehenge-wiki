@@ -87,6 +87,9 @@ def cli_skill_gate(wiki_root: Path) -> dict[str, Any]:
         repo_root / "work" / "llm_wiki" / "cli.py",
         repo_root / "work" / "skills" / "llm-wiki" / "SKILL.md",
         repo_root / "work" / "skills" / "llm-wiki" / "scripts" / "run_llm_wiki.py",
+        repo_root / "rust-cli" / "Cargo.toml",
+        repo_root / "rust-cli" / "src" / "bin" / "llm-wiki-linux.rs",
+        repo_root / "rust-cli" / "src" / "bin" / "llm-wiki-windows.rs",
     ]
     missing = [path.relative_to(repo_root).as_posix() for path in required if not path.exists()]
     return gate(
