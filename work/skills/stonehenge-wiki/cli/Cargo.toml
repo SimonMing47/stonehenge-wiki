@@ -1,0 +1,18 @@
+[package]
+name = "stonehenge-wiki-skill-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[bin]]
+name = "stonehenge-wiki"
+path = "src/bin/stonehenge-wiki.rs"
+
+[[bin]]
+name = "stonehenge-wiki-linux"
+path = "src/bin/stonehenge-wiki-linux.rs"
+
+[[bin]]
+name = "stonehenge-wiki-windows"
+path = "src/bin/stonehenge-wiki-windows.rs"

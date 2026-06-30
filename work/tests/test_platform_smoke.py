@@ -13,23 +13,23 @@ import zipfile
 from pathlib import Path
 from urllib.parse import quote
 
-from llm_wiki.extractors import extract_docx
-from llm_wiki.answerer import QuestionAnswerer
-from llm_wiki.cli import main as cli_main
-from llm_wiki.llm import LLMAnswer, build_context
-from llm_wiki.indexer import WikiIndex
-from llm_wiki.models import Question
-from llm_wiki.office_bridge import convert_office, has_soffice
-from llm_wiki.platform import LLMWikiPlatform
-from llm_wiki.security import PermissionGuard
-from llm_wiki.server import build_server
+from stonehenge_wiki.extractors import extract_docx
+from stonehenge_wiki.answerer import QuestionAnswerer
+from stonehenge_wiki.cli import main as cli_main
+from stonehenge_wiki.llm import LLMAnswer, build_context
+from stonehenge_wiki.indexer import WikiIndex
+from stonehenge_wiki.models import Question
+from stonehenge_wiki.office_bridge import convert_office, has_soffice
+from stonehenge_wiki.platform import StonehengeWikiPlatform
+from stonehenge_wiki.security import PermissionGuard
+from stonehenge_wiki.server import build_server
 
 
 class PlatformSmokeTest(unittest.TestCase):
     def test_group_run_persistence_audit_and_repair(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "05_需求设计"
             question_dir = wiki / "question"
             docs.mkdir(parents=True)
@@ -64,7 +64,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             results = platform.run_groups(groups=["group-1"])
 
             self.assertEqual(results[0]["count"], 4)
@@ -81,9 +81,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertGreaterEqual(health["store"]["audit_events"], 4)
 
     def test_compile_and_lint_markdown_wiki_layer(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-compile-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-compile-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "04_常用命令"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir(parents=True)
@@ -96,7 +96,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             compiled = platform.compile_wiki()
             lint = platform.lint_wiki()
 
@@ -120,9 +120,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertFalse(stale_topic.exists())
 
     def test_compiled_wiki_sections_cli_api_and_secret_filter(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-sections-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-sections-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "04_常用命令"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -137,7 +137,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             compiled = platform.compile_wiki()
             source_rel = "docs/04_常用命令/sqlite.md"
             sections = platform.list_wiki_sections(source_path=source_rel)
@@ -193,16 +193,16 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(traversal_status, 400)
 
     def test_http_console_assets_and_health(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-web-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-web-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             (wiki / "docs").mkdir(parents=True)
             (wiki / "question").mkdir()
             (wiki / "output").mkdir()
             (root / "result").mkdir()
             (wiki / "Permission.json").write_text("{}", encoding="utf-8")
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             httpd = build_server(platform, "127.0.0.1", 0)
             thread = threading.Thread(target=httpd.serve_forever, daemon=True)
             thread.start()
@@ -221,14 +221,14 @@ class PlatformSmokeTest(unittest.TestCase):
                 httpd.server_close()
                 thread.join(timeout=5)
 
-            self.assertIn("LLM Wiki", index_html)
+            self.assertIn("Stonehenge Wiki", index_html)
             self.assertIn("authName", index_html)
             self.assertIn('id="tokenInput" class="secret-input" type="password"', index_html)
             self.assertIn("wikiSectionCount", index_html)
             self.assertIn('data-page="audit"', index_html)
             self.assertIn('data-page="sources"', index_html)
-            self.assertIn("Articles", index_html)
-            self.assertIn("wikiPageList", index_html)
+            self.assertIn("wikiTreeList", index_html)
+            self.assertIn("wikiGraph", index_html)
             self.assertIn("wikiPagePreview", index_html)
             self.assertIn("refreshAll", app_js)
             self.assertIn("renderPage", app_js)
@@ -258,9 +258,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(favicon_status, 204)
 
     def test_http_read_and_admin_token_scopes(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-auth-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-auth-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "00_inbox"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -271,8 +271,8 @@ class PlatformSmokeTest(unittest.TestCase):
                 json.dumps(
                     {
                         "api": {
-                            "token_env": "LLM_WIKI_TEST_ADMIN_TOKEN",
-                            "read_token_env": "LLM_WIKI_TEST_READ_TOKEN",
+                            "token_env": "STONEHENGE_WIKI_TEST_ADMIN_TOKEN",
+                            "read_token_env": "STONEHENGE_WIKI_TEST_READ_TOKEN",
                         }
                     }
                 ),
@@ -286,20 +286,20 @@ class PlatformSmokeTest(unittest.TestCase):
 
             with temporary_env(
                 {
-                    "LLM_WIKI_TEST_ADMIN_TOKEN": "admin-secret",
-                    "LLM_WIKI_TEST_READ_TOKEN": "read-secret",
+                    "STONEHENGE_WIKI_TEST_ADMIN_TOKEN": "admin-secret",
+                    "STONEHENGE_WIKI_TEST_READ_TOKEN": "read-secret",
                 }
             ):
-                platform = LLMWikiPlatform.from_wiki_root(wiki)
+                platform = StonehengeWikiPlatform.from_wiki_root(wiki)
                 platform.compile_wiki()
                 httpd = build_server(platform, "127.0.0.1", 0)
                 thread = threading.Thread(target=httpd.serve_forever, daemon=True)
                 thread.start()
                 try:
                     base = f"http://127.0.0.1:{httpd.server_address[1]}"
-                    read_headers = {"X-LLM-WIKI-TOKEN": "read-secret"}
-                    admin_headers = {"X-LLM-WIKI-TOKEN": "admin-secret"}
-                    bad_headers = {"X-LLM-WIKI-TOKEN": "wrong"}
+                    read_headers = {"X-STONEHENGE-WIKI-TOKEN": "read-secret"}
+                    admin_headers = {"X-STONEHENGE-WIKI-TOKEN": "admin-secret"}
+                    bad_headers = {"X-STONEHENGE-WIKI-TOKEN": "wrong"}
 
                     health = json.loads(http_get(base + "/health"))
                     unauth_index = http_get_status(base + "/index")
@@ -408,14 +408,14 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(admin_evaluation["report"]["summary"]["total_questions"], 1)
 
     def test_wiki_env_file_enables_api_auth_readiness(self) -> None:
-        env_keys = ["LLM_WIKI_ENV_TEST_ADMIN_TOKEN", "LLM_WIKI_ENV_TEST_READ_TOKEN"]
+        env_keys = ["STONEHENGE_WIKI_ENV_TEST_ADMIN_TOKEN", "STONEHENGE_WIKI_ENV_TEST_READ_TOKEN"]
         old_values = {key: os.environ.get(key) for key in env_keys}
         for key in env_keys:
             os.environ.pop(key, None)
         try:
-            with tempfile.TemporaryDirectory(prefix="llm-wiki-env-auth-test-") as tmp:
+            with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-env-auth-test-") as tmp:
                 root = Path(tmp)
-                wiki = root / "llm-wiki"
+                wiki = root / "stonehenge-wiki"
                 docs = wiki / "docs" / "04_常用命令"
                 docs.mkdir(parents=True)
                 (wiki / "question").mkdir()
@@ -456,7 +456,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 ]
                 (wiki / "question" / "group-ready.md").write_text(json.dumps(questions, ensure_ascii=False), encoding="utf-8")
 
-                platform = LLMWikiPlatform.from_wiki_root(wiki)
+                platform = StonehengeWikiPlatform.from_wiki_root(wiki)
                 platform.compile_wiki()
                 health = platform.health()
                 report = platform.readiness_report(groups=["group-ready"])
@@ -474,9 +474,9 @@ class PlatformSmokeTest(unittest.TestCase):
                     os.environ[key] = old_value
 
     def test_source_risk_report_cli_api_and_governance(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-risk-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-risk-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             inbox = wiki / "docs" / "00_inbox"
             env = wiki / "docs" / "02_环境信息"
             inbox.mkdir(parents=True)
@@ -496,7 +496,7 @@ class PlatformSmokeTest(unittest.TestCase):
             )
             (env / "spark-prod.env").write_text("password=allowed-env-secret\n", encoding="utf-8")
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             risk_report = platform.source_risk_report()
             codes = {finding["code"] for finding in risk_report["findings"]}
 
@@ -540,9 +540,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(api_risk["summary"]["risk_count"], risk_report["summary"]["risk_count"])
 
     def test_source_quarantine_filters_runtime_wiki_and_persists(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-quarantine-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-quarantine-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "00_inbox"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -558,7 +558,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             platform.compile_wiki()
             unsafe_rel = "docs/00_inbox/unsafe.md"
             before = platform.ask("Omega restricted operating note")
@@ -600,7 +600,7 @@ class PlatformSmokeTest(unittest.TestCase):
             cli_status = json.loads(cli_output.getvalue())
             self.assertEqual(code, 0)
             self.assertEqual(cli_status["source_status"], "active")
-            reactivated = LLMWikiPlatform.from_wiki_root(wiki)
+            reactivated = StonehengeWikiPlatform.from_wiki_root(wiki)
             self.assertTrue(reactivated.ask("Omega restricted operating note")["answer"]["datas"])
 
             httpd = build_server(reactivated, "127.0.0.1", 0)
@@ -624,9 +624,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertTrue(api_reviews["reviews"])
 
     def test_permission_denied_sources_are_policy_quarantined(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-policy-quarantine-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-policy-quarantine-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "02_环境信息"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -641,7 +641,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             denied_rel = "docs/02_环境信息/spark-prod.env"
             sources = {source["rel_path"]: source for source in platform.list_sources()}
             reviews = platform.list_source_reviews(rel_path=denied_rel)
@@ -665,9 +665,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(platform.health()["files"], 0)
 
     def test_evaluation_report_cli_api_and_export(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-eval-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-eval-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "04_常用命令"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -692,7 +692,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             report = platform.evaluation_report(groups=["group-eval"])
             summary = report["report"]["summary"]
             self.assertEqual(summary["status"], "ok")
@@ -705,7 +705,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(exported["status"], "ok")
             self.assertTrue((wiki / exported["path"]).exists())
             self.assertTrue((wiki / exported["json_path"]).exists())
-            self.assertIn("LLM Wiki Evaluation Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
+            self.assertIn("Stonehenge Wiki Evaluation Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
 
             cli_output = io.StringIO()
             with contextlib.redirect_stdout(cli_output):
@@ -728,12 +728,12 @@ class PlatformSmokeTest(unittest.TestCase):
                 thread.join(timeout=5)
 
             self.assertEqual(api_report["report"]["summary"]["schema_valid"], 4)
-            self.assertIn(b"LLM Wiki Evaluation Report", report_bytes)
+            self.assertIn(b"Stonehenge Wiki Evaluation Report", report_bytes)
 
     def test_readiness_report_cli_api_and_export(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-ready-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-ready-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "04_常用命令"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -771,7 +771,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             platform.compile_wiki()
             report = platform.readiness_report(groups=["group-ready"])
             summary = report["report"]["summary"]
@@ -789,7 +789,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(exported["status"], "ok")
             self.assertTrue((wiki / exported["path"]).exists())
             self.assertTrue((wiki / exported["json_path"]).exists())
-            self.assertIn("LLM Wiki Readiness Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
+            self.assertIn("Stonehenge Wiki Readiness Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
 
             cli_output = io.StringIO()
             with contextlib.redirect_stdout(cli_output):
@@ -845,14 +845,14 @@ class PlatformSmokeTest(unittest.TestCase):
                 thread.join(timeout=5)
 
             self.assertEqual(api_report["report"]["summary"]["fail"], 0)
-            self.assertIn(b"LLM Wiki Readiness Report", report_bytes)
+            self.assertIn(b"Stonehenge Wiki Readiness Report", report_bytes)
             self.assertGreater(len(bundle_bytes), 1000)
             self.assertFalse(api_bundle["manifest"]["included"]["raw_docs"])
 
     def test_generate_presentation_endpoint(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-slides-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-slides-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "04_常用命令"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -864,7 +864,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             httpd = build_server(platform, "127.0.0.1", 0)
             thread = threading.Thread(target=httpd.serve_forever, daemon=True)
             thread.start()
@@ -894,9 +894,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(direct["slide_count"], 6)
 
     def test_pivot_generation_has_no_dependency_dead_end(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-pivot-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-pivot-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "06_日常办公"
             docs.mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -905,7 +905,7 @@ class PlatformSmokeTest(unittest.TestCase):
             (wiki / "Permission.json").write_text("{}", encoding="utf-8")
             make_minimal_xlsx(docs / "wiki_metrics.xlsx")
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             answer = platform.ask("根据 wiki_metrics.xlsx 生成透视图")
             text = "\n".join(answer["answer"]["datas"])
 
@@ -916,12 +916,12 @@ class PlatformSmokeTest(unittest.TestCase):
             if target.suffix == ".csv":
                 csv_text = target.read_text(encoding="utf-8")
                 self.assertIn("Category", csv_text)
-                self.assertIn("LLM Wiki,1", csv_text)
+                self.assertIn("Stonehenge Wiki,1", csv_text)
 
     def test_source_import_cli_api_and_private_url_guard(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-import-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-import-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             incoming = root / "incoming"
             (wiki / "docs").mkdir(parents=True)
             (wiki / "question").mkdir()
@@ -951,7 +951,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 )
             self.assertEqual(code, 0)
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             imported = wiki / "docs" / "03_学习材料" / "Knowledge-Notes.md"
             imported_rel = "docs/03_学习材料/Knowledge-Notes.md"
             self.assertTrue(imported.exists())
@@ -1016,7 +1016,7 @@ class PlatformSmokeTest(unittest.TestCase):
             exported = platform.export_governance_report()
             self.assertEqual(exported["status"], "ok")
             self.assertTrue((wiki / exported["path"]).exists())
-            self.assertIn("LLM Wiki Governance Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
+            self.assertIn("Stonehenge Wiki Governance Report", (wiki / exported["path"]).read_text(encoding="utf-8"))
 
             blocked = platform.ingest_source("http://127.0.0.1/private.md")
             self.assertEqual(blocked["reason"], "private_url")
@@ -1055,12 +1055,12 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(len(source_history["versions"]), 1)
             self.assertEqual({item["status"] for item in source_list["sources"]}, {"active", "missing"})
             self.assertEqual(governance["report"]["summary"]["status"], "attention")
-            self.assertIn(b"LLM Wiki Governance Report", report_bytes)
+            self.assertIn(b"Stonehenge Wiki Governance Report", report_bytes)
 
     def test_knowledge_answers_use_llm_without_sending_password_queries(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-llm-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-llm-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "02_环境信息"
             docs.mkdir(parents=True)
             (wiki / "Permission.json").write_text("{}", encoding="utf-8")
@@ -1080,7 +1080,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("数据库密码: env-secret", "\n".join(secret["answer"]["datas"]))
 
     def test_llm_context_redacts_secret_values(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-redact-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-redact-test-") as tmp:
             root = Path(tmp)
             record = make_document_record(
                 root,
@@ -1100,9 +1100,9 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertNotIn("snippet-secret", context)
 
     def test_llm_failure_falls_back_to_deterministic_snippets(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-fallback-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-fallback-test-") as tmp:
             root = Path(tmp)
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "04_常用命令"
             docs.mkdir(parents=True)
             (wiki / "Permission.json").write_text("{}", encoding="utf-8")
@@ -1120,7 +1120,7 @@ class PlatformSmokeTest(unittest.TestCase):
 
     @unittest.skipUnless(has_soffice(), "LibreOffice/soffice is not installed")
     def test_legacy_doc_repair_via_libreoffice_bridge(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="llm-wiki-legacy-test-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-legacy-test-") as tmp:
             root = Path(tmp)
             source_docx = root / "source.docx"
             make_minimal_docx(
@@ -1130,7 +1130,7 @@ class PlatformSmokeTest(unittest.TestCase):
             legacy_doc = convert_office(source_docx, "doc", root / "converted")
             self.assertIsNotNone(legacy_doc)
 
-            wiki = root / "llm-wiki"
+            wiki = root / "stonehenge-wiki"
             docs = wiki / "docs" / "05_需求设计"
             question_dir = wiki / "question"
             docs.mkdir(parents=True)
@@ -1148,7 +1148,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            platform = LLMWikiPlatform.from_wiki_root(wiki)
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             platform.run_groups(groups=["group-legacy"])
             fixed_doc = wiki / "output" / "fixed" / "05_需求设计" / "legacy.doc"
             self.assertTrue(fixed_doc.exists())
@@ -1226,7 +1226,7 @@ def make_minimal_xlsx(path: Path) -> None:
             """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="9" uniqueCount="9">
 <si><t>Category</t></si><si><t>Count</t></si><si><t>Owner</t></si>
-<si><t>LLM Wiki</t></si><si><t>李四</t></si><si><t>Compiled Wiki</t></si>
+<si><t>Stonehenge Wiki</t></si><si><t>李四</t></si><si><t>Compiled Wiki</t></si>
 <si><t>王五</t></si><si><t>Agentic Wiki</t></si><si><t>赵六</t></si>
 </sst>""",
         )
@@ -1312,13 +1312,13 @@ def temporary_env(values: dict[str, str]):
 
 
 def extract_docx_like_pptx(path: Path):
-    from llm_wiki.extractors import extract_pptx
+    from stonehenge_wiki.extractors import extract_pptx
 
     return extract_pptx(path, path.name)
 
 
 def make_document_record(root: Path, rel_path: str, text: str):
-    from llm_wiki.models import DocumentRecord
+    from stonehenge_wiki.models import DocumentRecord
 
     full_path = root / rel_path
     full_path.parent.mkdir(parents=True, exist_ok=True)

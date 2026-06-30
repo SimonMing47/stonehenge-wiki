@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="title">Stonehenge Wiki</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail" aria-label="Primary">
+        <div class="brand">
+          <span class="mark" aria-hidden="true">SW</span>
+          <span>
+            <strong data-i18n="brand.title">Stonehenge Wiki</strong>
+            <small data-i18n="brand.subtitle">Stonehenge Wiki</small>
+          </span>
+        </div>
+        <nav class="nav">
+          <a href="#ask" id="navAsk" data-i18n="nav.ask">Ask</a>
+          <a href="#wiki" id="navWiki" data-i18n="nav.wiki">Wiki</a>
+          <a href="#studio" id="navStudio" data-i18n="nav.studio">Workbench</a>
+          <a href="#sources" id="navSources" data-i18n="nav.raw">Raw</a>
+          <a href="#agents" id="navAgents" data-i18n="nav.agents">Agents</a>
+          <a href="#governance" id="navGovernance" data-i18n="nav.governance">Governance</a>
+          <a href="#audit" id="navAudit" data-i18n="nav.audit">Audit</a>
+        </nav>
+        <div class="rail-foot">
+          <span id="apiState" class="state-dot">Offline</span>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p id="appSubtitle" class="eyebrow" data-i18n="top.subtitle">Knowledge Operations</p>
+            <h1 id="appTitle" data-i18n="top.title">Stonehenge Wiki</h1>
+          </div>
+          <form id="tokenForm" class="toolbar">
+            <button id="langToggle" type="button" data-i18n="toolbar.lang">English</button>
+            <input id="tokenInput" class="secret-input" type="password" placeholder="API token" aria-label="API token" autocomplete="off" spellcheck="false" data-placeholder-i18n="token.placeholder" />
+            <button id="saveTokenBtn" type="button" data-i18n="toolbar.save">Save</button>
+            <button id="refreshBtn" type="button" data-i18n="toolbar.refresh">Refresh</button>
+            <button id="reindexBtn" type="button" class="primary" data-i18n="toolbar.reindex">Reindex</button>
+          </form>
+        </header>
+
+        <section class="metrics" aria-label="Platform status">
+          <div>
+            <span id="metricFilesLabel" data-i18n="metric.files">Files</span>
+            <strong id="fileCount">0</strong>
+          </div>
+          <div>
+            <span id="metricCommentsLabel" data-i18n="metric.comments">Comments</span>
+            <strong id="commentCount">0</strong>
+          </div>
+          <div>
+            <span id="metricAuditLabel" data-i18n="metric.audit">Audit Events</span>
+            <strong id="auditCount">0</strong>
+          </div>
+          <div>
+            <span id="metricSectionsLabel" data-i18n="metric.wiki_sections">Wiki Sections</span>
+            <strong id="wikiSectionCount">0</strong>
+          </div>
+          <div>
+            <span id="metricSourceRiskLabel" data-i18n="metric.source_risks">Source Risks</span>
+            <strong id="sourceRiskCount">0</strong>
+          </div>
+          <div>
+            <span id="metricDatabaseLabel" data-i18n="metric.database">Database</span>
+            <strong id="dbName">wiki.sqlite</strong>
+          </div>
+          <div>
+            <span id="metricLLMLabel" data-i18n="metric.llm">LLM</span>
+            <strong id="llmName">disabled</strong>
+          </div>
+          <div>
+            <span id="metricKnowledgeLabel" data-i18n="metric.knowledge">Knowledge</span>
+            <strong id="knowledgeMode">wiki</strong>
+          </div>
+          <div>
+            <span id="metricAuthLabel" data-i18n="metric.auth">Auth</span>
+            <strong id="authName">open</strong>
+          </div>
+        </section>
+
+        <section id="ask" class="page" data-page="ask" aria-label="Ask workspace">
+          <div class="surface ask-pane page-surface">
+            <div class="section-head">
+              <h2 data-i18n="ask.title">Ask</h2>
+              <span id="queryStatus" data-i18n="status.ready">Ready</span>
+            </div>
+            <textarea id="questionInput" rows="6" data-i18n="ask.placeholder" data-placeholder-i18n="ask.placeholder"></textarea>
+            <div class="ask-actions">
+              <input id="questionId" value="console-1" aria-label="Question id" />
+              <select id="questionLevel" aria-label="Question level">
+                <option>简单</option>
+                <option>中等</option>
+                <option>困难</option>
+              </select>
+              <button id="askBtn" type="button" class="primary" data-i18n="ask.button.ask">Ask</button>
+              <button id="explainBtn" type="button" data-i18n="ask.button.explain">Explain</button>
+            </div>
+            <div id="answerOutput" class="answer-output" aria-label="Answer output">
+              <span class="muted" data-i18n="status.ready">Ready</span>
+            </div>
+          </div>
+
+          <div class="surface run-row">
+            <div>
+              <h2 data-i18n="question_groups.title">Question Groups</h2>
+              <p class="muted" data-i18n="question_groups.subtitle">question/group-*.md</p>
+            </div>
+            <div class="row-actions compact">
+              <input id="groupInput" data-placeholder-i18n="question_groups.placeholder" aria-label="Group name" />
+              <button id="runGroupBtn" type="button" data-i18n="question_groups.run">Run Group</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="wiki" class="page" data-page="wiki" aria-label="Compiled wiki workspace">
+          <div class="wiki-reader">
+            <div class="surface wiki-page-list-pane">
+              <div class="section-head">
+                <h2 data-i18n="wiki.tree">知识树</h2>
+                <span id="wikiPageStatus" data-i18n="status.ready">Ready</span>
+              </div>
+              <div class="wiki-tree-controls row-actions compact">
+                <input id="wikiTreeSearch" data-placeholder-i18n="wiki.tree_search" aria-label="Search tree" />
+                <button id="wikiTreeSearchClear" type="button" data-i18n="status.reset">Reset</button>
+              </div>
+              <div id="wikiTreeList" class="wiki-tree-list"></div>
+            </div>
+
+            <article class="surface wiki-page-preview-pane">
+              <div class="section-head">
+                <h2 id="wikiPageTitle" data-i18n="wiki.preview">Preview</h2>
+                <span id="wikiPageMeta">Select an article</span>
+              </div>
+              <div id="wikiPagePreview" class="wiki-page-preview">
+                <span class="muted" id="wikiPagePreviewHint" data-i18n="wiki.preview_hint">Select an article from the list.</span>
+              </div>
+              <div id="wikiGraphPanel" class="wiki-graph-panel">
+                <div class="section-head">
+                  <h3 data-i18n="wiki.graph">Knowledge Graph</h3>
+                  <span id="wikiGraphStatus" data-i18n="status.ready">Ready</span>
+                </div>
+                <div id="wikiGraph" class="wiki-graph"></div>
+              </div>
+            </article>
+          </div>
+
+          <div class="wiki-workspace">
+            <div class="surface explain-pane">
+              <div class="section-head">
+                <h2 data-i18n="wiki.explain">Explain</h2>
+                <span id="explainStatus" data-i18n="status.ready">Ready</span>
+              </div>
+              <div id="explainOutput" class="explain-output">
+                <span class="muted" id="explainHint" data-i18n="wiki.explain_hint">Ask a question, then inspect route, safety, and evidence.</span>
+              </div>
+            </div>
+
+            <div class="surface wiki-pane">
+              <div class="section-head">
+                <h2 data-i18n="wiki.compiled">Compiled Wiki</h2>
+                <span id="wikiStatus" data-i18n="status.ready">Ready</span>
+              </div>
+              <div class="row-actions compact wiki-search">
+                <input id="wikiSearchInput" data-placeholder-i18n="wiki.search_placeholder" aria-label="Wiki section search" />
+                <button id="wikiSearchBtn" type="button" data-i18n="wiki.search">Search</button>
+              </div>
+              <div id="wikiSectionList" class="wiki-section-list"></div>
+            </div>
+          </div>
+
+          <div class="surface run-row">
+            <div>
+              <h2 data-i18n="wiki.compiled">Compiled Wiki</h2>
+              <p class="muted" data-i18n="wiki.path_description">wiki/index.md · wiki/sources · wiki/topics · wiki/log.md</p>
+            </div>
+            <div class="row-actions compact">
+              <button id="compileWikiBtn" type="button" data-i18n="wiki.compile">Compile</button>
+              <button id="lintWikiBtn" type="button" data-i18n="wiki.lint">Lint</button>
+            </div>
+          </div>
+
+          <div id="wikiOperationOutput" class="answer-output">
+            <span class="muted" data-i18n="status.ready">Ready</span>
+          </div>
+        </section>
+
+        <section id="studio" class="page" data-page="studio" aria-label="Content workbench">
+          <div class="surface artifact-pane page-surface">
+            <div class="section-head">
+              <h2 data-i18n="studio.title">工作台</h2>
+              <span id="slidesStatus" data-i18n="status.ready">Ready</span>
+            </div>
+            <textarea id="slidesTopic" rows="5" data-i18n="studio.topic_placeholder" data-placeholder-i18n="studio.topic_placeholder"></textarea>
+            <div class="ask-actions">
+              <select id="slideCount" aria-label="Slide count">
+                <option value="4" data-i18n="studio.slides_4">4 slides</option>
+                <option value="6" data-i18n="studio.slides_6" selected>6 slides</option>
+                <option value="8" data-i18n="studio.slides_8">8 slides</option>
+              </select>
+              <button id="generateSlidesBtn" type="button" class="primary" data-i18n="studio.generate">Generate Brief</button>
+            </div>
+            <div id="artifactOutput" class="artifact-output">
+              <span class="muted" id="artifactHint" data-i18n="studio.hint">No artifact yet</span>
+            </div>
+          </div>
+        </section>
+
+        <section id="sources" class="page" data-page="sources" aria-label="Raw">
+          <div class="source-page-grid">
+            <div class="surface source-pane">
+              <div class="section-head">
+                <h2 data-i18n="sources.title">Raw</h2>
+                <span id="fileScope" data-i18n="sources.file_scope">0 indexed</span>
+              </div>
+              <div class="source-import">
+                <textarea id="importSource" rows="3" data-placeholder-i18n="sources.import_placeholder"></textarea>
+                <div class="import-actions">
+                  <input id="importTitle" data-placeholder-i18n="sources.import_title" aria-label="Import title" />
+                  <input id="importCategory" value="00_inbox" data-placeholder-i18n="sources.import_category" aria-label="Import category" />
+                  <button id="importBtn" type="button" class="primary" data-i18n="sources.import_btn">Import</button>
+                </div>
+                <div id="importStatus" class="import-status muted" data-i18n="status.ready">Ready</div>
+              </div>
+              <div id="fileList" class="source-list"></div>
+            </div>
+
+            <div class="surface comments-pane">
+              <div class="section-head">
+                <h2 data-i18n="sources.comments_title">Comments</h2>
+                <span id="commentScope" data-i18n="sources.comment_scope">0 found</span>
+              </div>
+              <div id="commentList" class="table-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="agents" class="page" data-page="agents" aria-label="LLM Agents">
+          <div class="surface agents-pane">
+            <div class="section-head">
+              <h2 data-i18n="agents.title">LLM Agents</h2>
+              <span id="llmConfigStatus">Ready</span>
+            </div>
+            <div class="agent-controls">
+              <label class="inline-field">
+                <span data-i18n="agents.enabled">LLM enabled</span>
+                <input id="llmEnabled" type="checkbox" checked />
+              </label>
+              <label class="inline-field">
+                <span data-i18n="agents.default_agent">Default agent</span>
+                <input id="llmDefaultAgent" placeholder="default" />
+              </label>
+            </div>
+
+            <div class="agents-layout">
+              <article class="surface">
+                <div class="section-head">
+                  <h3 data-i18n="agents.agent_list">Agents</h3>
+                  <div class="row-actions compact">
+                    <button id="addAgentBtn" type="button" data-i18n="agents.add">Add Agent</button>
+                    <button id="saveAgentsBtn" type="button" class="primary" data-i18n="agents.save">Save</button>
+                  </div>
+                </div>
+                <div id="llmAgentsList" class="agents-list"></div>
+              </article>
+
+              <article class="surface">
+                <div class="section-head">
+                  <h3 data-i18n="agents.category_map">Category Agents</h3>
+                  <div class="row-actions compact">
+                    <button id="addCategoryMapBtn" type="button" data-i18n="agents.add_mapping">Add Mapping</button>
+                  </div>
+                </div>
+                <div id="llmCategoryAgentMap" class="category-map-list"></div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="governance" class="page" data-page="governance" aria-label="Governance">
+          <div class="surface run-row">
+            <div>
+              <h2 data-i18n="governance.title">Governance</h2>
+              <p id="governanceSummary" class="muted" data-i18n="governance.summary_placeholder">report not loaded</p>
+            </div>
+            <div class="row-actions compact">
+              <button id="refreshReportBtn" type="button" data-i18n="governance.refresh_report">Refresh Report</button>
+              <button id="exportReportBtn" type="button" data-i18n="governance.export_markdown">Export Markdown</button>
+              <button id="refreshReadinessBtn" type="button" data-i18n="governance.refresh_readiness">Refresh Readiness</button>
+              <button id="exportReadinessBtn" type="button" data-i18n="governance.export_readiness">Export Readiness</button>
+              <button id="exportReleaseBtn" type="button" data-i18n="governance.export_release">Export Release</button>
+              <button id="runEvaluationBtn" type="button" data-i18n="governance.run_evaluation">Run Evaluation</button>
+              <button id="exportEvaluationBtn" type="button" data-i18n="governance.export_evaluation">Export Evaluation</button>
+            </div>
+          </div>
+
+          <div class="surface readiness-pane">
+            <div class="section-head">
+              <h2 data-i18n="governance.readiness_title">Readiness Gates</h2>
+              <span id="readinessStatus" data-i18n="status.ready">Ready</span>
+            </div>
+            <div id="readinessList" class="gate-list"></div>
+          </div>
+
+          <div class="surface risk-pane">
+            <div class="section-head">
+              <h2 data-i18n="governance.risk_title">Source Risk Review</h2>
+              <span id="riskStatus" data-i18n="status.ready">Ready</span>
+            </div>
+            <div id="riskList" class="risk-list"></div>
+          </div>
+        </section>
+
+        <section id="audit" class="page" data-page="audit" aria-label="Audit">
+          <div class="surface audit-pane">
+            <div class="section-head">
+              <h2 data-i18n="audit.title">Audit</h2>
+              <span data-i18n="audit.subtitle">latest events</span>
+            </div>
+            <div id="auditList" class="audit-list"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

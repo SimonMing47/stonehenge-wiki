@@ -1,4 +1,4 @@
-# LLM-Wiki-System 系统规划
+# stonehenge-wiki 系统规划
 
 ## 调研摘要
 
@@ -25,7 +25,7 @@ Karpathy 的 LLM Wiki 模式强调三层：raw sources、LLM-generated wiki、sc
 CLI / Skill / HTTP API / Web Console
         |
         v
-LLMWikiPlatform
+StonehengeWikiPlatform
         |
         +--> PlatformConfig: config.json + 环境变量
         +--> PermissionGuard: Permission.json + 高危意图拦截
@@ -50,7 +50,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 - 代码执行只支持安全子集：Python 先 AST 检查，再隔离临时目录短超时运行；JS/Java 也做危险 API 静态阻断。
 - Skill 和 HTTP API 不重新实现逻辑，只调用平台服务，确保所有入口的安全、审计和格式一致。
 - SQLite 保存可重建索引、批注元数据、来源注册表、metadata-only 来源版本历史、wiki 章节索引、审计事件和任务运行记录，不复制原始文档正文，降低敏感内容扩散风险。
-- API 支持可选分级 token 鉴权：`llm-wiki/.env` 或环境变量中的 `LLM_WIKI_READ_TOKEN` 可读索引、审计和问答，`LLM_WIKI_API_TOKEN` 具备管理权限，可导入、重建、编译和生成文件；shell 环境变量优先于 `.env`。
+- API 支持可选分级 token 鉴权：`stonehenge-wiki/.env` 或环境变量中的 `STONEHENGE_WIKI_READ_TOKEN` 可读索引、审计和问答，`STONEHENGE_WIKI_API_TOKEN` 具备管理权限，可导入、重建、编译和生成文件；shell 环境变量优先于 `.env`。
 - 受控导入通道把本地文件或公开 URL 复制到 `docs/<category>/` 后重建索引，阻断私网 URL、超大文件、未知扩展和权限配置拒绝的路径。
 - 治理报告汇总来源状态、TODO 到期风险、阻断审计和任务历史，可通过 API/CLI 查看并导出 Markdown。
 - 来源审批支持 `active/quarantined` 状态；被隔离来源仍保留 provenance、版本和风险记录，但会从问答、PPT 生成和编译后的 wiki 知识面中剔除。
@@ -63,7 +63,7 @@ wiki/index.md / wiki/sources / wiki/topics / wiki/log.md
 
 ## 平台模块
 
-- `config.py`：加载 `llm-wiki/config.json`，控制状态目录、数据库、API 和审计。
+- `config.py`：加载 `stonehenge-wiki/config.json`，控制状态目录、数据库、API 和审计。
 - `store.py`：SQLite 持久化层，保存索引快照、批注表、来源注册表、来源版本历史、wiki 章节索引、审计事件和任务运行结果。
 - `platform.py`：企业级服务门面，统一 CLI、skill、API 调用路径。
 - `importer.py`：受控知识源导入，处理 URL/文件读取、扩展名白名单、目录规范化、去重命名和 SSRF 防护。

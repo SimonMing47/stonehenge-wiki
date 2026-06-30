@@ -1,4 +1,0 @@
-interface:
-  display_name: "LLM Wiki"
-  short_description: "Run the LLM-wiki CLI safely"
-  default_prompt: "Use $llm-wiki to answer or repair an llm-wiki question group."

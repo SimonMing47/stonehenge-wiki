@@ -1,33 +1,33 @@
-# LLM-Wiki-System 运行说明
+# stonehenge-wiki 运行说明
 
 ## 环境
 
-- Python 3.11.0
-- 必需依赖：无
+- 对外入口：`work/skills/stonehenge-wiki/bin/stonehenge-wiki`（Rust CLI）
+- 构建依赖：Rust / Cargo
 - 推荐依赖：`openpyxl`，用于更完整地读取 Excel 单元格批注并生成透视表/透视图文件
 - 推荐外部程序：LibreOffice / `soffice`，用于 `.doc/.ppt/.xls` 老式 Office 文件转换、索引和修复
 
-安装推荐依赖：
+构建 skill CLI：
 
 ```bash
-python3 -m pip install openpyxl
+./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
 ```
 
 安装 LibreOffice 后，确保命令行可访问 `soffice` 或 `libreoffice`。
 
 ## 目录
 
-评测运行时，`work/` 同级应存在 `llm-wiki/`：
+评测运行时，`work/` 同级应存在 `stonehenge-wiki/`：
 
 ```text
-llm-wiki/
+stonehenge-wiki/
   docs/
   question/
   output/
   Permission.json
 work/
   main.py
-  llm_wiki/
+  stonehenge_wiki/
 result/
   output.md
 ```
@@ -36,113 +36,88 @@ result/
 
 本作品不是单次脚本，而是一个企业级 LLM-wiki 平台骨架：
 
-- `LLMWikiPlatform` 统一承载索引、安全、问答、修复、审计和任务运行。
-- `SQLiteStore` 将可重建索引、批注表、审计事件、任务运行记录持久化到 `llm-wiki/.state/wiki.sqlite`。
+- `StonehengeWikiPlatform` 统一承载索引、安全、问答、修复、审计和任务运行。
+- `SQLiteStore` 将可重建索引、批注表、审计事件、任务运行记录持久化到 `stonehenge-wiki/.state/wiki.sqlite`。
 - `wiki/` 是参考 Karpathy LLM Wiki 思路新增的编译型 Markdown 知识层：`docs/` 保留原始来源，`wiki/` 保存可维护知识页，`AGENTS.md` 定义 schema。
 - CLI、Codex skill、HTTP API、浏览器控制台共用同一套平台核心，避免规则分叉。
-- API 可通过 `llm-wiki/.env` 或环境变量配置 `LLM_WIKI_API_TOKEN` / `LLM_WIKI_READ_TOKEN`，开启 `X-LLM-WIKI-TOKEN` 分级鉴权。
+- API 可通过 `stonehenge-wiki/.env` 或环境变量配置 `STONEHENGE_WIKI_API_TOKEN` / `STONEHENGE_WIKI_READ_TOKEN`，开启 `X-STONEHENGE-WIKI-TOKEN` 分级鉴权。
 
 ## CLI 入口
 
-### Rust CLI（新增）
-
-除了 Python CLI 外，项目新增 Rust 封装 CLI（仅做调用透传）：
-
-- Linux：`rust-cli/target/release/llm-wiki-linux`
-- Windows：`rust-cli/target/release/llm-wiki-windows.exe`
-
-构建方式：
+公开 CLI 位于 skill 目录下：
 
 ```bash
-cd rust-cli
-cargo build --release --bin llm-wiki-linux    # Linux
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --help
 ```
 
-```powershell
-cd rust-cli
-cargo build --release --bin llm-wiki-windows  # Windows
-```
+CLI 是 REST API client，只通过 HTTP 调用 Stonehenge Wiki 服务，不启动本地服务、不执行项目源码。默认连接 `http://127.0.0.1:8765`；可通过 `--url`、`--token` 或 `STONEHENGE_WIKI_URL`、`STONEHENGE_WIKI_TOKEN` 指定服务地址和 token。
 
-Rust CLI 会调用 `work/main.py`，参数与 Python CLI 兼容：
+平台还提供 Linux / Windows 两个 Rust 入口用于对应平台打包：
 
 ```bash
-./rust-cli/target/release/llm-wiki-linux --group group-1
-./rust-cli/target/release/llm-wiki-windows.exe --ask "统计 docx 文件数量"
+cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-linux
+cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-windows
 ```
 
-可选环境变量：
-
-- `LLM_WIKI_MAIN_PY`: 指定主入口脚本路径（默认按运行路径自动查找 `work/main.py`）
-- `LLM_WIKI_ROOT`: 指定 `llm-wiki/` 根目录
-- `LLM_WIKI_PYTHON`: 指定 Python 可执行路径
-
-如果不使用 Rust CLI，可直接继续使用：
-
-处理 `llm-wiki/question/` 下全部 `group-*.md`：
+处理 `stonehenge-wiki/question/` 下全部 `group-*.md`：
 
 ```bash
-python3 work/main.py
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki
 ```
 
 处理指定题组：
 
 ```bash
-python3 work/main.py --group group-1
-```
-
-指定 wiki 目录：
-
-```bash
-python3 work/main.py --wiki-root /path/to/llm-wiki --group group-1
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --group group-1
 ```
 
 单问调试：
 
 ```bash
-python3 work/main.py --ask "统计 docx 文件数量"
-python3 work/main.py --explain-ask "SQLite SELECT 命令是什么"
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --ask "统计 docx 文件数量"
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --explain-ask "SQLite SELECT 命令是什么"
 ```
 
 索引检查：
 
 ```bash
-python3 work/main.py --dump-index
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --dump-index
 ```
 
 来源注册表：
 
 ```bash
-python3 work/main.py --list-sources
-python3 work/main.py --list-sources --include-missing-sources
-python3 work/main.py --list-source-versions
-python3 work/main.py --source-history docs/03_学习材料/Knowledge-Notes.md
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-sources
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-sources --include-missing-sources
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-source-versions
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-history docs/03_学习材料/Knowledge-Notes.md
 ```
 
 重建并持久化索引：
 
 ```bash
-python3 work/main.py --reindex
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --reindex
 ```
 
 导入知识源并自动重建索引：
 
 ```bash
-python3 work/main.py --import-source ./docs/source.pdf --import-title "知识库评估材料" --import-category 03_学习材料
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --import-source ./docs/source.pdf --import-title "知识库评估材料" --import-category 03_学习材料
 ```
 
 查看审计日志：
 
 ```bash
-python3 work/main.py --audit-log --audit-limit 20
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --audit-log --audit-limit 20
 ```
 
 来源风险扫描：
 
 ```bash
-python3 work/main.py --source-risk-report
-python3 work/main.py --set-source-status docs/00_inbox/risky.md --source-status quarantined --source-status-reason "prompt injection review"
-python3 work/main.py --set-source-status docs/00_inbox/risky.md --source-status active --source-status-reason "review complete"
-python3 work/main.py --list-source-reviews --source-review-path docs/00_inbox/risky.md
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-risk-report
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --set-source-status docs/00_inbox/risky.md --source-status quarantined --source-status-reason "prompt injection review"
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --set-source-status docs/00_inbox/risky.md --source-status active --source-status-reason "review complete"
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-source-reviews --source-review-path docs/00_inbox/risky.md
 ```
 
 命中 `Permission.json.file.deny` 的来源会被策略自动隔离为 `quarantined`；隔离来源保留来源注册表、版本和风险记录，但不会进入问答、PPT 生成或 compiled wiki 章节。
@@ -150,48 +125,47 @@ python3 work/main.py --list-source-reviews --source-review-path docs/00_inbox/ri
 治理报告：
 
 ```bash
-python3 work/main.py --governance-report
-python3 work/main.py --export-governance-report
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --governance-report
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-governance-report
 ```
 
 质量评估报告：
 
 ```bash
-python3 work/main.py --evaluation-report --group group-1
-python3 work/main.py --export-evaluation-report --group group-1
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --evaluation-report --group group-1
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-evaluation-report --group group-1
 ```
 
 企业交付门禁：
 
 ```bash
-python3 work/main.py --readiness-report --group group-demo
-python3 work/main.py --readiness-report --group group-demo --readiness-fail-on fail
-python3 work/main.py --export-readiness-report --group group-demo
-python3 work/main.py --export-release-bundle --group group-demo
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --readiness-report --group group-demo
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-readiness-report --group group-demo
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-release-bundle --group group-demo
 ```
 
-readiness report 会检查 Python 运行时、`llm-wiki` 目录结构、CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。`--readiness-fail-on fail|warn` 适合 CI 使用，命中对应级别时返回退出码 2。release bundle 会打包报告、题组、答案和 compiled wiki，不打包原始 `docs/` 文件或 `.state/wiki.sqlite`。
+readiness report 会检查引擎运行时、`stonehenge-wiki` 目录结构、Rust CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。release bundle 会打包报告、题组、答案和 compiled wiki，不打包原始 `docs/` 文件或 `.state/wiki.sqlite`。
 
 本地受保护运行可复制示例文件并填入真实 token：
 
 ```bash
-cp llm-wiki/.env.example llm-wiki/.env
+cp stonehenge-wiki/.env.example stonehenge-wiki/.env
 ```
 
-`llm-wiki/.env` 会在 CLI、HTTP API、skill wrapper 和 readiness 入口启动时自动加载；shell 中已经设置的同名环境变量优先，不会被 `.env` 覆盖。`.env` 不应提交到 Git。
+`stonehenge-wiki/.env` 会在 CLI、HTTP API、skill wrapper 和 readiness 入口启动时自动加载；shell 中已经设置的同名环境变量优先，不会被 `.env` 覆盖。`.env` 不应提交到 Git。
 
 编译 Markdown wiki：
 
 ```bash
-python3 work/main.py --compile-wiki
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --compile-wiki
 ```
 
 查看和搜索编译后的 wiki 章节：
 
 ```bash
-python3 work/main.py --list-wiki-sections --wiki-section-limit 20
-python3 work/main.py --list-wiki-sections --wiki-section-source docs/04_常用命令/sqlite.md
-python3 work/main.py --search-wiki "SQLite SELECT" --wiki-section-limit 5
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-wiki-sections --wiki-section-limit 20
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-wiki-sections --wiki-section-source docs/04_常用命令/sqlite.md
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --search-wiki "SQLite SELECT" --wiki-section-limit 5
 ```
 
 浏览器控制台的 `Wiki` 页面提供 compiled wiki 文章列表和同页预览，可直接点开 `wiki/index.md`、`wiki/sources/*.md`、`wiki/topics/*.md` 查看内容，不会回退读取原始 `docs/`。
@@ -199,38 +173,32 @@ python3 work/main.py --search-wiki "SQLite SELECT" --wiki-section-limit 5
 检查 Markdown wiki：
 
 ```bash
-python3 work/main.py --lint-wiki
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --lint-wiki
 ```
 
-启动 HTTP API：
-
-```bash
-python3 work/main.py --serve
-```
-
-启动后打开控制台：
+REST API 服务启动后打开控制台：
 
 ```text
 http://127.0.0.1:8765/
 ```
 
-启动指定端口：
+检查 REST API：
 
 ```bash
-python3 work/main.py --serve --host 127.0.0.1 --port 8765
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
 ```
 
-自验证：
+REST 自验证：
 
 ```bash
-python3 work/main.py --self-test
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
 ```
 
 开发验证：
 
 ```bash
-python3 -m compileall -q work
-PYTHONPATH=work python3 -m unittest discover -s work/tests -v
+cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
 ```
 
 ## HTTP API
@@ -264,31 +232,31 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -v
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `LLM_WIKI_API_TOKEN` 或 `LLM_WIKI_READ_TOKEN`，请求需携带 `X-LLM-WIKI-TOKEN`。`LLM_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/pages`、`/wiki/page`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`LLM_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `STONEHENGE_WIKI_API_TOKEN` 或 `STONEHENGE_WIKI_READ_TOKEN`，请求需携带 `X-STONEHENGE-WIKI-TOKEN`。`STONEHENGE_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/pages`、`/wiki/page`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`STONEHENGE_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 
 仓库内置 Codex skill 位于：
 
 ```text
-work/skills/llm-wiki/
+work/skills/stonehenge-wiki/
 ```
 
-可直接通过 wrapper 调用 CLI：
+可直接调用 skill 下的 Rust CLI：
 
 ```bash
-python3 work/skills/llm-wiki/scripts/run_llm_wiki.py --group group-1
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --group group-1
 ```
 
-如需安装到本机 Codex，可将 `work/skills/llm-wiki` 复制到 `${CODEX_HOME:-$HOME/.codex}/skills/`。
+如需安装到本机 Codex，可将 `work/skills/stonehenge-wiki` 复制到 `${CODEX_HOME:-$HOME/.codex}/skills/`。
 
 ## 输出约定
 
-- 答案写入 `llm-wiki/output/<group>-answer.md`
-- 修复文件写入 `llm-wiki/output/fixed/`
+- 答案写入 `stonehenge-wiki/output/<group>-answer.md`
+- 修复文件写入 `stonehenge-wiki/output/fixed/`
 - 成功运行日志追加到 `result/output.md`
-- 运行状态、索引、审计写入 `llm-wiki/.state/wiki.sqlite`
+- 运行状态、索引、审计写入 `stonehenge-wiki/.state/wiki.sqlite`
 - 来源注册表会记录 metadata-only 版本历史，包含路径、SHA-256、大小、首次/末次观测时间和观测次数
 - 编译后的 wiki 章节索引写入 `wiki_sections` 表，用于 CLI/API 的 wiki 层搜索
-- 治理报告和质量评估报告写入 `llm-wiki/output/reports/`
+- 治理报告和质量评估报告写入 `stonehenge-wiki/output/reports/`
 - 高危命令统一返回 `{"error_msg":"高危命令，拒绝访问"}`
