@@ -40,7 +40,7 @@ class PlatformHandler(BaseHTTPRequestHandler):
         if parsed.path in {"/", "/console"}:
             return self.write_static("index.html")
         if parsed.path == "/favicon.ico":
-            return self.write_no_content()
+            return self.write_static("favicon.svg")
         if parsed.path.startswith("/assets/"):
             return self.write_static(parsed.path.removeprefix("/assets/"))
         if parsed.path == "/health":

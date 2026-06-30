@@ -211,6 +211,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 index_html = http_get(base + "/")
                 app_js = http_get(base + "/assets/app.js")
                 styles_css = http_get(base + "/assets/styles.css")
+                favicon_svg = http_get(base + "/assets/favicon.svg")
                 health = json.loads(http_get(base + "/health"))
                 sources = json.loads(http_get(base + "/sources"))
                 source_risk = json.loads(http_get(base + "/sources/risk"))
@@ -222,6 +223,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 thread.join(timeout=5)
 
             self.assertIn("Stonehenge Wiki", index_html)
+            self.assertIn('href="/assets/favicon.svg"', index_html)
             self.assertIn("authName", index_html)
             self.assertIn('id="tokenInput" class="secret-input" type="password"', index_html)
             self.assertIn("wikiSectionCount", index_html)
@@ -255,7 +257,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(sources["sources"], [])
             self.assertEqual(source_risk["summary"]["risk_count"], 0)
             self.assertIn(lint["status"], {"ok", "error"})
-            self.assertEqual(favicon_status, 204)
+            self.assertIn('aria-label="Stonehenge Wiki"', favicon_svg)
+            self.assertEqual(favicon_status, 200)
 
     def test_http_read_and_admin_token_scopes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-auth-test-") as tmp:
