@@ -60,6 +60,7 @@ For API access, make sure the Stonehenge Wiki REST service is already running, t
 
 ```bash
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --api-contract
 ```
 
 Then open `http://127.0.0.1:8765/` for the browser console.

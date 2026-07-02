@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
+from .api_contract import api_contract
 from .platform import StonehengeWikiPlatform
 
 
@@ -45,6 +46,10 @@ class PlatformHandler(BaseHTTPRequestHandler):
             return self.write_static(parsed.path.removeprefix("/assets/"))
         if parsed.path == "/health":
             return self.write_json(self.stonehenge_wiki_platform.health())
+        if parsed.path == "/api/contract":
+            if not self.ensure_authorized("read"):
+                return
+            return self.write_json(api_contract())
         if parsed.path.startswith("/files/"):
             if not self.ensure_authorized("read"):
                 return

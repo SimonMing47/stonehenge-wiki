@@ -195,6 +195,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 
 - Rust CLI 是 REST API client，只负责把命令行参数映射为 HTTP 请求。
 - `--url` / `--token` 或 `STONEHENGE_WIKI_URL` / `STONEHENGE_WIKI_TOKEN` 控制目标服务和鉴权。
+- `--api-contract` 对应 `GET /api/contract`，用于 skill、CI、前端和第三方调用方读取统一 route/scope/CLI 契约。
 - `--import-source` / `--compile-wiki` / `--reindex` / `--lint-wiki`
 - `--ask` / `--explain-ask` / `--question` / `--group`
 - `--generate-brief` / `--generate-ppt`（工作台产物，后者保留为兼容别名）
@@ -204,7 +205,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 ### 6.2 HTTP 入口（当前实现）
 
 健康与索引：
-- `GET /health`, `GET /index`, `GET /audit`
+- `GET /health`, `GET /api/contract`, `GET /index`, `GET /audit`
 
 知识与来源：
 - `GET /sources`, `GET /sources/history`, `GET /sources/risk`, `GET /sources/reviews`

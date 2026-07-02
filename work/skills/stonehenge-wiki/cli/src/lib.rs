@@ -139,6 +139,7 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
     while index < args.len() {
         match args[index].as_str() {
             "--health" => selected = Some(get("/health")),
+            "--api-contract" => selected = Some(get("/api/contract")),
             "--dump-index" => selected = Some(get("/index")),
             "--list-sources" => selected = Some(get("/sources")),
             "--include-missing-sources" => include_missing = true,
@@ -608,6 +609,7 @@ Connection:
 
 Read commands:
   --health
+  --api-contract
   --dump-index
   --list-sources [--include-missing-sources]
   --source-detail PATH

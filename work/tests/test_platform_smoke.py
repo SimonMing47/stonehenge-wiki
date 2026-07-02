@@ -202,6 +202,11 @@ class PlatformSmokeTest(unittest.TestCase):
             (root / "result").mkdir()
             (wiki / "Permission.json").write_text("{}", encoding="utf-8")
 
+            cli_contract_output = io.StringIO()
+            with contextlib.redirect_stdout(cli_contract_output):
+                cli_contract_code = cli_main(["--api-contract"])
+            cli_contract = json.loads(cli_contract_output.getvalue())
+
             platform = StonehengeWikiPlatform.from_wiki_root(wiki)
             httpd = build_server(platform, "127.0.0.1", 0)
             thread = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -213,6 +218,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 styles_css = http_get(base + "/assets/styles.css")
                 favicon_svg = http_get(base + "/assets/favicon.svg")
                 health = json.loads(http_get(base + "/health"))
+                api_contract = json.loads(http_get(base + "/api/contract"))
                 sources = json.loads(http_get(base + "/sources"))
                 source_risk = json.loads(http_get(base + "/sources/risk"))
                 lint = json.loads(http_get(base + "/wiki/lint"))
@@ -222,6 +228,16 @@ class PlatformSmokeTest(unittest.TestCase):
                 httpd.server_close()
                 thread.join(timeout=5)
 
+            contract_paths = {(route["method"], route["path"]) for route in api_contract["routes"]}
+            cli_contract_paths = {(route["method"], route["path"]) for route in cli_contract["routes"]}
+            self.assertEqual(cli_contract_code, 0)
+            self.assertEqual(api_contract["status"], "ok")
+            self.assertFalse(api_contract["architecture"]["rag"])
+            self.assertGreaterEqual(api_contract["route_count"], 30)
+            self.assertIn(("GET", "/api/contract"), contract_paths)
+            self.assertIn(("GET", "/sources/detail"), contract_paths)
+            self.assertIn(("POST", "/llm/test"), contract_paths)
+            self.assertEqual(contract_paths, cli_contract_paths)
             self.assertIn("Stonehenge Wiki", index_html)
             self.assertIn('href="/assets/favicon.svg"', index_html)
             self.assertIn("authName", index_html)
@@ -310,7 +326,9 @@ class PlatformSmokeTest(unittest.TestCase):
 
                     health = json.loads(http_get(base + "/health"))
                     unauth_index = http_get_status(base + "/index")
+                    unauth_contract = http_get_status(base + "/api/contract")
                     bad_index = http_get_status(base + "/index", headers=bad_headers)
+                    read_contract = json.loads(http_get(base + "/api/contract", headers=read_headers))
                     read_index = json.loads(http_get(base + "/index", headers=read_headers))
                     read_sources = json.loads(http_get(base + "/sources", headers=read_headers))
                     read_source_detail = json.loads(
@@ -387,7 +405,10 @@ class PlatformSmokeTest(unittest.TestCase):
 
             self.assertTrue(health["auth"]["enabled"])
             self.assertEqual(unauth_index, 401)
+            self.assertEqual(unauth_contract, 401)
             self.assertEqual(bad_index, 401)
+            self.assertEqual(read_contract["status"], "ok")
+            self.assertTrue(any(route["path"] == "/api/contract" for route in read_contract["routes"]))
             self.assertEqual(len(read_index["files"]), 1)
             self.assertEqual(len(read_sources["sources"]), 1)
             self.assertEqual(read_source_detail["path"], "docs/00_inbox/auth.md")

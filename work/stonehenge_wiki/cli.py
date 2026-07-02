@@ -6,6 +6,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from .api_contract import api_contract
 from .platform import StonehengeWikiPlatform
 from .readiness import readiness_exit_code
 from .server import serve
@@ -21,6 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--group", action="append", help="Group stem such as group-1")
     parser.add_argument("--ask", help="Answer one ad-hoc question and print JSON to stdout")
     parser.add_argument("--explain-ask", help="Print retrieval and safety evidence for one ad-hoc question")
+    parser.add_argument("--api-contract", action="store_true", help="Print the machine-readable REST API contract")
     parser.add_argument("--dump-index", action="store_true", help="Print indexed paths/comments as JSON")
     parser.add_argument("--list-sources", action="store_true", help="Print source registry records as JSON")
     parser.add_argument("--include-missing-sources", action="store_true", help="Include missing source registry records")
@@ -66,6 +68,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.self_test:
         return run_self_test()
+
+    if args.api_contract:
+        print_json(api_contract())
+        return 0
 
     wiki_root = args.wiki_root.resolve()
     if args.serve:

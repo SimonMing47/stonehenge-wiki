@@ -187,6 +187,7 @@ http://127.0.0.1:8765/
 
 ```bash
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --api-contract
 ```
 
 REST 自验证：
@@ -301,6 +302,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 默认监听 `127.0.0.1:8765`。
 
 - `GET /health`：健康检查和索引统计
+- `GET /api/contract`：机器可读 REST API 契约，包含 route、scope、CLI 映射和 no-RAG 边界说明
 - `GET /`：浏览器控制台
 - `GET /index`：文件、批注和持久化状态
 - `GET /sources?include_missing=1`：来源注册表，包含 origin、hash、大小、状态和最后索引时间
