@@ -78,20 +78,20 @@ The default local profile is:
 - `agents.opencode.api_key_env`: `DEEPSEEK_API_KEY`
 - `agents.opencode.env_file`: `~/.hermes/.env`
 
-If opencode is missing, install it with the official installer, then source the shell profile:
+If opencode is missing, or if it has no local LLM provider configured, bootstrap it from the local Hermes DeepSeek API without committing secrets:
 
 ```bash
-command -v opencode >/dev/null || curl -fsSL https://opencode.ai/install | bash
-source ~/.zshrc >/dev/null 2>&1 || true
-opencode --version
+./work/skills/stonehenge-wiki/scripts/configure_opencode_from_hermes.sh
 ```
 
-If opencode has no LLM configured, copy only the Hermes DeepSeek key into a local 0600 key file and point `~/.config/opencode/opencode.json` at it with `{file:~/.config/opencode/hermes-deepseek.key}`. Do not store API keys in the repository.
+The script reads `DEEPSEEK_API_KEY` from `~/.hermes/.env`, writes only `~/.config/opencode/hermes-deepseek.key` with mode `0600`, and writes `~/.config/opencode/opencode.json` with an OpenAI-compatible `hermes-deepseek/deepseek-v4-pro` provider. Do not store API keys in the repository.
 
 Validate agent wiring before answering LLM-backed questions:
 
 ```bash
+opencode --version
 opencode models hermes-deepseek
+opencode run -m hermes-deepseek/deepseek-v4-pro --pure --format json "只回复 OK"
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
 curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --test-llm-agent opencode --test-llm-live

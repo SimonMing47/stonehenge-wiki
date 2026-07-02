@@ -230,15 +230,19 @@ LLM 配置必须按 agent 隔离，不要把所有模型参数只堆在顶层 `l
 }
 ```
 
-如果本机还没有 opencode，先按官方安装脚本安装：
+如果本机还没有 opencode，或 opencode 没有 LLM provider 配置，直接使用 skill 脚本从本机 Hermes 配置中抽取已验证可用的 DeepSeek API：
 
 ```bash
-command -v opencode >/dev/null || curl -fsSL https://opencode.ai/install | bash
-source ~/.zshrc >/dev/null 2>&1 || true
-opencode --version
+./work/skills/stonehenge-wiki/scripts/configure_opencode_from_hermes.sh
 ```
 
-如果 opencode 没有 LLM 配置，优先复用 `~/.hermes/.env` 中已经可用的 `DEEPSEEK_API_KEY`。密钥文件只放在用户目录，不提交到仓库：
+脚本会执行三件事：
+
+- 如果 `opencode` 不存在，则安装到 `~/.opencode/bin`，并复用 shell 中已有的 PATH 配置。
+- 从 `~/.hermes/.env` 读取 `DEEPSEEK_API_KEY`，写入 `~/.config/opencode/hermes-deepseek.key`，权限固定为 `0600`。
+- 写入 `~/.config/opencode/opencode.json`，配置 OpenAI-compatible provider `hermes-deepseek/deepseek-v4-pro`。
+
+手工配置时也遵循同样约定。密钥文件只放在用户目录，不提交到仓库：
 
 ```bash
 mkdir -p ~/.config/opencode
@@ -281,12 +285,15 @@ chmod 600 ~/.config/opencode/hermes-deepseek.key
 ```bash
 opencode --version
 opencode models hermes-deepseek
+opencode run -m hermes-deepseek/deepseek-v4-pro --pure --format json "只回复 OK"
 python3 -m json.tool stonehenge-wiki/config.json >/dev/null
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
 curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --test-llm-agent opencode --test-llm-live
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --ask "SQLite SELECT 命令是什么"
 ```
+
+本机 2026-07-02 验证结果：opencode `1.17.13` 能列出 `hermes-deepseek/deepseek-v4-pro`，`opencode run` 最小请求返回 `OK`，Stonehenge Wiki `--test-llm-agent opencode --test-llm-live` 返回 `reply_preview: OK`。
 
 注意：Stonehenge Wiki 的 Rust CLI 只调用 REST API，不直接调用 opencode，也不和 Python 解释器交互。opencode 配置用于统一本机 agent/provider/model 的命名和密钥来源；Stonehenge Wiki 后端通过 OpenAI-compatible REST endpoint 调用同一组能力。
 

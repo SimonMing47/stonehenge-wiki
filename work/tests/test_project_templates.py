@@ -48,6 +48,21 @@ class ProjectTemplateTest(unittest.TestCase):
         self.assertNotIn("actions/checkout@v4", workflow)
         self.assertNotIn("actions/setup-python@v5", workflow)
 
+    def test_opencode_hermes_bootstrap_is_documented_without_secrets(self) -> None:
+        script = REPO_ROOT / "work" / "skills" / "stonehenge-wiki" / "scripts" / "configure_opencode_from_hermes.sh"
+        skill = (REPO_ROOT / "work" / "skills" / "stonehenge-wiki" / "SKILL.md").read_text(encoding="utf-8")
+        instruction = (REPO_ROOT / "INSTRUCTION.md").read_text(encoding="utf-8")
+        script_text = script.read_text(encoding="utf-8")
+
+        self.assertTrue(script.exists())
+        self.assertIn("configure_opencode_from_hermes.sh", skill)
+        self.assertIn("configure_opencode_from_hermes.sh", instruction)
+        self.assertIn("DEEPSEEK_API_KEY", script_text)
+        self.assertIn("OPENCODE_PROVIDER=\"${OPENCODE_PROVIDER:-hermes-deepseek}\"", script_text)
+        self.assertIn("OPENCODE_MODEL=\"${OPENCODE_MODEL:-deepseek-v4-pro}\"", script_text)
+        self.assertIn("opencode run -m hermes-deepseek/deepseek-v4-pro", instruction)
+        self.assertNotRegex(script_text, r"sk-[A-Za-z0-9]{20,}")
+
 
 if __name__ == "__main__":
     unittest.main()
