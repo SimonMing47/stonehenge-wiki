@@ -26,6 +26,7 @@ def verify_api_contract(repo_root: Path | None = None) -> dict[str, Any]:
     errors.extend(validate_contract_shape(contract, routes))
 
     server_routes = extract_server_routes(root / "work" / "stonehenge_wiki" / "server.py")
+    server_scopes = extract_server_scopes(root / "work" / "stonehenge_wiki" / "server.py")
     contract_routes = {(route["method"], route["path"]) for route in routes}
     missing_in_contract = sorted(server_routes - contract_routes)
     missing_in_server = sorted(contract_routes - server_routes)
@@ -33,6 +34,16 @@ def verify_api_contract(repo_root: Path | None = None) -> dict[str, Any]:
         errors.append(f"server route {method} {path} is missing from api_contract.ROUTES")
     for method, path in missing_in_server:
         errors.append(f"contract route {method} {path} is missing from server.py")
+    for route in routes:
+        key = (route["method"], route["path"])
+        server_scope = server_scopes.get(key)
+        if server_scope is None:
+            continue
+        if route["scope"] != server_scope:
+            errors.append(
+                f"contract scope mismatch for {route['method']} {route['path']}: "
+                f"contract={route['scope']} server={server_scope}"
+            )
 
     rust_cli = (root / "work" / "skills" / "stonehenge-wiki" / "cli" / "src" / "lib.rs").read_text(encoding="utf-8")
     contract_flags = sorted(extract_contract_cli_flags(routes))
@@ -51,6 +62,7 @@ def verify_api_contract(repo_root: Path | None = None) -> dict[str, Any]:
         "summary": {
             "contract_routes": len(contract_routes),
             "server_routes": len(server_routes),
+            "server_scopes": len(server_scopes),
             "contract_cli_flags": len(contract_flags),
             "rust_cli_paths": len(rust_paths),
             "errors": len(errors),
@@ -96,18 +108,56 @@ def validate_contract_shape(contract: dict[str, Any], routes: list[dict[str, Any
 
 
 def extract_server_routes(server_path: Path | None = None) -> set[tuple[str, str]]:
+    return set(extract_server_scopes(server_path).keys())
+
+
+def extract_server_scopes(server_path: Path | None = None) -> dict[tuple[str, str], str]:
     if server_path is None:
         server_path = Path(__file__).resolve().with_name("server.py")
     tree = ast.parse(server_path.read_text(encoding="utf-8"))
-    routes: set[tuple[str, str]] = set()
+    scopes: dict[tuple[str, str], str] = {}
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name in {"do_GET", "do_POST"}:
-            method = node.name.removeprefix("do_")
-            for child in ast.walk(node):
-                if isinstance(child, ast.If):
-                    for path in extract_paths_from_test(child.test):
-                        routes.add((method, path))
-    return routes
+        if isinstance(node, ast.FunctionDef) and node.name == "do_GET":
+            for statement in node.body:
+                if isinstance(statement, ast.If):
+                    paths = extract_paths_from_test(statement.test)
+                    if not paths:
+                        continue
+                    scope = extract_ensure_authorized_scope(statement.body) or "public"
+                    for path in paths:
+                        scopes[("GET", path)] = scope
+        if isinstance(node, ast.FunctionDef) and node.name == "do_POST":
+            read_paths = extract_post_read_scope_paths(node)
+            for statement in node.body:
+                if isinstance(statement, ast.If):
+                    for path in extract_paths_from_test(statement.test):
+                        scopes[("POST", path)] = "read" if path in read_paths else "admin"
+    return scopes
+
+
+def extract_ensure_authorized_scope(statements: list[ast.stmt]) -> str | None:
+    for statement in statements:
+        for node in ast.walk(statement):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if node.func.attr == "ensure_authorized" and node.args:
+                    return constant_string(node.args[0])
+    return None
+
+
+def extract_post_read_scope_paths(function: ast.FunctionDef) -> set[str]:
+    for statement in function.body:
+        if not isinstance(statement, ast.Assign):
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == "required_scope" for target in statement.targets):
+            continue
+        if not isinstance(statement.value, ast.IfExp):
+            continue
+        if constant_string(statement.value.body) != "read":
+            continue
+        if constant_string(statement.value.orelse) != "admin":
+            continue
+        return extract_paths_from_test(statement.value.test)
+    return set()
 
 
 def extract_paths_from_test(node: ast.AST) -> set[str]:

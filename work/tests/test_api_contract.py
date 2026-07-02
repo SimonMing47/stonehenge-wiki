@@ -3,7 +3,12 @@ from __future__ import annotations
 import unittest
 
 from stonehenge_wiki.api_contract import api_contract
-from stonehenge_wiki.contract_checks import extract_server_routes, validate_contract_shape, verify_api_contract
+from stonehenge_wiki.contract_checks import (
+    extract_server_routes,
+    extract_server_scopes,
+    validate_contract_shape,
+    verify_api_contract,
+)
 
 
 class ApiContractTest(unittest.TestCase):
@@ -29,6 +34,15 @@ class ApiContractTest(unittest.TestCase):
         self.assertIn(("GET", "/assets/{path}"), routes)
         self.assertIn(("GET", "/files/{path}"), routes)
         self.assertIn(("POST", "/llm/test"), routes)
+
+    def test_server_scope_extraction_tracks_public_read_and_admin(self) -> None:
+        scopes = extract_server_scopes()
+
+        self.assertEqual(scopes[("GET", "/health")], "public")
+        self.assertEqual(scopes[("GET", "/api/contract")], "read")
+        self.assertEqual(scopes[("GET", "/llm/config")], "admin")
+        self.assertEqual(scopes[("POST", "/ask")], "read")
+        self.assertEqual(scopes[("POST", "/llm/test")], "admin")
 
 
 if __name__ == "__main__":

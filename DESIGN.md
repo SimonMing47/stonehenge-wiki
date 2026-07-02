@@ -640,7 +640,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 | 类型 | 命令/动作 | 负责人 | 频率 |
 | --- | --- | --- | --- |
 | Python 语法 | `python3 -m compileall -q work` | C | 每 PR |
-| API contract | `PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks` | A/C | 每 PR |
+| API contract | `PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks`，校验 route、scope、CLI 映射 | A/C | 每 PR |
 | 平台 smoke | `PYTHONPATH=work python3 -m unittest discover -s work/tests -q` | C | 每 PR |
 | Rust fmt | `cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check` | C | 每 PR |
 | Rust CLI | `cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml` | C | 每 PR |
@@ -686,7 +686,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 
 ### P0
 
-- 给 REST API route contract 增加更深的 scope/schema 一致性检查。
+- 给 REST API route contract 增加更深的 query/body schema 一致性检查。
 - 给 README/INSTRUCTION/DESIGN 增加一致性检查脚本。
 - 扩展 GitHub Actions，增加 release bundle 和 browser smoke 的可选门禁。
 
