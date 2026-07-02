@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Stonehenge Wiki design documentation
+    url: https://github.com/SimonMing47/stonehenge-wiki/blob/main/DESIGN.md
+    about: Read the architecture, roadmap, owner model, and verification matrix before filing broad design work.

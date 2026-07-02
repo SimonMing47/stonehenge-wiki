@@ -339,7 +339,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 
 | 里程碑 | 目标 | 主要交付 |
 | --- | --- | --- |
-| M1 项目工程化 | 让 3 人稳定协作 | CI、CONTRIBUTING、CHANGELOG、PR 模板、API contract |
+| M1 项目工程化 | 让 3 人稳定协作 | CI、CONTRIBUTING、CHANGELOG、PR/Issue 模板、API contract |
 | M2 知识运营闭环 | 从导入到治理、预览、编译、问答闭环 | 来源详情、版本历史、原始源预览、图谱边类型 |
 | M3 安全与治理增强 | 企业可验收安全能力 | 风险分级、source review、token scope、审计导出 |
 | M4 工作台成熟化 | 日常可用的问答和生成工作台 | 历史记录、证据展开、LLM 连接测试、配置回滚 |

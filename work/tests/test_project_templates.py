@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+class ProjectTemplateTest(unittest.TestCase):
+    def test_pull_request_template_covers_delivery_guardrails(self) -> None:
+        template = (REPO_ROOT / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
+
+        for required in [
+            "Platform/API/Security",
+            "Web Console/Product",
+            "CLI/Skill/Quality/Release",
+            "no-RAG",
+            "Rust CLI remains REST-only",
+            "stonehenge_wiki.contract_checks",
+            "Browser smoke",
+            "Release smoke",
+            "GitHub Actions run",
+        ]:
+            self.assertIn(required, template)
+
+    def test_issue_forms_preserve_architecture_and_safety_prompts(self) -> None:
+        bug = (REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml").read_text(encoding="utf-8")
+        feature = (REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / "feature_request.yml").read_text(encoding="utf-8")
+        config = (REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / "config.yml").read_text(encoding="utf-8")
+
+        for text in (bug, feature):
+            self.assertIn("Platform/API/Security", text)
+            self.assertIn("Web Console/Product", text)
+            self.assertIn("CLI/Skill/Quality/Release", text)
+            self.assertIn("no-RAG", text)
+            self.assertIn("REST", text)
+        self.assertIn("Sensitive values", bug)
+        self.assertIn("compiled wiki", feature)
+        self.assertIn("release bundles", feature)
+        self.assertIn("blank_issues_enabled: false", config)
+
+
+if __name__ == "__main__":
+    unittest.main()

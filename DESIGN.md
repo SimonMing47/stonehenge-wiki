@@ -457,6 +457,7 @@ Rust CLI 的职责是把命令行参数翻译为 HTTP 请求：
 - Raw 页面可查看来源数据。
 - Favicon 添加到页签。
 - GitHub 仓库已推送到 `SimonMing47/stonehenge-wiki`。
+- GitHub Actions、PR 模板、Bug/Feature issue forms 已建立。
 
 **验收命令**
 
@@ -478,7 +479,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 
 - 统一 `CONTRIBUTING.md`、`CHANGELOG.md`、版本策略。
 - 增加 GitHub Actions：Python smoke、API contract、Rust fmt/test、skill build。
-- 建立 issue/PR 模板。
+- 建立 issue/PR 模板，并用测试保护关键 guardrails。
 - 梳理 API contract 表，形成兼容规则。
 - 清理所有过期文档命令。
 
@@ -695,8 +696,8 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 
 - Raw 来源详情和版本历史 UI。
 - Wiki 图谱边类型增强。
-- Release bundle manifest。
-- GitHub Actions。
+- Release bundle manifest 版本差异和签名策略。
+- GitHub Actions release artifact 自动化。
 
 ### P2
 

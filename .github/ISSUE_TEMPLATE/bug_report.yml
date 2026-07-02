@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a Stonehenge Wiki runtime, API, CLI, skill, or Web Console defect.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Platform/API/Security
+        - Web Console/Product
+        - CLI/Skill/Quality/Release
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What went wrong, and what did you expect instead?
+      placeholder: "Example: Raw source detail returns 404 for an indexed source."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include commands, URLs, route names, or browser pages.
+      placeholder: |
+        1. Start `python3 work/main.py --serve --host 127.0.0.1 --port 8765`
+        2. Open `http://127.0.0.1:8765/#sources`
+        3. Click ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Paste logs, API responses, CLI output, screenshots, or CI run links.
+    validations:
+      required: false
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification already run
+      description: List local checks or GitHub Actions results.
+      placeholder: |
+        - `PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks`: pass/fail
+        - `PYTHONPATH=work python3 -m unittest discover -s work/tests -q`: pass/fail
+    validations:
+      required: false
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Guardrails
+      options:
+        - label: This issue preserves the no-RAG architecture and does not request vector storage as the core retrieval path.
+          required: true
+        - label: Sensitive values, API keys, and raw private documents are not pasted into this issue.
+          required: true
+        - label: If this affects Rust CLI, the expected behavior is still REST-only.
+          required: false

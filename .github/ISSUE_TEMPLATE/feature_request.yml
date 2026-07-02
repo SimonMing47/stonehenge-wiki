@@ -1,0 +1,61 @@
+name: Feature request
+description: Propose a Stonehenge Wiki capability, workflow, or product improvement.
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Platform/API/Security
+        - Web Console/Product
+        - CLI/Skill/Quality/Release
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the user-visible or operator-visible outcome.
+      placeholder: "Example: Governance page can export a release bundle with traceable artifact hashes."
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and constraints
+      description: Mention API, CLI, skill, Web, security, auth, audit, data, or release impact.
+      placeholder: |
+        - API/contract:
+        - CLI/skill:
+        - Web Console:
+        - Security/auth/audit:
+        - Data/release:
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Concrete checks that prove the feature is done.
+      placeholder: |
+        - API contract updated and `contract_checks` passes.
+        - Web page shows loading/success/fail states if UI changes.
+        - Release/readiness/evaluation checks updated if delivery behavior changes.
+    validations:
+      required: true
+  - type: checkboxes
+    id: architecture
+    attributes:
+      label: Architecture guardrails
+      options:
+        - label: Preserves no-RAG architecture and uses compiled wiki / `wiki_sections` as the retrieval surface.
+          required: true
+        - label: Keeps Rust CLI as a REST API client only.
+          required: true
+        - label: Does not package raw `docs/` or `.state/wiki.sqlite` into release bundles.
+          required: true
+        - label: Documents any API, schema, auth, or migration impact.
+          required: true

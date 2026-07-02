@@ -26,6 +26,8 @@ UI 变更需要在 `http://127.0.0.1:8765/` 做浏览器检查；安全、鉴权
 
 ## PR 内容
 
+打开 PR 时使用 `.github/pull_request_template.md`。模板会提示 owner area、API/CLI/Web/security/data/release 影响、架构 guardrails、验证结果和证据链接。
+
 每个 PR 至少包含：
 
 - 变更范围
@@ -34,6 +36,10 @@ UI 变更需要在 `http://127.0.0.1:8765/` 做浏览器检查；安全、鉴权
 - UI 变更截图或说明
 - 安全/鉴权影响
 - 是否涉及数据迁移或向后兼容
+
+## Issue 内容
+
+Bug 和 Feature 使用 `.github/ISSUE_TEMPLATE/` 下的表单。Issue 必须标明 area，并说明复现步骤或验收标准；涉及 CLI、release、auth、安全、Web Console 或 API contract 时，应给出相应证据和验证命令。
 
 ## Review 规则
 
