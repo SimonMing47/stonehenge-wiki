@@ -278,6 +278,17 @@
                 <span data-i18n="agents.default_agent">Default agent</span>
                 <input id="llmDefaultAgent" placeholder="default" />
               </label>
+              <label class="inline-field">
+                <span data-i18n="agents.runtime_mode">Runtime mode</span>
+                <select id="llmRuntimeMode">
+                  <option value="api" data-i18n="agents.runtime_api">LLM API</option>
+                  <option value="opencode" data-i18n="agents.runtime_opencode">opencode</option>
+                </select>
+              </label>
+              <label class="inline-field">
+                <span data-i18n="agents.runtime_command">Runtime command</span>
+                <input id="llmRuntimeCommand" placeholder="opencode" />
+              </label>
             </div>
 
             <div class="agents-layout">

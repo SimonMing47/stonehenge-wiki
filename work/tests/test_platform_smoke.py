@@ -360,6 +360,16 @@ class PlatformSmokeTest(unittest.TestCase):
                             headers=read_headers,
                         )
                     )
+                    read_ask_public = http_post_status(
+                        base + "/ask",
+                        {"id": "public-ask", "title": "public ask without token", "level": "简单"},
+                    )
+                    read_explain_public = json.loads(
+                        http_post(
+                            base + "/explain",
+                            {"id": "public-explain", "title": "public explain without token", "level": "中等"},
+                        )
+                    )
                     read_reindex = http_post_status(base + "/reindex", {}, headers=read_headers)
                     read_source_status = http_post_status(
                         base + "/sources/status",
@@ -434,6 +444,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(read_readiness_export, 403)
             self.assertEqual(read_release_export, 403)
             self.assertEqual(read_evaluation, 403)
+            self.assertEqual(read_ask_public, 200)
+            self.assertIn(read_explain_public["status"], {"ok", "blocked"})
             self.assertEqual(admin_reindex, 200)
             self.assertEqual(admin_export, 200)
             self.assertIn("summary", admin_readiness["report"])

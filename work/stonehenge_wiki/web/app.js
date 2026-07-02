@@ -12,6 +12,7 @@ const state = {
   wikiPage: null,
   sourceRisk: null,
   sourceDetail: null,
+  sourceDetailPath: "",
   sourceDetailError: null,
   explanation: null,
   llm: null,
@@ -70,6 +71,7 @@ const I18N = {
     "sources.detail_hint": "选择一个来源查看抽取预览。",
     "sources.view_detail": "查看",
     "sources.preview_title": "抽取预览",
+    "sources.preview_chars": "预览字符数",
     "sources.meta_title": "元数据",
     "sources.versions_title": "版本",
     "sources.reviews_title": "审核",
@@ -129,6 +131,10 @@ const I18N = {
     "agents.name": "名称",
     "agents.category": "分类",
     "agents.agent": "代理",
+    "agents.runtime_mode": "运行模式",
+    "agents.runtime_command": "运行时命令",
+    "agents.runtime_api": "LLM API",
+    "agents.runtime_opencode": "opencode",
     "studio.title": "工作台",
     "studio.topic_placeholder": "输入你的演讲主题",
     "studio.slides_4": "4 页",
@@ -177,6 +183,7 @@ const I18N = {
     "status.comments": "条注释",
     "status.questions": "问题",
     "status.unknown": "未知",
+    "status.refresh": "刷新",
     "status.score": "得分",
     "status.risks": "风险",
     "status.sources": "来源",
@@ -274,6 +281,7 @@ const I18N = {
     "sources.detail_hint": "Select a source to inspect extracted preview.",
     "sources.view_detail": "View",
     "sources.preview_title": "Extracted preview",
+    "sources.preview_chars": "Preview chars",
     "sources.meta_title": "Metadata",
     "sources.versions_title": "Versions",
     "sources.reviews_title": "Reviews",
@@ -333,6 +341,10 @@ const I18N = {
     "agents.name": "Name",
     "agents.category": "Category",
     "agents.agent": "Agent",
+    "agents.runtime_mode": "Runtime mode",
+    "agents.runtime_command": "Runtime command",
+    "agents.runtime_api": "LLM API",
+    "agents.runtime_opencode": "opencode",
     "studio.title": "Workbench",
     "studio.topic_placeholder": "Enter your speaking topic",
     "studio.slides_4": "4 slides",
@@ -360,6 +372,7 @@ const I18N = {
     "status.test_failed": "Connection failed",
     "status.not_loaded": "Not loaded",
     "status.loading": "Loading",
+    "status.refresh": "Refresh",
     "status.preview": "Preview",
     "status.select_article": "Select an article",
     "status.select_article_hint": "Select an article from the list.",
@@ -588,6 +601,8 @@ function renderLLMConfig() {
 
   el("llmEnabled").checked = Boolean(config.enabled);
   el("llmDefaultAgent").value = String(config.default_agent || "default");
+  el("llmRuntimeMode").value = String(config.runtime_mode || "api");
+  el("llmRuntimeCommand").value = String(config.runtime_command || "");
 
   el("llmAgentsList").innerHTML = agentNames.length
     ? agentNames.map((name) => llmAgentRow(name, agentMap[name] || {})).join("")
@@ -622,6 +637,8 @@ function llmAgentRow(name, data) {
     max_context_chars: 12000,
     max_tokens: 800,
     temperature: 0.1,
+    runtime_mode: "api",
+    runtime_command: "",
   };
   const cfg = { ...defaults, ...data };
   const rowId = `agent-${name}`;
@@ -653,6 +670,17 @@ function llmAgentRow(name, data) {
         <label>
           <span>${translate("agents.base_url")}</span>
           <input type="text" value="${escapeHtml(cfg.base_url)}" data-agent-base-url="${escapeHtml(rowId)}" />
+        </label>
+        <label>
+          <span>${translate("agents.runtime_mode")}</span>
+          <select data-agent-runtime-mode="${escapeHtml(rowId)}">
+            <option value="api" ${cfg.runtime_mode === "api" ? "selected" : ""}>${translate("agents.runtime_api")}</option>
+            <option value="opencode" ${cfg.runtime_mode === "opencode" ? "selected" : ""}>${translate("agents.runtime_opencode")}</option>
+          </select>
+        </label>
+        <label>
+          <span>${translate("agents.runtime_command")}</span>
+          <input type="text" value="${escapeHtml(cfg.runtime_command)}" data-agent-runtime-command="${escapeHtml(rowId)}" />
         </label>
         <label>
           <span>${translate("agents.api_key_env")}</span>
@@ -821,6 +849,8 @@ function collectLLMConfigPayload() {
       const maxContext = row.querySelector(`[data-agent-context="${CSS.escape(rowId)}"]`);
       const maxTokens = row.querySelector(`[data-agent-tokens="${CSS.escape(rowId)}"]`);
       const temperature = row.querySelector(`[data-agent-temperature="${CSS.escape(rowId)}"]`);
+      const runtimeMode = row.querySelector(`[data-agent-runtime-mode="${CSS.escape(rowId)}"]`);
+      const runtimeCommand = row.querySelector(`[data-agent-runtime-command="${CSS.escape(rowId)}"]`);
       if (!name.trim()) {
         return;
       }
@@ -835,6 +865,8 @@ function collectLLMConfigPayload() {
         max_context_chars: Number(maxContext?.value || 12000),
         max_tokens: Number(maxTokens?.value || 800),
         temperature: Number(temperature?.value || 0.1),
+        runtime_mode: String(runtimeMode?.value || "api").trim(),
+        runtime_command: String(runtimeCommand?.value || "").trim(),
       };
     });
 
@@ -852,6 +884,8 @@ function collectLLMConfigPayload() {
   return {
     enabled: Boolean(el("llmEnabled").checked),
     default_agent: String(el("llmDefaultAgent").value || "default").trim(),
+    runtime_mode: String(el("llmRuntimeMode")?.value || "api").trim(),
+    runtime_command: String(el("llmRuntimeCommand")?.value || "").trim(),
     agents: rawAgents,
     category_agents: categoryAgents,
   };
@@ -908,11 +942,28 @@ function fileRow(file, source) {
   `;
 }
 
+function getSourcePreviewChars() {
+  const value = Number.parseInt(el("sourcePreviewChars")?.value || "8000", 10);
+  if (!Number.isFinite(value) || value <= 0) {
+    return 8000;
+  }
+  return Math.min(value, 20000);
+}
+
+function setSourceDetailPath(path) {
+  state.sourceDetailPath = String(path || "").trim();
+}
+
 async function loadSourceDetail(path) {
-  if (!path) return;
+  const sourcePath = String(path || "").trim();
+  if (!sourcePath) return;
+  setSourceDetailPath(sourcePath);
   el("sourceDetailStatus").textContent = translate("status.loading");
   try {
-    const result = await api(`/sources/detail?path=${encodeURIComponent(path)}`);
+    const previewChars = getSourcePreviewChars();
+    const result = await api(
+      `/sources/detail?path=${encodeURIComponent(sourcePath)}&preview_chars=${encodeURIComponent(String(previewChars))}`
+    );
     if (result.error) {
       state.sourceDetail = null;
       state.sourceDetailError = result.error;
@@ -2060,6 +2111,8 @@ function applyLanguage() {
     node.placeholder = translate(key);
   });
   el("llmEnabled")?.setAttribute("aria-label", translate("agents.enabled"));
+  el("llmRuntimeMode")?.setAttribute("aria-label", translate("agents.runtime_mode"));
+  el("llmRuntimeCommand")?.setAttribute("aria-label", translate("agents.runtime_command"));
   renderLLMConfig();
 }
 
@@ -2105,6 +2158,14 @@ el("addAgentBtn").addEventListener("click", () => {
 });
 el("addCategoryMapBtn").addEventListener("click", addCategoryMappingRow);
 el("saveAgentsBtn").addEventListener("click", saveLlmConfig);
+el("refreshSourceDetailBtn").addEventListener("click", () => {
+  loadSourceDetail(state.sourceDetailPath);
+});
+el("sourcePreviewChars").addEventListener("change", () => {
+  if (state.sourceDetailPath) {
+    loadSourceDetail(state.sourceDetailPath);
+  }
+});
 window.addEventListener("hashchange", renderPage);
 document.addEventListener("click", (event) => {
   const wikiPageButton = event.target.closest("[data-wiki-page-path]");
