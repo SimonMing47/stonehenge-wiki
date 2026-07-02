@@ -40,6 +40,14 @@ class ProjectTemplateTest(unittest.TestCase):
         self.assertIn("release bundles", feature)
         self.assertIn("blank_issues_enabled: false", config)
 
+    def test_ci_workflow_uses_current_action_majors(self) -> None:
+        workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+        self.assertIn("actions/checkout@v7", workflow)
+        self.assertIn("actions/setup-python@v6", workflow)
+        self.assertNotIn("actions/checkout@v4", workflow)
+        self.assertNotIn("actions/setup-python@v5", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
