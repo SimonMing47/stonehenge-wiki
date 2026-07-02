@@ -156,6 +156,15 @@ ROUTES: list[dict[str, Any]] = [
     },
     {
         "method": "GET",
+        "path": "/jobs",
+        "scope": "read",
+        "category": "governance",
+        "summary": "List recent job run records.",
+        "query": {"limit": field_contract(False, "int", "Maximum jobs to return.")},
+        "cli": None,
+    },
+    {
+        "method": "GET",
         "path": "/wiki/lint",
         "scope": "read",
         "category": "wiki",

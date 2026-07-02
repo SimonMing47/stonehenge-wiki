@@ -629,6 +629,7 @@ h3 {
 .gate-list,
 .trace-list,
 .source-list,
+.jobs-list,
 .agents-list {
   /* consistent container styling follows below */
 }
@@ -640,7 +641,8 @@ h3 {
 .audit-list,
 .risk-list,
 .gate-list,
-.source-list {
+.source-list,
+.jobs-list {
   display: grid;
   gap: 0;
   border: 1px solid var(--line);
@@ -659,7 +661,8 @@ h3 {
 .row,
 .audit-row,
 .risk-row,
-.gate-row {
+.gate-row,
+.job-row {
   display: grid;
   gap: 6px;
   width: 100%;
@@ -676,7 +679,8 @@ h3 {
 .source-row:hover,
 .row:hover,
 .audit-row:hover,
-.risk-row:hover {
+.risk-row:hover,
+.job-row:hover {
   background: #fbfdff;
 }
 
@@ -700,7 +704,8 @@ h3 {
 .row:last-child,
 .audit-row:last-child,
 .risk-row:last-child,
-.gate-row:last-child {
+.gate-row:last-child,
+.job-row:last-child {
   border-bottom: 0;
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
@@ -1072,6 +1077,17 @@ h3 {
   font-size: 14px;
 }
 
+.job-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.job-title-row strong {
+  overflow-wrap: anywhere;
+}
+
 .source-row-title {
   display: flex;
   align-items: flex-start;
@@ -1138,6 +1154,19 @@ h3 {
   border-radius: var(--radius-sm);
   background: #0f172a;
   color: #eef2ff;
+}
+
+.job-preview {
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fbff;
+  color: #1f2937;
 }
 
 .meta {

@@ -101,6 +101,11 @@ class PlatformHandler(BaseHTTPRequestHandler):
                 return
             limit = int(parse_qs(parsed.query).get("limit", ["50"])[0])
             return self.write_json({"events": self.stonehenge_wiki_platform.audit_events(limit)})
+        if parsed.path == "/jobs":
+            if not self.ensure_authorized("read"):
+                return
+            limit = int(parse_qs(parsed.query).get("limit", ["50"])[0])
+            return self.write_json({"jobs": self.stonehenge_wiki_platform.jobs(limit)})
         if parsed.path == "/wiki/lint":
             if not self.ensure_authorized("read"):
                 return

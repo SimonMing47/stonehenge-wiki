@@ -14,6 +14,7 @@ const state = {
   sourceDetail: null,
   sourceDetailPath: "",
   sourceDetailError: null,
+  jobs: [],
   explanation: null,
   llm: null,
   llmConfig: null,
@@ -151,6 +152,7 @@ const I18N = {
     "governance.export_release": "导出发布包",
     "governance.run_evaluation": "运行评估",
     "governance.export_evaluation": "导出评估",
+    "governance.jobs_title": "作业历史",
     "governance.readiness_title": "发布前门禁",
     "governance.risk_title": "来源风险审核",
     "audit.title": "审计",
@@ -187,6 +189,7 @@ const I18N = {
     "status.score": "得分",
     "status.risks": "风险",
     "status.sources": "来源",
+    "status.jobs": "作业",
     "status.todos": "待办",
     "status.readiness": "准备度",
     "status.no_indexed_files": "尚无索引文件",
@@ -195,6 +198,7 @@ const I18N = {
     "status.no_readiness_report": "尚无准备度报告",
     "status.no_readiness_gates": "尚无准备度门禁",
     "status.no_source_risks": "暂无来源风险",
+    "status.no_jobs": "暂无作业记录",
     "status.no_evidence": "暂无证据",
     "status.version": "版本",
     "status.versions": "版本",
@@ -361,6 +365,7 @@ const I18N = {
     "governance.export_release": "Export Release",
     "governance.run_evaluation": "Run Evaluation",
     "governance.export_evaluation": "Export Evaluation",
+    "governance.jobs_title": "Job History",
     "governance.readiness_title": "Readiness Gates",
     "governance.risk_title": "Source Risk Review",
     "audit.title": "Audit",
@@ -397,6 +402,7 @@ const I18N = {
     "status.score": "score",
     "status.risks": "risks",
     "status.sources": "sources",
+    "status.jobs": "jobs",
     "status.todos": "todos",
     "status.readiness": "readiness",
     "status.no_indexed_files": "No indexed files",
@@ -405,6 +411,7 @@ const I18N = {
     "status.no_readiness_report": "No readiness report",
     "status.no_readiness_gates": "No readiness gates",
     "status.no_source_risks": "No source risks",
+    "status.no_jobs": "No jobs yet",
     "status.no_evidence": "No evidence",
     "status.version": "version",
     "status.versions": "versions",
@@ -522,7 +529,7 @@ function buildSourcesFallback(sources) {
 async function refreshAll() {
   setBusy("refreshBtn", true);
   try {
-    const [health, index, audit, governance, readiness, wikiSections, wikiPages, sourceRisk, sources, llmConfig] = await Promise.all([
+    const [health, index, audit, governance, readiness, wikiSections, wikiPages, sourceRisk, jobs, sources, llmConfig] = await Promise.all([
       safeApiCall("/health"),
       safeApiCall("/index"),
       safeApiCall("/audit?limit=25"),
@@ -531,6 +538,7 @@ async function refreshAll() {
       safeApiCall("/wiki/sections?limit=14"),
       safeApiCall("/wiki/pages?limit=200"),
       safeApiCall("/sources/risk"),
+      safeApiCall("/jobs?limit=50"),
       safeApiCall("/sources?include_missing=1"),
       safeApiCall("/llm/config"),
     ]);
@@ -552,6 +560,7 @@ async function refreshAll() {
     state.wikiSections = wikiSections.ok ? (wikiSections.data.sections || []) : [];
     state.wikiPages = wikiPages.ok ? (wikiPages.data.pages || []) : [];
     state.sourceRisk = sourceRisk.ok ? sourceRisk.data : state.sourceRisk;
+    state.jobs = jobs.ok ? (jobs.data.jobs || []) : [];
     state.wikiPageIndex = buildWikiPageIndex(state.wikiPages);
     if (llmConfig.ok) {
       state.llmConfig = llmConfig.data;
@@ -562,6 +571,7 @@ async function refreshAll() {
     renderSourceDetail();
     renderAudit();
     renderGovernance();
+    renderJobs();
     renderReadiness();
     renderWikiPageList();
     renderWikiSections(state.wikiSections);
@@ -1092,6 +1102,34 @@ function renderGovernance() {
   const readinessText = readiness.status ? ` · ${translate("status.readiness")} ${readiness.status}` : "";
   const summaryStatusText = summary.status || translate("status.unknown");
   el("governanceSummary").textContent = `${summaryStatusText} · ${riskCount} ${translate("status.risks")} · ${summary.sources || 0} ${translate("status.sources")} · ${report.todo?.total || 0} ${translate("status.todos")}${readinessText}`;
+}
+
+function renderJobs() {
+  const rows = state.jobs || [];
+  el("jobsStatus").textContent = `${rows.length} ${translate("status.jobs")}`;
+  el("jobsList").innerHTML = rows.length
+    ? rows.map((job) => jobRow(job)).join("")
+    : emptyRow(translate("status.no_jobs"));
+}
+
+function jobRow(job) {
+  const createdAt = job.created_at || "";
+  const input = job.input ? JSON.stringify(job.input) : "";
+  const output = job.output ? JSON.stringify(job.output) : "";
+  return `
+    <div class="job-row">
+      <div class="job-title-row">
+        <strong>${escapeHtml(job.job_type || "")}</strong>
+        <span class="${job.status === "ok" ? "ok" : "blocked"}">${escapeHtml(job.status || "")}</span>
+      </div>
+      <div class="meta">
+        <span>${escapeHtml(createdAt)}</span>
+        <span>${escapeHtml(job.id ? String(job.id) : "")}</span>
+      </div>
+      ${input ? `<pre class="job-preview">${escapeHtml(input.slice(0, 240))}${String(input).length > 240 ? "…" : ""}</pre>` : ""}
+      ${output ? `<pre class="job-preview">${escapeHtml(output.slice(0, 240))}${String(output).length > 240 ? "…" : ""}</pre>` : ""}
+    </div>
+  `;
 }
 
 function renderReadiness() {

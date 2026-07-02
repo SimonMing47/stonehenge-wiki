@@ -1038,6 +1038,9 @@ class StonehengeWikiPlatform:
     def audit_events(self, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_audit_events(limit)
 
+    def jobs(self, limit: int = 50) -> list[dict[str, Any]]:
+        return self.store.list_jobs(limit)
+
     def health(self) -> dict[str, Any]:
         default_llm = self.default_llm_config()
         return {

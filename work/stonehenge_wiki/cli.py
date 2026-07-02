@@ -33,6 +33,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-risk-report", action="store_true", help="Print source risk scan report as JSON")
     parser.add_argument("--list-source-reviews", action="store_true", help="Print source review events as JSON")
     parser.add_argument("--source-review-path", help="Filter source review events by path")
+    parser.add_argument("--jobs", action="store_true", help="Print recent job run records as JSON")
+    parser.add_argument("--jobs-limit", type=int, default=50, help="Job record count for --jobs")
     parser.add_argument("--set-source-status", help="Set source status for one registry path")
     parser.add_argument("--source-status", choices=["active", "quarantined"], help="Status for --set-source-status")
     parser.add_argument("--source-status-reason", default="", help="Reason for --set-source-status")
@@ -122,6 +124,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_source_reviews:
         print_json({"reviews": platform.list_source_reviews(rel_path=args.source_review_path, limit=args.source_history_limit)})
+        return 0
+    if args.jobs:
+        print_json({"jobs": platform.jobs(limit=args.jobs_limit)})
         return 0
 
     if args.set_source_status:
