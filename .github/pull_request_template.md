@@ -31,7 +31,7 @@ Run the checks that apply and paste the result summary.
 - [ ] `PYTHONPATH=work python3 -m unittest discover -s work/tests -q`
 - [ ] `cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check`
 - [ ] `cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml`
-- [ ] `./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh`
+- [ ] `./work/scripts/build_skill_cli.sh`
 - [ ] Browser smoke on `http://127.0.0.1:8765/` when UI changes.
 - [ ] Release smoke when readiness/evaluation/release bundle changes.
 

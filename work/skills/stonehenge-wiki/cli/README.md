@@ -7,14 +7,14 @@ The public CLI for this skill lives under `work/skills/stonehenge-wiki/`.
 Local skill binary:
 
 ```bash
-./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
+./work/scripts/build_skill_cli.sh
 ```
 
-`build_skill_cli.sh` builds three entry points into `work/skills/stonehenge-wiki/bin`:
+`build_skill_cli.sh` builds the Rust CLI binaries by target into
 
-- `stonehenge-wiki` (默认入口)
-- `stonehenge-wiki-linux` (Linux 命名入口)
-- `stonehenge-wiki-windows.exe` (Windows 打包入口；无交叉编译 target 时会回退 host 产物提示)
+- `work/skills/stonehenge-wiki/bin/<os>-<arch>/stonehenge-wiki`
+
+在本机 host 上，脚本会额外维护 `work/skills/stonehenge-wiki/bin/stonehenge-wiki` 作为默认启动入口（指向 host 平台产物）。
 
 Manual build commands (if needed):
 

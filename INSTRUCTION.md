@@ -10,7 +10,7 @@
 构建 skill CLI：
 
 ```bash
-./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
+./work/scripts/build_skill_cli.sh
 ```
 
 安装 LibreOffice 后，确保命令行可访问 `soffice` 或 `libreoffice`。
@@ -305,7 +305,7 @@ PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks
 PYTHONPATH=work python3 -m unittest discover -s work/tests -q
 cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check
 cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
-./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
+./work/scripts/build_skill_cli.sh
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
 ```
 

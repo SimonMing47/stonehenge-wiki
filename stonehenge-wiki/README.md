@@ -45,7 +45,7 @@ Raw 页面和 REST CLI 支持查看来源详情，包括 metadata、脱敏抽取
 `AGENTS.md` 定义 wiki schema。运行：
 
 ```bash
-./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
+./work/scripts/build_skill_cli.sh
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --compile-wiki
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --lint-wiki
 ```

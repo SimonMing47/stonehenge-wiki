@@ -467,7 +467,7 @@ PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks
 PYTHONPATH=work python3 -m unittest discover -s work/tests -q
 cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check
 cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
-./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
+./work/scripts/build_skill_cli.sh
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
 ```
 
@@ -646,7 +646,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 | 平台 smoke | `PYTHONPATH=work python3 -m unittest discover -s work/tests -q` | C | 每 PR |
 | Rust fmt | `cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check` | C | 每 PR |
 | Rust CLI | `cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml` | C | 每 PR |
-| Skill build | `./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh` | C | 每 PR |
+| Skill build | `./work/scripts/build_skill_cli.sh` | C | 每 PR |
 | REST health | `./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health` | A/C | 每 PR |
 | Browser smoke | 打开 `http://127.0.0.1:8765/` 检查主要页面 | B | UI PR |
 | Security smoke | 高危命令/敏感文件/prompt injection | A/C | 安全 PR |

@@ -272,7 +272,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
   - `PYTHONPATH=work python3 -m unittest discover -s work/tests -q`
   - `cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check`
   - `cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml`
-  - `./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh`
+  - `./work/scripts/build_skill_cli.sh`
   - `./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health`
 
 ---

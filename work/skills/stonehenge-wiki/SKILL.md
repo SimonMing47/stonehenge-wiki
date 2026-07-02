@@ -10,7 +10,7 @@ description: Run the repository-local Stonehenge Wiki system for deterministic d
 Use the bundled Rust CLI as the source of truth. From the repository root, build it once when needed:
 
 ```bash
-./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
+./work/scripts/build_skill_cli.sh
 ```
 
 The REST CLI entrypoint is:

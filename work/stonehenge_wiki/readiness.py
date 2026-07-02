@@ -86,7 +86,7 @@ def cli_skill_gate(wiki_root: Path) -> dict[str, Any]:
         repo_root / "work" / "main.py",
         repo_root / "work" / "stonehenge_wiki" / "cli.py",
         repo_root / "work" / "skills" / "stonehenge-wiki" / "SKILL.md",
-        repo_root / "work" / "skills" / "stonehenge-wiki" / "scripts" / "build_skill_cli.sh",
+        repo_root / "work" / "scripts" / "build_skill_cli.sh",
         repo_root / "work" / "skills" / "stonehenge-wiki" / "cli" / "Cargo.toml",
         repo_root / "work" / "skills" / "stonehenge-wiki" / "cli" / "src" / "bin" / "stonehenge-wiki-linux.rs",
         repo_root / "work" / "skills" / "stonehenge-wiki" / "cli" / "src" / "bin" / "stonehenge-wiki-windows.rs",
