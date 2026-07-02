@@ -4,6 +4,7 @@ import unittest
 
 from stonehenge_wiki.api_contract import api_contract
 from stonehenge_wiki.contract_checks import (
+    extract_server_request_fields,
     extract_server_routes,
     extract_server_scopes,
     validate_contract_shape,
@@ -43,6 +44,15 @@ class ApiContractTest(unittest.TestCase):
         self.assertEqual(scopes[("GET", "/llm/config")], "admin")
         self.assertEqual(scopes[("POST", "/ask")], "read")
         self.assertEqual(scopes[("POST", "/llm/test")], "admin")
+
+    def test_server_request_field_extraction_tracks_aliases(self) -> None:
+        fields = extract_server_request_fields()
+
+        self.assertEqual(fields[("GET", "/wiki/sections")]["query"], {"source_path", "path", "limit"})
+        self.assertEqual(fields[("GET", "/wiki/search")]["query"], {"q", "query", "limit"})
+        self.assertEqual(fields[("GET", "/reports/readiness")]["query"], {"groups", "group"})
+        self.assertEqual(fields[("POST", "/sources/status")]["body"], {"path", "rel_path", "status", "reason", "actor"})
+        self.assertEqual(fields[("POST", "/llm/test")]["body"], {"agent_name", "agent", "live"})
 
 
 if __name__ == "__main__":

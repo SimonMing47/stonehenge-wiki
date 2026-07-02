@@ -136,7 +136,11 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "wiki",
         "summary": "List compiled wiki section records.",
-        "query": {"source_path": "optional source path", "limit": "optional int"},
+        "query": {
+            "source_path": "optional source path",
+            "path": "optional alias for source_path",
+            "limit": "optional int",
+        },
         "cli": "--list-wiki-sections [--wiki-section-source PATH] [--wiki-section-limit N]",
     },
     {
@@ -163,7 +167,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "wiki",
         "summary": "Search the compiled wiki section index without vector/RAG storage.",
-        "query": {"q": "required query", "limit": "optional int"},
+        "query": {"q": "required query", "query": "optional alias for q", "limit": "optional int"},
         "cli": "--search-wiki QUERY [--wiki-section-limit N]",
     },
     {
@@ -180,7 +184,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "reports",
         "summary": "Return enterprise readiness gates.",
-        "query": {"groups": "optional repeated group"},
+        "query": {"groups": "optional repeated group", "group": "optional repeated group alias"},
         "cli": "--readiness-report [--group GROUP]",
     },
     {
@@ -232,7 +236,13 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "sources",
         "summary": "Set source status to active or quarantined and record a review event.",
-        "body": {"path": "required source path", "status": "required active|quarantined", "reason": "optional", "actor": "optional"},
+        "body": {
+            "path": "required source path",
+            "rel_path": "optional alias for path",
+            "status": "required active|quarantined",
+            "reason": "optional",
+            "actor": "optional",
+        },
         "cli": "--set-source-status PATH --source-status active|quarantined",
     },
     {
@@ -328,7 +338,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "llm",
         "summary": "Validate one named LLM agent and optionally run a live probe.",
-        "body": {"agent_name": "required agent name", "live": "optional bool"},
+        "body": {"agent_name": "required agent name", "agent": "optional alias for agent_name", "live": "optional bool"},
         "cli": "--test-llm-agent AGENT [--test-llm-live]",
     },
 ]
