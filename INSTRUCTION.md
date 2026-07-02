@@ -145,7 +145,7 @@ cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-release-bundle --group group-demo
 ```
 
-readiness report 会检查引擎运行时、`stonehenge-wiki` 目录结构、Rust CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。release bundle 会打包报告、题组、答案和 compiled wiki，不打包原始 `docs/` 文件或 `.state/wiki.sqlite`。
+readiness report 会检查引擎运行时、`stonehenge-wiki` 目录结构、Rust CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。release bundle 会打包报告、题组、答案和 compiled wiki，不打包原始 `docs/` 文件或 `.state/wiki.sqlite`。`manifest.json` 会记录生成者、artifact 数量、每个打包文件的 `size`/`sha256`，API 响应还会返回发布包自身的 `sha256`。
 
 本地受保护运行可复制示例文件并填入真实 token：
 

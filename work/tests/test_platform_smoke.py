@@ -847,17 +847,25 @@ class PlatformSmokeTest(unittest.TestCase):
             bundle = platform.export_release_bundle(groups=["group-ready"])
             bundle_path = wiki / bundle["path"]
             self.assertTrue(bundle_path.exists())
+            self.assertEqual(len(bundle["sha256"]), 64)
+            self.assertEqual(len(bundle["manifest_sha256"]), 64)
             self.assertFalse(bundle["manifest"]["included"]["raw_docs"])
             self.assertFalse(bundle["manifest"]["included"]["sqlite_state"])
             with zipfile.ZipFile(bundle_path) as archive:
                 names = set(archive.namelist())
                 manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+            artifact_by_path = {artifact["path"]: artifact for artifact in manifest["artifacts"]}
             self.assertIn("reports/readiness-report.json", names)
             self.assertIn("reports/governance-report.md", names)
             self.assertIn("wiki/index.md", names)
             self.assertIn("question/group-ready.md", names)
             self.assertNotIn("docs/04_常用命令/sqlite.md", names)
             self.assertNotIn(".state/wiki.sqlite", names)
+            self.assertEqual(manifest["generated_by"]["name"], "stonehenge-wiki")
+            self.assertEqual(manifest["artifact_count"], len(manifest["artifacts"]))
+            self.assertEqual(len(artifact_by_path["wiki/index.md"]["sha256"]), 64)
+            self.assertGreater(artifact_by_path["wiki/index.md"]["size"], 0)
+            self.assertNotIn("docs/04_常用命令/sqlite.md", artifact_by_path)
             self.assertEqual(manifest["knowledge_mode"], "compiled_wiki")
             self.assertFalse(manifest["included"]["raw_docs"])
 
@@ -879,6 +887,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(api_report["report"]["summary"]["fail"], 0)
             self.assertIn(b"Stonehenge Wiki Readiness Report", report_bytes)
             self.assertGreater(len(bundle_bytes), 1000)
+            self.assertEqual(len(api_bundle["sha256"]), 64)
+            self.assertEqual(api_bundle["manifest"]["generated_by"]["name"], "stonehenge-wiki")
             self.assertFalse(api_bundle["manifest"]["included"]["raw_docs"])
 
     def test_generate_presentation_endpoint(self) -> None:

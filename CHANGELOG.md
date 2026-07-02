@@ -11,6 +11,7 @@
 - 增加 Raw 来源详情：`GET /sources/detail`、Rust CLI `--source-detail`、同页脱敏抽取预览、版本、审核、风险和 wiki 区段。
 - 增加机器可读 API 契约：`GET /api/contract`、Python 兼容 CLI `--api-contract`、Rust REST CLI `--api-contract`。
 - 增加 API contract 一致性检查和 GitHub Actions CI，覆盖 Python compile、route/scope/query/body/CLI contract、unittest、Rust fmt/test 和 skill CLI build。
+- 增强 release bundle manifest，可追踪生成者、artifact 数量、每个打包文件的 size/sha256，以及发布包自身 sha256。
 
 ## 0.1.0
 

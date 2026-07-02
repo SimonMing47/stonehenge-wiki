@@ -161,6 +161,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 - `governance` 汇总来源状态、风险、TODO、阻断、任务历史
 - `readiness` 输出企业交付门禁（fail/warn/ok + 严重性）
 - `evaluation` 输出题组质量指标与风险分布，用于 CI 或交付前校验
+- `release` 输出 metadata-only bundle，manifest 记录生成者、artifact 清单、size/sha256，不打包原始 `docs/` 或 `.state/wiki.sqlite`
 
 ---
 

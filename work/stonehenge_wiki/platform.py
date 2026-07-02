@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 import zipfile
@@ -413,38 +414,25 @@ class StonehengeWikiPlatform:
         output_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         target = output_dir / f"stonehenge-wiki-release-{timestamp}.zip"
-        manifest = self.release_manifest(question_files, readiness, governance, evaluation)
+        artifacts = self.release_artifacts(question_files, readiness, governance, evaluation)
+        manifest = self.release_manifest(question_files, readiness, governance, evaluation, artifacts)
+        manifest_bytes = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
 
         with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as bundle:
-            bundle.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
-            bundle.writestr(
-                "reports/governance-report.json",
-                json.dumps(governance.get("report", {}), ensure_ascii=False, indent=2),
-            )
-            add_if_exists(bundle, self.wiki_root / readiness["path"], "reports/readiness-report.md")
-            add_if_exists(bundle, self.wiki_root / readiness["json_path"], "reports/readiness-report.json")
-            add_if_exists(bundle, self.wiki_root / governance["path"], "reports/governance-report.md")
-            if evaluation:
-                add_if_exists(bundle, self.wiki_root / evaluation["path"], "reports/evaluation-report.md")
-                add_if_exists(bundle, self.wiki_root / evaluation["json_path"], "reports/evaluation-report.json")
-            for rel in ["README.md", "AGENTS.md", "Permission.json", "config.json"]:
-                add_if_exists(bundle, self.wiki_root / rel, rel)
-            for question_file in question_files:
-                if question_file.exists():
-                    arcname = "question/" + question_file.name
-                    add_if_exists(bundle, question_file, arcname)
-                answer_path = output_path_for_question_file(self.wiki_root, question_file)
-                if answer_path.exists():
-                    add_if_exists(bundle, answer_path, "output/" + answer_path.name)
-            add_tree(bundle, self.wiki_root / "wiki", "wiki")
+            bundle.writestr("manifest.json", manifest_bytes)
+            for artifact in artifacts:
+                write_release_artifact(bundle, artifact)
 
         rel = target.relative_to(self.wiki_root).as_posix()
+        bundle_sha256 = file_sha256(target)
         result = {
             "status": "ok",
             "path": rel,
             "download_url": "/files/" + quote(rel, safe="/"),
             "manifest": manifest,
             "size": target.stat().st_size,
+            "sha256": bundle_sha256,
+            "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
         }
         self.store.record_job(
             "release_bundle_export",
@@ -452,6 +440,7 @@ class StonehengeWikiPlatform:
             {
                 "question_files": [str(path) for path in question_files],
                 "include_evaluation": include_evaluation,
+                "sha256": bundle_sha256,
             },
             result,
         )
@@ -471,6 +460,7 @@ class StonehengeWikiPlatform:
         readiness: dict[str, Any],
         governance: dict[str, Any],
         evaluation: dict[str, Any] | None,
+        artifacts: list[dict[str, Any]],
     ) -> dict[str, Any]:
         health = self.health()
         answer_files = [
@@ -480,10 +470,25 @@ class StonehengeWikiPlatform:
         ]
         return {
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "generated_by": {
+                "name": "stonehenge-wiki",
+                "component": "StonehengeWikiPlatform.export_release_bundle",
+                "version": "0.1.0",
+            },
             "wiki_root": str(self.wiki_root),
             "knowledge_mode": health.get("knowledge_mode"),
             "rag": health.get("rag", {}),
             "llm": health.get("llm", {}),
+            "artifact_count": len(artifacts),
+            "artifacts": [
+                {
+                    "path": artifact["arcname"],
+                    "size": artifact["size"],
+                    "sha256": artifact["sha256"],
+                    "source": artifact["source"],
+                }
+                for artifact in artifacts
+            ],
             "reports": {
                 "readiness": readiness.get("path"),
                 "governance": governance.get("path"),
@@ -502,6 +507,36 @@ class StonehengeWikiPlatform:
                 "screenshots": False,
             },
         }
+
+    def release_artifacts(
+        self,
+        question_files: list[Path],
+        readiness: dict[str, Any],
+        governance: dict[str, Any],
+        evaluation: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
+        artifacts: list[dict[str, Any]] = []
+        add_release_bytes(
+            artifacts,
+            "reports/governance-report.json",
+            json.dumps(governance.get("report", {}), ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+        add_release_file(artifacts, self.wiki_root / readiness["path"], "reports/readiness-report.md", self.wiki_root)
+        add_release_file(artifacts, self.wiki_root / readiness["json_path"], "reports/readiness-report.json", self.wiki_root)
+        add_release_file(artifacts, self.wiki_root / governance["path"], "reports/governance-report.md", self.wiki_root)
+        if evaluation:
+            add_release_file(artifacts, self.wiki_root / evaluation["path"], "reports/evaluation-report.md", self.wiki_root)
+            add_release_file(artifacts, self.wiki_root / evaluation["json_path"], "reports/evaluation-report.json", self.wiki_root)
+        for rel in ["README.md", "AGENTS.md", "Permission.json", "config.json"]:
+            add_release_file(artifacts, self.wiki_root / rel, rel, self.wiki_root)
+        for question_file in question_files:
+            if question_file.exists():
+                add_release_file(artifacts, question_file, "question/" + question_file.name, self.wiki_root)
+            answer_path = output_path_for_question_file(self.wiki_root, question_file)
+            if answer_path.exists():
+                add_release_file(artifacts, answer_path, "output/" + answer_path.name, self.wiki_root)
+        add_release_tree(artifacts, self.wiki_root / "wiki", "wiki", self.wiki_root)
+        return artifacts
 
     def dump_index(self) -> dict[str, Any]:
         source_risk_report = self.source_risk_report()
@@ -1038,16 +1073,57 @@ def without_markdown(report: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in report.items() if key != "markdown"}
 
 
-def add_if_exists(bundle: zipfile.ZipFile, path: Path, arcname: str) -> None:
-    if path.is_file():
-        bundle.write(path, arcname)
+def add_release_file(artifacts: list[dict[str, Any]], path: Path, arcname: str, wiki_root: Path) -> None:
+    if not path.is_file():
+        return
+    data = path.read_bytes()
+    artifacts.append(
+        {
+            "arcname": arcname,
+            "source": release_source_path(path, wiki_root),
+            "size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "data": data,
+        }
+    )
 
 
-def add_tree(bundle: zipfile.ZipFile, root: Path, arc_root: str) -> None:
+def add_release_bytes(artifacts: list[dict[str, Any]], arcname: str, data: bytes) -> None:
+    artifacts.append(
+        {
+            "arcname": arcname,
+            "source": "generated",
+            "size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "data": data,
+        }
+    )
+
+
+def add_release_tree(artifacts: list[dict[str, Any]], root: Path, arc_root: str, wiki_root: Path) -> None:
     if not root.exists():
         return
     for path in sorted(item for item in root.rglob("*") if item.is_file()):
-        bundle.write(path, f"{arc_root}/{path.relative_to(root).as_posix()}")
+        add_release_file(artifacts, path, f"{arc_root}/{path.relative_to(root).as_posix()}", wiki_root)
+
+
+def write_release_artifact(bundle: zipfile.ZipFile, artifact: dict[str, Any]) -> None:
+    bundle.writestr(artifact["arcname"], artifact["data"])
+
+
+def release_source_path(path: Path, wiki_root: Path) -> str:
+    try:
+        return path.relative_to(wiki_root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def wiki_page_sort_key(path: Path) -> tuple[int, str]:
