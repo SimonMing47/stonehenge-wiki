@@ -120,7 +120,7 @@ cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-source-reviews --source-review-path docs/00_inbox/risky.md
 ```
 
-命中 `Permission.json.file.deny` 的来源会被策略自动隔离为 `quarantined`；隔离来源保留来源注册表、版本和风险记录，但不会进入问答、PPT 生成或 compiled wiki 章节。
+命中 `Permission.json.file.deny` 的来源会被策略自动隔离为 `quarantined`；隔离来源保留来源注册表、版本和风险记录，但不会进入问答、工作台生成或 compiled wiki 章节。
 
 治理报告：
 
@@ -194,6 +194,99 @@ REST 自验证：
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
 ```
 
+## LLM Agent 与 opencode 配置
+
+LLM 配置必须按 agent 隔离，不要把所有模型参数只堆在顶层 `llm` 字段里。`stonehenge-wiki/config.json` 的约定如下：
+
+- `llm.agents.<name>`：一个可独立启停、独立 provider/model/env 的 agent 配置。
+- `llm.default_agent`：默认问答、题组运行和工作台生成使用的 agent。
+- `llm.category_agents`：按知识类别路由到指定 agent，例如 `03_学习材料` 使用 `opencode`。
+- 顶层 `llm.provider/model/base_url/api_key_env/env_file` 保留为兼容字段，也会作为 agent 的 fallback。
+
+当前默认 agent 是 `opencode`，它复用本机 Hermes 中已经可用的 DeepSeek API：
+
+```json
+{
+  "llm": {
+    "enabled": true,
+    "default_agent": "opencode",
+    "agents": {
+      "opencode": {
+        "enabled": true,
+        "provider": "opencode-hermes-deepseek",
+        "model": "deepseek-v4-pro",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "env_file": "~/.hermes/.env",
+        "timeout_seconds": 120,
+        "max_context_chars": 16000,
+        "max_tokens": 900,
+        "temperature": 0.1
+      }
+    }
+  }
+}
+```
+
+如果本机还没有 opencode，先按官方安装脚本安装：
+
+```bash
+command -v opencode >/dev/null || curl -fsSL https://opencode.ai/install | bash
+source ~/.zshrc >/dev/null 2>&1 || true
+opencode --version
+```
+
+如果 opencode 没有 LLM 配置，优先复用 `~/.hermes/.env` 中已经可用的 `DEEPSEEK_API_KEY`。密钥文件只放在用户目录，不提交到仓库：
+
+```bash
+mkdir -p ~/.config/opencode
+grep '^DEEPSEEK_API_KEY=' ~/.hermes/.env | cut -d= -f2- > ~/.config/opencode/hermes-deepseek.key
+chmod 600 ~/.config/opencode/hermes-deepseek.key
+```
+
+`~/.config/opencode/opencode.json` 应使用 OpenAI-compatible provider，并通过 `{file:...}` 引用密钥文件：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "hermes-deepseek/deepseek-v4-pro",
+  "small_model": "hermes-deepseek/deepseek-v4-pro",
+  "provider": {
+    "hermes-deepseek": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Hermes DeepSeek",
+      "options": {
+        "baseURL": "https://api.deepseek.com/v1",
+        "apiKey": "{file:~/.config/opencode/hermes-deepseek.key}"
+      },
+      "models": {
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro",
+          "limit": {
+            "context": 16000,
+            "output": 900
+          }
+        }
+      }
+    }
+  },
+  "enabled_providers": ["hermes-deepseek"]
+}
+```
+
+验证顺序：
+
+```bash
+opencode --version
+opencode models hermes-deepseek
+python3 -m json.tool stonehenge-wiki/config.json >/dev/null
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
+curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --ask "SQLite SELECT 命令是什么"
+```
+
+注意：Stonehenge Wiki 的 Rust CLI 只调用 REST API，不直接调用 opencode，也不和 Python 解释器交互。opencode 配置用于统一本机 agent/provider/model 的命名和密钥来源；Stonehenge Wiki 后端通过 OpenAI-compatible REST endpoint 调用同一组能力。
+
 开发验证：
 
 ```bash
@@ -217,13 +310,13 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 - `GET /wiki/sections?source_path=docs/04_常用命令/sqlite.md&limit=20`：查看编译后的 wiki 章节
 - `GET /wiki/search?q=SQLite%20SELECT&limit=5`：搜索编译后的 wiki 章节
 - `GET /reports/governance`：治理报告 JSON，包含来源状态、TODO 风险、审计阻断和任务历史
-- `GET /files/output/...`：下载生成物，例如 PPTX
+- `GET /files/output/...`：下载生成物，例如工作台演示文件
 - `POST /ask`：单问，JSON body 示例 `{"id":"api-1","title":"统计 docx 文件数量","level":"简单"}`
 - `POST /explain`：查看一次问题的检索证据、安全路由和匹配片段，JSON body 示例 `{"id":"trace-1","title":"SQLite SELECT 命令是什么","level":"中等"}`
 - `POST /groups/run`：运行题组，JSON body 示例 `{"groups":["group-1"]}`
 - `POST /sources/import`：导入本地文件或公开 URL，JSON body 示例 `{"source":"https://example.com/page.html","title":"网页资料","category":"00_inbox"}`
 - `POST /sources/status`：隔离或恢复来源，JSON body 示例 `{"path":"docs/00_inbox/risky.md","status":"quarantined","reason":"prompt injection review"}`
-- `POST /slides/generate`：生成 PPTX，JSON body 示例 `{"topic":"企业知识库建设方案","slide_count":6}`
+- `POST /slides/generate`：生成工作台演示文件，JSON body 示例 `{"topic":"企业知识库建设方案","slide_count":6}`
 - `POST /reports/governance/export`：导出 Markdown 治理报告到 `output/reports/`
 - `POST /reports/evaluation`：运行题组质量评估，JSON body 示例 `{"groups":["group-1"]}`
 - `POST /reports/evaluation/export`：导出题组质量评估 Markdown/JSON 报告到 `output/reports/`
@@ -232,7 +325,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `STONEHENGE_WIKI_API_TOKEN` 或 `STONEHENGE_WIKI_READ_TOKEN`，请求需携带 `X-STONEHENGE-WIKI-TOKEN`。`STONEHENGE_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/pages`、`/wiki/page`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`STONEHENGE_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、生成 PPT、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `STONEHENGE_WIKI_API_TOKEN` 或 `STONEHENGE_WIKI_READ_TOKEN`，请求需携带 `X-STONEHENGE-WIKI-TOKEN`。`STONEHENGE_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/pages`、`/wiki/page`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`STONEHENGE_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、工作台生成、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 

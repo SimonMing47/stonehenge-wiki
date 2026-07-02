@@ -1,7 +1,7 @@
 # Stonehenge Wiki 详细设计文档（企业知识工作台）
 
-**版本**：v1.0
-**更新日期**：2026-06-30
+**版本**：v1.1
+**更新日期**：2026-07-02
 **适用范围**：`stonehenge-wiki` 项目内 `work/stonehenge_wiki` 平台
 
 ## 1. 目标与约束
@@ -127,6 +127,8 @@ Stonehenge Wiki Platform (work/stonehenge_wiki/platform.py)
    └─> 结果记录到任务运行与审计
 ```
 
+LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode` agent 使用本机 Hermes 的 `DEEPSEEK_API_KEY`，provider 标记为 `opencode-hermes-deepseek`，运行时通过 OpenAI-compatible REST endpoint 调用，不要求 Rust CLI 直接调用 opencode 或 Python。
+
 ### 4.3 explain 链路
 
 在返回回答的同时提供：
@@ -146,7 +148,7 @@ Stonehenge Wiki Platform (work/stonehenge_wiki/platform.py)
 ### 4.5 演示物生成（工作台）
 
 - 前端“工作台”页面提供主题输入与页数配置。
-- 后端通过 `/slides/generate` 生成文件产物（默认输出 PPTX）。
+- 后端通过 `/slides/generate` 生成文件产物（默认输出 `.pptx` 格式）。
 - 返回下载链接到文件服务 `/files/output/...`。
 - UI 上不展示 “PPT” 文案，统一改为“工作台/生成演示稿/下载文件”。
 
@@ -280,7 +282,7 @@ Stonehenge Wiki Platform (work/stonehenge_wiki/platform.py)
 
 - `HEAD` 在当前服务端口返回 `501`（标准 HTTP 行为，非功能故障）
 - Office 旧格式依赖外部转换能力（未安装 `soffice` 时会降级读取策略）
-- 演示物文件仍按历史约定使用 `.pptx` 后缀，属于产物格式属性，不代表页面文案强制展示“PPT”字样
+- 演示物文件仍按历史约定使用 `.pptx` 后缀，属于产物格式属性，不代表页面文案要展示对应缩写
 - 文件系统与 token 配置由 `.env` 和环境变量共同控制，建议仅在受控环境下设置高权限 token
 
 ---
@@ -292,8 +294,46 @@ Stonehenge Wiki Platform (work/stonehenge_wiki/platform.py)
 - [x] 来源治理与隔离机制
 - [x] 审计与治理报告
 - [x] 就绪度门禁与评估报告
+- [x] opencode 独立 LLM agent 配置与 Hermes DeepSeek 复用
 - [x] Web 页面“工作台”与“Stonehenge Wiki”命名统一
 
 ---
 
-该文档与现有实现一一对应，后续如有字段命名或路由变更，请同步更新本文件“接口与能力映射”与“安全与权限”章节。
+## 12. 三人协作分工
+
+项目按三条 owner 线维护，详细项目级计划见仓库根目录 `DESIGN.md`。
+
+### 12.1 平台/API/安全 owner
+
+负责 `platform.py`、`server.py`、`store.py`、`security.py`、`source_risk.py`、`importer.py`、`config.py` 和 `Permission.json`。该 owner 对 REST API 契约、token scope、SQLite schema、来源隔离、安全审计和 readiness 关键门禁负责。
+
+### 12.2 Web Console/产品体验 owner
+
+负责 `web/index.html`、`web/app.js`、`web/styles.css`、favicon 和页面信息架构。该 owner 对 Ask、Wiki、Workbench、Raw、Agents、Governance、Audit 的可见状态、响应式布局、树状知识库、知识图谱和错误提示负责。
+
+### 12.3 CLI/Skill/质量与发布 owner
+
+负责 `work/skills/stonehenge-wiki/`、Rust CLI、`INSTRUCTION.md`、顶层 `DESIGN.md`、测试矩阵、release bundle 和 GitHub 发布。该 owner 确保公开 CLI 只调用 REST API，不与 Python 本地实现交互。
+
+### 12.4 协作门禁
+
+- API、schema、安全、鉴权、输出格式变更必须跨 owner review。
+- UI 新能力必须有 API 契约和测试覆盖。
+- CLI 参数变更必须同步 skill 文档、运行说明和 smoke test。
+- 每个里程碑必须保留验证命令、截图或报告路径。
+
+---
+
+## 13. 未来里程碑摘要
+
+| 里程碑 | 目标 | 主要交付 |
+| --- | --- | --- |
+| M1 项目工程化 | 让 3 人稳定协作 | CI、CONTRIBUTING、CHANGELOG、PR 模板、API contract |
+| M2 知识运营闭环 | 从导入到治理、预览、编译、问答闭环 | 来源详情、版本历史、原始源预览、图谱边类型 |
+| M3 安全与治理增强 | 企业可验收安全能力 | 风险分级、source review、token scope、审计导出 |
+| M4 工作台成熟化 | 日常可用的问答和生成工作台 | 历史记录、证据展开、LLM 连接测试、配置回滚 |
+| M5 发布与生产化 | 可交付版本和运维手册 | CLI release artifact、部署手册、备份恢复、性能基线 |
+
+---
+
+该文档与现有实现一一对应，后续如有字段命名、路由变更、owner 调整或里程碑变化，请同步更新本文件“接口与能力映射”“安全与权限”“三人协作分工”章节。

@@ -22,7 +22,11 @@ stonehenge-wiki/.state/wiki.sqlite
 
 受保护 API 可通过 `stonehenge-wiki/.env` 启用。复制 `.env.example` 为 `.env`，填入 `STONEHENGE_WIKI_API_TOKEN` 和 `STONEHENGE_WIKI_READ_TOKEN` 后，CLI、HTTP API、skill wrapper 和 readiness 检查都会自动加载；shell 中已经存在的同名环境变量优先。
 
-来源注册表支持 `active`、`quarantined`、`missing` 状态。`quarantined` 来源仍保留路径、hash、版本和风险记录，但不会进入问答、PPT 生成和编译后的 `wiki/` 知识面。命中 `Permission.json.file.deny` 的来源会被策略自动隔离。
+来源注册表支持 `active`、`quarantined`、`missing` 状态。`quarantined` 来源仍保留路径、hash、版本和风险记录，但不会进入问答、工作台生成和编译后的 `wiki/` 知识面。命中 `Permission.json.file.deny` 的来源会被策略自动隔离。
+
+## LLM Agent
+
+`config.json` 中的 `llm.agents` 支持独立 agent 配置。当前默认 agent 为 `opencode`，通过 `~/.hermes/.env` 读取 `DEEPSEEK_API_KEY`，provider 标记为 `opencode-hermes-deepseek`。Rust CLI 仍然只调用 REST API，不直接调用 opencode 或 Python。
 
 ## 编译型 Wiki
 
@@ -47,12 +51,11 @@ stonehenge-wiki/.state/wiki.sqlite
 
 ```bash
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --readiness-report --group group-demo
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --readiness-report --group group-demo --readiness-fail-on fail
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-readiness-report --group group-demo
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-release-bundle --group group-demo
 ```
 
-导出的 Markdown 和 JSON 报告位于 `output/reports/readiness-report.*`。该报告以 pass/warn/fail 方式检查题组数量、权限安全、compiled wiki、no-RAG 架构、来源隔离、修复输出、审计、LLM 和 API token scope。`--readiness-fail-on fail|warn` 可作为 CI 门禁；release bundle 位于 `output/releases/`，只包含报告、题组、答案和 compiled wiki，不包含原始 `docs/` 或 `.state/wiki.sqlite`。
+导出的 Markdown 和 JSON 报告位于 `output/reports/readiness-report.*`。该报告以 pass/warn/fail 方式检查题组数量、权限安全、compiled wiki、no-RAG 架构、来源隔离、修复输出、审计、LLM 和 API token scope。release bundle 位于 `output/releases/`，只包含报告、题组、答案和 compiled wiki，不包含原始 `docs/` 或 `.state/wiki.sqlite`。
 
 ## 批注/TODO
 
