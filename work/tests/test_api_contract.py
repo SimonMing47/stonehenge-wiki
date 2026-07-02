@@ -80,7 +80,8 @@ class ApiContractTest(unittest.TestCase):
         self.assertEqual(scopes[("GET", "/health")], "public")
         self.assertEqual(scopes[("GET", "/api/contract")], "read")
         self.assertEqual(scopes[("GET", "/llm/config")], "admin")
-        self.assertEqual(scopes[("POST", "/ask")], "read")
+        self.assertEqual(scopes[("POST", "/ask")], "public")
+        self.assertEqual(scopes[("POST", "/explain")], "public")
         self.assertEqual(scopes[("POST", "/llm/test")], "admin")
 
     def test_server_request_field_extraction_tracks_aliases(self) -> None:

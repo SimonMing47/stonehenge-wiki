@@ -170,7 +170,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 ### 5.1 双令牌模型
 
 - `STONEHENGE_WIKI_API_TOKEN`：管理员操作（导入、重建、编译、题组执行、生成输出、导出）
-- `STONEHENGE_WIKI_READ_TOKEN`：只读操作（查看索引、审计、问答、治理结果）
+- `STONEHENGE_WIKI_READ_TOKEN`：只读操作（查看索引、审计、治理结果；问答与解释默认公开）
 - 无 token 时按配置支持公开读写（默认不推荐）
 - API 均以 `X-STONEHENGE-WIKI-TOKEN` 头传入
 

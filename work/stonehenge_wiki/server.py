@@ -159,7 +159,7 @@ class PlatformHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        required_scope = "read" if parsed.path in {"/ask", "/explain"} else "admin"
+        required_scope = "public" if parsed.path in {"/ask", "/explain"} else "admin"
         if not self.ensure_authorized(required_scope):
             return
         body = self.read_json()
@@ -251,6 +251,8 @@ class PlatformHandler(BaseHTTPRequestHandler):
         config = self.stonehenge_wiki_platform.config
         admin_token = config.api_token
         read_token = config.api_read_token
+        if required_scope == "public":
+            return None
         if not admin_token and not read_token:
             return None
 

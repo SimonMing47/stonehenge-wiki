@@ -237,7 +237,7 @@ ROUTES: list[dict[str, Any]] = [
     {
         "method": "POST",
         "path": "/ask",
-        "scope": "read",
+        "scope": "public",
         "category": "qa",
         "summary": "Answer one question through the compiled wiki knowledge layer.",
         "body": {
@@ -250,7 +250,7 @@ ROUTES: list[dict[str, Any]] = [
     {
         "method": "POST",
         "path": "/explain",
-        "scope": "read",
+        "scope": "public",
         "category": "qa",
         "summary": "Explain retrieval, safety, and evidence routing for one question.",
         "body": {

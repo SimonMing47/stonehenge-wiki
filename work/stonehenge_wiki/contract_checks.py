@@ -214,11 +214,11 @@ def extract_server_scopes(server_path: Path | None = None) -> dict[tuple[str, st
                     for path in paths:
                         scopes[("GET", path)] = scope
         if isinstance(node, ast.FunctionDef) and node.name == "do_POST":
-            read_paths = extract_post_read_scope_paths(node)
+            non_admin_scopes = extract_post_non_admin_scopes(node)
             for statement in node.body:
                 if isinstance(statement, ast.If):
                     for path in extract_paths_from_test(statement.test):
-                        scopes[("POST", path)] = "read" if path in read_paths else "admin"
+                        scopes[("POST", path)] = non_admin_scopes.get(path, "admin")
     return scopes
 
 
@@ -231,7 +231,8 @@ def extract_ensure_authorized_scope(statements: list[ast.stmt]) -> str | None:
     return None
 
 
-def extract_post_read_scope_paths(function: ast.FunctionDef) -> set[str]:
+def extract_post_non_admin_scopes(function: ast.FunctionDef) -> dict[str, str]:
+    scopes: dict[str, str] = {}
     for statement in function.body:
         if not isinstance(statement, ast.Assign):
             continue
@@ -239,12 +240,14 @@ def extract_post_read_scope_paths(function: ast.FunctionDef) -> set[str]:
             continue
         if not isinstance(statement.value, ast.IfExp):
             continue
-        if constant_string(statement.value.body) != "read":
+        scope = constant_string(statement.value.body)
+        if scope not in {"read", "public"}:
             continue
         if constant_string(statement.value.orelse) != "admin":
             continue
-        return extract_paths_from_test(statement.value.test)
-    return set()
+        for path in extract_paths_from_test(statement.value.test):
+            scopes[path] = scope
+    return scopes
 
 
 def extract_server_request_fields(server_path: Path | None = None) -> dict[tuple[str, str], dict[str, set[str]]]:
