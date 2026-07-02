@@ -87,6 +87,16 @@ class StonehengeWikiPlatform:
         except (TypeError, ValueError):
             return fallback
 
+    def _coerce_runtime_mode(self, value: Any, fallback: str = "api") -> str:
+        mode = str(value).strip().lower() if isinstance(value, str) else str(fallback)
+        if not mode:
+            mode = str(fallback)
+        return mode if mode in {"api", "opencode"} else (str(fallback) if str(fallback) in {"api", "opencode"} else "api")
+
+    def _coerce_runtime_command(self, value: Any, fallback: str = "") -> str:
+        command = str(value).strip() if isinstance(value, str) else str(value).strip()
+        return command if command else fallback
+
     def rebuild_index(self) -> dict[str, Any]:
         self.full_index.build()
         policy_result: dict[str, Any] = {"quarantined": []}
@@ -674,6 +684,8 @@ class StonehengeWikiPlatform:
         return {
             "llm": {
                 "enabled": bool(default_config.enabled if isinstance(default_config, LLMConfig) else self.config.llm.enabled),
+                "runtime_mode": default_config.runtime_mode if isinstance(default_config, LLMConfig) else self.config.llm.runtime_mode,
+                "runtime_command": default_config.runtime_command if isinstance(default_config, LLMConfig) else self.config.llm.runtime_command,
                 "default_agent": self.llm_default_agent,
                 "agents": {
                     name: llm_config_to_dict(name, agent)
@@ -763,6 +775,10 @@ class StonehengeWikiPlatform:
         enabled = bool(payload.get("enabled", self.config.llm.enabled))
         default_agent = str(payload.get("default_agent", self.config.llm_default_agent) or self.config.llm_default_agent)
         category_agents = payload.get("category_agents", self.config.llm_category_agents)
+        global_runtime_mode = self._coerce_runtime_mode(payload.get("runtime_mode"), self.config.llm.runtime_mode)
+        global_runtime_command = self._coerce_runtime_command(payload.get("runtime_command"), self.config.llm.runtime_command)
+        if global_runtime_mode == "opencode" and not global_runtime_command:
+            return {"status": "error", "error": "runtime_command_required_for_opencode"}
         if not isinstance(category_agents, dict):
             return {"status": "error", "error": "invalid_category_agents"}
 
@@ -783,6 +799,16 @@ class StonehengeWikiPlatform:
         for agent_name, agent_body in agents.items():
             if not isinstance(agent_name, str) or not isinstance(agent_body, dict):
                 continue
+            runtime_mode = self._coerce_runtime_mode(
+                agent_body.get("runtime_mode", global_runtime_mode),
+                global_runtime_mode,
+            )
+            runtime_command = self._coerce_runtime_command(
+                agent_body.get("runtime_command", global_runtime_command),
+                global_runtime_command,
+            )
+            if runtime_mode == "opencode" and not runtime_command:
+                return {"status": "error", "error": f"runtime_command_required_for_agent:{agent_name}"}
             raw_enabled = bool(agent_body.get("enabled", enabled))
             raw_env_file = agent_body.get("env_file", "")
             serialized = llm_config_to_dict(
@@ -798,9 +824,13 @@ class StonehengeWikiPlatform:
                     max_context_chars=self._coerce_int(agent_body.get("max_context_chars", 12000), 12000),
                     max_tokens=self._coerce_int(agent_body.get("max_tokens", 800), 800),
                     temperature=self._coerce_float(agent_body.get("temperature", 0.1), 0.1),
+                    runtime_mode=runtime_mode,
+                    runtime_command=runtime_command,
                 ),
             )
             serialized["enabled"] = bool(serialized.get("enabled"))
+            serialized["runtime_mode"] = runtime_mode
+            serialized["runtime_command"] = runtime_command
             serialized_agents[agent_name] = serialized
 
         if not serialized_agents:
@@ -835,6 +865,8 @@ class StonehengeWikiPlatform:
         default_client = cleaned_agents.get(default_agent, {})
         base.update({
             "enabled": enabled,
+            "runtime_mode": global_runtime_mode,
+            "runtime_command": global_runtime_command,
             "agents": cleaned_agents,
             "default_agent": default_agent,
             "category_agents": normalized_category_agents,

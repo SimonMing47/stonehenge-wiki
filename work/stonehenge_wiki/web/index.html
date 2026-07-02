@@ -242,7 +242,19 @@
             <div class="surface source-detail-pane">
               <div class="section-head">
                 <h2 data-i18n="sources.detail_title">Source Detail</h2>
-                <span id="sourceDetailStatus" data-i18n="sources.detail_hint">Select a source</span>
+                <div class="source-detail-toolbar row-actions compact">
+                  <label class="inline-field">
+                    <span data-i18n="sources.preview_chars">Preview chars</span>
+                    <select id="sourcePreviewChars">
+                      <option value="2000">2,000</option>
+                      <option value="8000" selected>8,000</option>
+                      <option value="16000">16,000</option>
+                      <option value="20000">20,000</option>
+                    </select>
+                  </label>
+                  <button id="refreshSourceDetailBtn" type="button" data-i18n="status.refresh">Refresh</button>
+                  <span id="sourceDetailStatus" data-i18n="sources.detail_hint">Select a source</span>
+                </div>
               </div>
               <div id="sourceDetail" class="source-detail">
                 <span class="muted" data-i18n="sources.detail_hint">Select a source</span>

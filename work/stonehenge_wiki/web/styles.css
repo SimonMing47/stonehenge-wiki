@@ -374,6 +374,30 @@ h3 {
   grid-column: 1 / -1;
 }
 
+.source-detail-toolbar {
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.source-detail-toolbar .inline-field {
+  padding: 6px 10px;
+  min-height: 34px;
+}
+
+.source-detail-toolbar .inline-field select {
+  min-width: 110px;
+}
+
+.source-detail-meta-note {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .agents-layout {
   margin-top: 14px;
   grid-template-columns: 1.15fr 0.85fr;

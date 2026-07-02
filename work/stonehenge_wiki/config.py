@@ -19,6 +19,8 @@ class LLMConfig:
     max_context_chars: int = 12000
     max_tokens: int = 800
     temperature: float = 0.1
+    runtime_mode: str = "api"
+    runtime_command: str = ""
 
 
 @dataclass(frozen=True)
@@ -112,6 +114,8 @@ def load_config(wiki_root: Path) -> PlatformConfig:
             max_context_chars=int(llm.get("max_context_chars", 12000)),
             max_tokens=int(llm.get("max_tokens", 800)),
             temperature=float(llm.get("temperature", 0.1)),
+            runtime_mode=str(llm.get("runtime_mode", base_profile.runtime_mode)).strip() or "api",
+            runtime_command=str(llm.get("runtime_command", base_profile.runtime_command)).strip(),
         ),
         llm_agents=llm_agents,
         llm_default_agent=raw_default_agent,
@@ -163,6 +167,9 @@ def _build_llm_config(payload: dict[str, Any], fallback: dict[str, Any]) -> LLMC
         **fallback,
         **{str(key): value for key, value in payload.items() if isinstance(key, str)},
     }
+    runtime_mode = str(merged.get("runtime_mode", fallback.get("runtime_mode", "api"))).strip() or "api"
+    if runtime_mode not in {"api", "opencode"}:
+        runtime_mode = str(fallback.get("runtime_mode", "api"))
     return LLMConfig(
         enabled=bool(merged.get("enabled", fallback.get("enabled", False))),
         provider=str(merged.get("provider", fallback.get("provider", ""))),
@@ -174,6 +181,8 @@ def _build_llm_config(payload: dict[str, Any], fallback: dict[str, Any]) -> LLMC
         max_context_chars=int(merged.get("max_context_chars", fallback.get("max_context_chars", 12000))),
         max_tokens=int(merged.get("max_tokens", fallback.get("max_tokens", 800))),
         temperature=float(merged.get("temperature", fallback.get("temperature", 0.1))),
+        runtime_mode=runtime_mode,
+        runtime_command=str(merged.get("runtime_command", fallback.get("runtime_command", ""))).strip(),
     )
 
 
@@ -190,4 +199,6 @@ def llm_config_to_dict(name: str, config: LLMConfig) -> dict[str, Any]:
         "max_context_chars": config.max_context_chars,
         "max_tokens": config.max_tokens,
         "temperature": config.temperature,
+        "runtime_mode": config.runtime_mode,
+        "runtime_command": config.runtime_command,
     }
