@@ -267,8 +267,11 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 - 健康检查：`curl http://127.0.0.1:8765/health`
 - 可回归验证：
   - `python3 -m compileall -q work`
-  - `PYTHONPATH=work python3 -m unittest discover -s work/tests -v`（若有测试）
+  - `PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks`
+  - `PYTHONPATH=work python3 -m unittest discover -s work/tests -q`
+  - `cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check`
   - `cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml`
+  - `./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh`
   - `./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health`
 
 ---

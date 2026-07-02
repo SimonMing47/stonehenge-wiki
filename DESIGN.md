@@ -461,7 +461,9 @@ Rust CLI 的职责是把命令行参数翻译为 HTTP 请求：
 
 ```bash
 python3 -m compileall -q work
-PYTHONPATH=work python3 -m unittest -q work/tests/test_platform_smoke.py
+PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks
+PYTHONPATH=work python3 -m unittest discover -s work/tests -q
+cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check
 cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 ./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
@@ -474,7 +476,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 **范围**
 
 - 统一 `CONTRIBUTING.md`、`CHANGELOG.md`、版本策略。
-- 增加 GitHub Actions：Python smoke、Rust test、diff check。
+- 增加 GitHub Actions：Python smoke、API contract、Rust fmt/test、skill build。
 - 建立 issue/PR 模板。
 - 梳理 API contract 表，形成兼容规则。
 - 清理所有过期文档命令。
@@ -638,7 +640,9 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 | 类型 | 命令/动作 | 负责人 | 频率 |
 | --- | --- | --- | --- |
 | Python 语法 | `python3 -m compileall -q work` | C | 每 PR |
-| 平台 smoke | `PYTHONPATH=work python3 -m unittest -q work/tests/test_platform_smoke.py` | C | 每 PR |
+| API contract | `PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks` | A/C | 每 PR |
+| 平台 smoke | `PYTHONPATH=work python3 -m unittest discover -s work/tests -q` | C | 每 PR |
+| Rust fmt | `cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check` | C | 每 PR |
 | Rust CLI | `cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml` | C | 每 PR |
 | Skill build | `./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh` | C | 每 PR |
 | REST health | `./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health` | A/C | 每 PR |
@@ -682,9 +686,9 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 
 ### P0
 
-- 给 REST API route contract 增加一致性检查脚本。
+- 给 REST API route contract 增加更深的 scope/schema 一致性检查。
 - 给 README/INSTRUCTION/DESIGN 增加一致性检查脚本。
-- 增加 GitHub Actions，自动运行 Python smoke 和 Rust CLI 测试。
+- 扩展 GitHub Actions，增加 release bundle 和 browser smoke 的可选门禁。
 
 ### P1
 

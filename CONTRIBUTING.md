@@ -14,7 +14,9 @@
 
 ```bash
 python3 -m compileall -q work
-PYTHONPATH=work python3 -m unittest -q work/tests/test_platform_smoke.py
+PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks
+PYTHONPATH=work python3 -m unittest discover -s work/tests -q
+cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check
 cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 ./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health

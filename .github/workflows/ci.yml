@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  verify:
+    name: Python and Rust verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python test dependencies
+        run: python -m pip install --upgrade pip openpyxl
+
+      - name: Compile Python modules
+        run: python -m compileall -q work
+
+      - name: Verify REST API contract
+        env:
+          PYTHONPATH: work
+        run: python -m stonehenge_wiki.contract_checks
+
+      - name: Run Python smoke tests
+        env:
+          PYTHONPATH: work
+        run: python -m unittest discover -s work/tests -q
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
+
+      - name: Build skill CLI
+        run: ./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
