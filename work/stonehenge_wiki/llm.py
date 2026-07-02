@@ -90,6 +90,34 @@ class LLMClient:
             sources=[record.rel_path for record in records],
         )
 
+    def test_completion(self) -> str:
+        if not self.ready:
+            raise RuntimeError("LLM client is not ready")
+        payload = {
+            "model": self.config.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "你是 Stonehenge Wiki 的 LLM 连接测试器。只回复 OK。",
+                },
+                {
+                    "role": "user",
+                    "content": "只回复 OK",
+                },
+            ],
+            "temperature": 0,
+            "max_tokens": max(1, min(int(self.config.max_tokens or 16), 16)),
+        }
+        data = self.post_json("/chat/completions", payload)
+        choices = data.get("choices", [])
+        if not choices:
+            raise RuntimeError("LLM test returned no choices")
+        message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+        text = redact_sensitive_text(str(message.get("content", "")).strip())
+        if not text:
+            raise RuntimeError("LLM test returned empty content")
+        return text[:120]
+
     def post_json(self, endpoint: str, payload: dict) -> dict:
         base = self.config.base_url.rstrip("/")
         request = urllib.request.Request(

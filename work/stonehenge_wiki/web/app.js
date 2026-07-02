@@ -100,6 +100,7 @@ const I18N = {
     "agents.category_map": "分类映射",
     "agents.add": "新增代理",
     "agents.save": "保存配置",
+    "agents.test": "测试连接",
     "agents.add_mapping": "新增映射",
     "agents.default_fallback": "fallback",
     "agents.provider": "模型服务",
@@ -139,6 +140,9 @@ const I18N = {
     "audit.subtitle": "最近事件",
     "status.saving": "保存中",
     "status.saved": "已保存",
+    "status.testing": "测试中",
+    "status.test_ok": "连接正常",
+    "status.test_failed": "连接失败",
     "status.not_loaded": "未加载",
     "status.loading": "加载中",
     "status.preview": "预览",
@@ -291,6 +295,7 @@ const I18N = {
     "agents.category_map": "Category mapping",
     "agents.add": "Add Agent",
     "agents.save": "Save",
+    "agents.test": "Test",
     "agents.add_mapping": "Add Mapping",
     "agents.default_fallback": "fallback",
     "agents.provider": "Provider",
@@ -330,6 +335,9 @@ const I18N = {
     "audit.subtitle": "latest events",
     "status.saving": "Saving",
     "status.saved": "Saved",
+    "status.testing": "Testing",
+    "status.test_ok": "Connected",
+    "status.test_failed": "Connection failed",
     "status.not_loaded": "Not loaded",
     "status.loading": "Loading",
     "status.preview": "Preview",
@@ -599,8 +607,14 @@ function llmAgentRow(name, data) {
   return `
     <div class="agent-row" data-agent-row="${escapeHtml(name)}">
       <div class="agent-row-head">
-        <strong>${escapeHtml(name)}</strong>
-        <button type="button" data-remove-agent="${escapeHtml(name)}" class="agent-remove-btn">${translate("agents.remove")}</button>
+        <div class="agent-heading">
+          <strong>${escapeHtml(name)}</strong>
+          <span class="agent-test-status" data-agent-test-status></span>
+        </div>
+        <div class="row-actions compact">
+          <button type="button" data-test-agent="${escapeHtml(name)}">${translate("agents.test")}</button>
+          <button type="button" data-remove-agent="${escapeHtml(name)}" class="agent-remove-btn">${translate("agents.remove")}</button>
+        </div>
       </div>
       <div class="agent-fields">
         <label>
@@ -727,6 +741,44 @@ async function saveLlmConfig() {
     el("llmConfigStatus").textContent = `${translate("status.failed")} · ${error.message}`;
   } finally {
     setBusy("saveAgentsBtn", false);
+  }
+}
+
+async function testLlmAgent(target) {
+  const row = target.closest(".agent-row");
+  if (!row) return;
+  const agentName = row.dataset.agentRow || "";
+  const status = row.querySelector("[data-agent-test-status]");
+  target.disabled = true;
+  if (status) {
+    status.className = "agent-test-status";
+    status.textContent = translate("status.testing");
+  }
+  try {
+    const result = await api("/llm/test", {
+      method: "POST",
+      body: JSON.stringify({ agent_name: agentName, live: true }),
+    });
+    if (status) {
+      const missing = Array.isArray(result.missing) && result.missing.length ? ` · ${result.missing.join(", ")}` : "";
+      status.className = `agent-test-status ${result.status === "ok" ? "ok" : "fail"}`;
+      status.textContent =
+        result.status === "ok"
+          ? `${translate("status.test_ok")} · ${result.model || agentName}`
+          : `${translate("status.test_failed")} · ${result.error || translate("status.unknown")}${missing}`;
+    }
+    el("llmConfigStatus").textContent =
+      result.status === "ok"
+        ? `${translate("status.test_ok")} · ${agentName}`
+        : `${translate("status.test_failed")} · ${agentName}`;
+  } catch (error) {
+    if (status) {
+      status.className = "agent-test-status fail";
+      status.textContent = `${translate("status.test_failed")} · ${error.message}`;
+    }
+    el("llmConfigStatus").textContent = `${translate("status.test_failed")} · ${error.message}`;
+  } finally {
+    target.disabled = false;
   }
 }
 
@@ -1933,6 +1985,11 @@ document.addEventListener("click", (event) => {
   const removeAgentBtn = event.target.closest("[data-remove-agent]");
   if (removeAgentBtn) {
     removeAgentRow(removeAgentBtn);
+    return;
+  }
+  const testAgentBtn = event.target.closest("[data-test-agent]");
+  if (testAgentBtn) {
+    testLlmAgent(testAgentBtn);
     return;
   }
   const removeCategoryBtn = event.target.closest("[data-remove-category]");

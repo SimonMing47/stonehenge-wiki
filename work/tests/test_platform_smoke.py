@@ -16,7 +16,7 @@ from urllib.parse import quote
 from stonehenge_wiki.extractors import extract_docx
 from stonehenge_wiki.answerer import QuestionAnswerer
 from stonehenge_wiki.cli import main as cli_main
-from stonehenge_wiki.llm import LLMAnswer, build_context
+from stonehenge_wiki.llm import LLMAnswer, LLMClient, build_context
 from stonehenge_wiki.indexer import WikiIndex
 from stonehenge_wiki.models import Question
 from stonehenge_wiki.office_bridge import convert_office, has_soffice
@@ -1121,6 +1121,64 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("SELECT * FROM documents", text)
             self.assertNotIn("llm:", text)
 
+    def test_llm_agent_diagnostics_api_and_live_probe_without_secret_leak(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-llm-agent-test-") as tmp:
+            root = Path(tmp)
+            wiki = root / "stonehenge-wiki"
+            docs = wiki / "docs" / "04_常用命令"
+            docs.mkdir(parents=True)
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "database.md").write_text("SQLite SELECT 查询资料\n", encoding="utf-8")
+            (wiki / "config.json").write_text(
+                json.dumps(
+                    {
+                        "llm": {
+                            "enabled": True,
+                            "default_agent": "default",
+                            "agents": {
+                                "default": {
+                                    "enabled": True,
+                                    "provider": "fake-openai-compatible",
+                                    "model": "fake-model",
+                                    "base_url": "https://example.invalid/v1",
+                                    "api_key_env": "STONEHENGE_TEST_LLM_KEY",
+                                    "timeout_seconds": 5,
+                                }
+                            },
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            with temporary_env({"STONEHENGE_TEST_LLM_KEY": "fake-test-secret-value"}):
+                platform = StonehengeWikiPlatform.from_wiki_root(wiki)
+                dry_run = platform.test_llm_agent("default", live=False)
+                platform.llm_clients["default"] = ProbeLLMClient(platform.config.llm_agents["default"])
+                live = platform.test_llm_agent("default", live=True)
+                missing = platform.test_llm_agent("missing", live=False)
+
+                httpd = build_server(platform, "127.0.0.1", 0)
+                thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                    api_live = json.loads(http_post(base + "/llm/test", {"agent_name": "default", "live": True}))
+                    events = json.loads(http_get(base + "/audit?limit=5"))["events"]
+                finally:
+                    httpd.shutdown()
+                    httpd.server_close()
+                    thread.join(timeout=5)
+
+            self.assertEqual(dry_run["status"], "ok")
+            self.assertTrue(dry_run["checks"]["api_key_present"])
+            self.assertNotIn("fake-test-secret-value", json.dumps(dry_run, ensure_ascii=False))
+            self.assertEqual(live["reply_preview"], "OK")
+            self.assertEqual(api_live["reply_preview"], "OK")
+            self.assertEqual(missing["error"], "agent_not_found")
+            self.assertTrue(any(event["event_type"] == "llm.test" for event in events))
+
     @unittest.skipUnless(has_soffice(), "LibreOffice/soffice is not installed")
     def test_legacy_doc_repair_via_libreoffice_bridge(self) -> None:
         with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-legacy-test-") as tmp:
@@ -1344,6 +1402,13 @@ class FakeLLMClient:
             model=self.model,
             sources=[record.rel_path for record in records],
         )
+
+
+class ProbeLLMClient(LLMClient):
+    def post_json(self, endpoint: str, payload: dict) -> dict:
+        self.endpoint = endpoint
+        self.payload = payload
+        return {"choices": [{"message": {"content": "OK"}}]}
 
 
 class FailingLLMClient:

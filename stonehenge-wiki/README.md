@@ -28,6 +28,12 @@ stonehenge-wiki/.state/wiki.sqlite
 
 `config.json` 中的 `llm.agents` 支持独立 agent 配置。当前默认 agent 为 `opencode`，通过 `~/.hermes/.env` 读取 `DEEPSEEK_API_KEY`，provider 标记为 `opencode-hermes-deepseek`。Rust CLI 仍然只调用 REST API，不直接调用 opencode 或 Python。
 
+可通过 REST CLI 测试 agent 配置和真实连接：
+
+```bash
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --test-llm-agent opencode --test-llm-live
+```
+
 ## 编译型 Wiki
 
 `AGENTS.md` 定义 wiki schema。运行：

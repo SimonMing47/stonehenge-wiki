@@ -282,6 +282,7 @@ opencode models hermes-deepseek
 python3 -m json.tool stonehenge-wiki/config.json >/dev/null
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
 curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --test-llm-agent opencode --test-llm-live
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --ask "SQLite SELECT 命令是什么"
 ```
 
@@ -313,6 +314,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 - `GET /files/output/...`：下载生成物，例如工作台演示文件
 - `POST /ask`：单问，JSON body 示例 `{"id":"api-1","title":"统计 docx 文件数量","level":"简单"}`
 - `POST /explain`：查看一次问题的检索证据、安全路由和匹配片段，JSON body 示例 `{"id":"trace-1","title":"SQLite SELECT 命令是什么","level":"中等"}`
+- `POST /llm/test`：测试 LLM agent 配置或真实连接，JSON body 示例 `{"agent_name":"opencode","live":true}`
 - `POST /groups/run`：运行题组，JSON body 示例 `{"groups":["group-1"]}`
 - `POST /sources/import`：导入本地文件或公开 URL，JSON body 示例 `{"source":"https://example.com/page.html","title":"网页资料","category":"00_inbox"}`
 - `POST /sources/status`：隔离或恢复来源，JSON body 示例 `{"path":"docs/00_inbox/risky.md","status":"quarantined","reason":"prompt injection review"}`

@@ -213,6 +213,10 @@ class PlatformHandler(BaseHTTPRequestHandler):
             )
         if parsed.path == "/llm/config":
             return self.write_json(self.stonehenge_wiki_platform.update_llm_config(body))
+        if parsed.path == "/llm/test":
+            agent_name = str(body.get("agent_name", body.get("agent", "")))
+            live = bool(body.get("live", False))
+            return self.write_json(self.stonehenge_wiki_platform.test_llm_agent(agent_name=agent_name, live=live))
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
     def ensure_authorized(self, required_scope: str) -> bool:

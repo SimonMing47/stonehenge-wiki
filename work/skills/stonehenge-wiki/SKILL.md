@@ -92,6 +92,7 @@ Validate agent wiring before answering LLM-backed questions:
 opencode models hermes-deepseek
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
 curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --test-llm-agent opencode --test-llm-live
 ```
 
 The Rust CLI remains a REST API client. It must not call Python or opencode directly.

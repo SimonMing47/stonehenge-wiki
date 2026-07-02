@@ -14,7 +14,7 @@ from .config import LLMConfig, PlatformConfig, llm_config_to_dict, load_config
 from .evaluation import build_evaluation_report
 from .indexer import WikiIndex
 from .importer import SourceImportError, import_source
-from .llm import LLMClient
+from .llm import LLMClient, redact_sensitive_text
 from .models import Question
 from .presentations import create_presentation
 from .readiness import build_readiness_report
@@ -612,6 +612,73 @@ class StonehengeWikiPlatform:
                 for source in self.list_sources(include_missing=True)
             }),
         }
+
+    def test_llm_agent(self, agent_name: str = "", live: bool = False) -> dict[str, Any]:
+        requested = (agent_name or self.llm_default_agent or "default").strip()
+        agent_config = self.config.llm_agents.get(requested)
+        if agent_config is None:
+            result = {"status": "error", "error": "agent_not_found", "agent_name": requested}
+            self.audit("llm.test", new_request_id(), requested or "llm", "blocked", True, result)
+            return result
+
+        client = self.llm_clients.get(requested) or LLMClient(agent_config)
+        api_key_present = bool(client.api_key())
+        checks = {
+            "enabled": bool(agent_config.enabled),
+            "provider": bool(agent_config.provider),
+            "model": bool(agent_config.model),
+            "base_url": bool(agent_config.base_url),
+            "api_key_env": bool(agent_config.api_key_env),
+            "api_key_present": api_key_present,
+        }
+        missing = [key for key, passed in checks.items() if not passed]
+        ready = bool(client.ready)
+        result: dict[str, Any] = {
+            "status": "ok" if ready else "error",
+            "agent_name": requested,
+            "default_agent": self.llm_default_agent,
+            "live": bool(live),
+            "ready": ready,
+            "provider": agent_config.provider,
+            "model": agent_config.model,
+            "base_url": agent_config.base_url,
+            "api_key_env": agent_config.api_key_env,
+            "env_file": str(agent_config.env_file) if agent_config.env_file else "",
+            "checks": checks,
+            "missing": missing,
+        }
+        if not ready:
+            result["error"] = "agent_not_ready"
+
+        if live:
+            if not ready:
+                result["error"] = "agent_not_ready"
+            else:
+                try:
+                    result["reply_preview"] = client.test_completion()
+                except Exception as exc:
+                    result["status"] = "error"
+                    result["ready"] = False
+                    result["error"] = "live_request_failed"
+                    result["detail"] = redact_sensitive_text(str(exc))[:300]
+
+        self.audit(
+            event_type="llm.test",
+            request_id=new_request_id(),
+            subject=requested,
+            status="ok" if result.get("status") == "ok" else "blocked",
+            blocked=result.get("status") != "ok",
+            payload={
+                "agent_name": requested,
+                "live": bool(live),
+                "ready": bool(result.get("ready")),
+                "provider": agent_config.provider,
+                "model": agent_config.model,
+                "missing": missing,
+                "error": result.get("error", ""),
+            },
+        )
+        return result
 
     def update_llm_config(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):

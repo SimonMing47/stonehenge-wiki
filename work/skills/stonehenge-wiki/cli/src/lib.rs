@@ -125,6 +125,8 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
     let mut reason = "".to_string();
     let mut actor = "cli".to_string();
     let mut include_evaluation = false;
+    let mut llm_test_agent: Option<String> = None;
+    let mut llm_test_live = false;
     let mut ask_question: Option<String> = None;
     let mut explain_question: Option<String> = None;
     let mut import_source: Option<String> = None;
@@ -181,6 +183,12 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
             "--governance-report" => selected = Some(get("/reports/governance")),
             "--readiness-report" => selected = Some(get("/reports/readiness")),
             "--audit-log" => selected = Some(get("/audit")),
+            "--test-llm-agent" => {
+                index += 1;
+                let value = required_value(args, index, "--test-llm-agent")?;
+                llm_test_agent = Some(value.to_string());
+            }
+            "--test-llm-live" => llm_test_live = true,
             "--ask" => {
                 index += 1;
                 let value = required_value(args, index, "--ask")?;
@@ -313,6 +321,16 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
                 r#"{{"topic":{},"slide_count":{}}}"#,
                 json_string(&topic),
                 slide_count
+            ),
+        );
+    }
+    if let Some(agent) = llm_test_agent {
+        action = post(
+            "/llm/test",
+            &format!(
+                r#"{{"agent_name":{},"live":{}}}"#,
+                json_string(&agent),
+                llm_test_live
             ),
         );
     }
@@ -597,6 +615,7 @@ Read commands:
 Write commands:
   --ask QUESTION [--id ID] [--level LEVEL]
   --explain-ask QUESTION [--id ID] [--level LEVEL]
+  --test-llm-agent AGENT [--test-llm-live]
   --reindex
   --import-source PATH_OR_URL [--import-title TITLE] [--import-category CATEGORY]
   --set-source-status PATH --source-status active|quarantined [--source-status-reason REASON]
