@@ -20,6 +20,20 @@ class ApiContractTest(unittest.TestCase):
         self.assertEqual(result["summary"]["errors"], 0)
         self.assertEqual(result["summary"]["warnings"], 0)
         self.assertGreaterEqual(result["summary"]["contract_routes"], 30)
+        self.assertGreaterEqual(result["summary"]["contract_field_metadata"], 40)
+
+    def test_api_contract_fields_are_machine_readable(self) -> None:
+        contract = api_contract()
+        routes = {(route["method"], route["path"]): route for route in contract["routes"]}
+
+        self.assertEqual(contract["schema_version"], 2)
+        self.assertEqual(routes[("GET", "/sources/detail")]["query"]["path"]["required"], True)
+        self.assertEqual(routes[("GET", "/sources/detail")]["query"]["preview_chars"]["type"], "int")
+        self.assertEqual(routes[("GET", "/wiki/search")]["query"]["query"]["alias_for"], "q")
+        self.assertEqual(routes[("GET", "/reports/readiness")]["query"]["groups"]["type"], "string[]")
+        self.assertEqual(routes[("POST", "/sources/status")]["body"]["rel_path"]["alias_for"], "path")
+        self.assertEqual(routes[("POST", "/sources/status")]["body"]["status"]["enum"], ["active", "quarantined"])
+        self.assertEqual(routes[("POST", "/llm/test")]["body"]["agent"]["alias_for"], "agent_name")
 
     def test_contract_shape_rejects_duplicate_routes(self) -> None:
         contract = api_contract()
@@ -27,6 +41,30 @@ class ApiContractTest(unittest.TestCase):
         errors = validate_contract_shape(contract | {"route_count": len(duplicated_routes)}, duplicated_routes)
 
         self.assertTrue(any("duplicate route contract entry" in error for error in errors))
+
+    def test_contract_shape_rejects_unstructured_field_metadata(self) -> None:
+        contract = api_contract()
+        route = dict(contract["routes"][0])
+        route["query"] = {"bad": "optional string"}
+        routes = [route]
+        errors = validate_contract_shape(contract | {"route_count": len(routes)}, routes)
+
+        self.assertTrue(any("query.bad must use structured metadata" in error for error in errors))
+
+    def test_contract_shape_rejects_broken_alias_metadata(self) -> None:
+        contract = api_contract()
+        route = dict(contract["routes"][0])
+        route["query"] = {
+            "alias": {
+                "required": False,
+                "type": "string",
+                "alias_for": "missing",
+            }
+        }
+        routes = [route]
+        errors = validate_contract_shape(contract | {"route_count": len(routes)}, routes)
+
+        self.assertTrue(any("alias_for points to missing field" in error for error in errors))
 
     def test_server_route_extraction_tracks_parameterized_routes(self) -> None:
         routes = extract_server_routes()

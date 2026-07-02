@@ -10,6 +10,7 @@ from .api_contract import ROUTES, api_contract
 
 VALID_METHODS = {"GET", "POST"}
 VALID_SCOPES = {"public", "read", "admin"}
+VALID_FIELD_TYPES = {"string", "int", "bool", "string[]", "string|string[]", "object"}
 PATH_PARAM_PREFIXES = {
     "/assets/{path}": "/assets/",
     "/files/{path}": "/files/",
@@ -85,6 +86,12 @@ def verify_api_contract(repo_root: Path | None = None) -> dict[str, Any]:
             ),
             "contract_cli_flags": len(contract_flags),
             "rust_cli_paths": len(rust_paths),
+            "contract_field_metadata": sum(
+                len(route.get(field_kind, {}))
+                for route in routes
+                for field_kind in ("query", "body")
+                if isinstance(route.get(field_kind, {}), dict)
+            ),
             "errors": len(errors),
             "warnings": len(warnings),
         },
@@ -97,6 +104,8 @@ def validate_contract_shape(contract: dict[str, Any], routes: list[dict[str, Any
     errors: list[str] = []
     if contract.get("route_count") != len(routes):
         errors.append("contract.route_count does not match len(contract.routes)")
+    if contract.get("schema_version") != 2:
+        errors.append("contract.schema_version must be 2 for structured field metadata")
     if contract.get("architecture", {}).get("rag") is not False:
         errors.append("contract.architecture.rag must be false")
     if contract.get("architecture", {}).get("knowledge_mode") != "compiled_wiki":
@@ -123,10 +132,65 @@ def validate_contract_shape(contract: dict[str, Any], routes: list[dict[str, Any
         for field_kind in ("query", "body"):
             if field_kind in route and not isinstance(route[field_kind], dict):
                 errors.append(f"route #{index} {method} {path} has invalid {field_kind} contract")
+            elif isinstance(route.get(field_kind), dict):
+                errors.extend(
+                    validate_field_metadata(
+                        route_index=index,
+                        method=str(method),
+                        path=str(path),
+                        field_kind=field_kind,
+                        fields=route[field_kind],
+                    )
+                )
         key = (str(method), str(path))
         if key in seen:
             errors.append(f"duplicate route contract entry: {method} {path}")
         seen.add(key)
+    return errors
+
+
+def validate_field_metadata(
+    *,
+    route_index: int,
+    method: str,
+    path: str,
+    field_kind: str,
+    fields: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    for field_name, metadata in fields.items():
+        prefix = f"route #{route_index} {method} {path} {field_kind}.{field_name}"
+        if not isinstance(field_name, str) or not field_name:
+            errors.append(f"route #{route_index} {method} {path} has invalid {field_kind} field name")
+            continue
+        if not isinstance(metadata, dict):
+            errors.append(f"{prefix} must use structured metadata")
+            continue
+        required = metadata.get("required")
+        if not isinstance(required, bool):
+            errors.append(f"{prefix}.required must be a boolean")
+        field_type = metadata.get("type")
+        if not isinstance(field_type, str) or not field_type.strip():
+            errors.append(f"{prefix}.type must be a non-empty string")
+        elif field_type not in VALID_FIELD_TYPES:
+            errors.append(f"{prefix}.type is unsupported: {field_type}")
+        description = metadata.get("description")
+        if description is not None and (not isinstance(description, str) or not description.strip()):
+            errors.append(f"{prefix}.description must be a non-empty string when present")
+        alias_for = metadata.get("alias_for")
+        if alias_for is not None:
+            if not isinstance(alias_for, str) or not alias_for.strip():
+                errors.append(f"{prefix}.alias_for must be a non-empty string when present")
+            elif alias_for == field_name:
+                errors.append(f"{prefix}.alias_for must not point to itself")
+            elif alias_for not in fields:
+                errors.append(f"{prefix}.alias_for points to missing field: {alias_for}")
+            elif metadata.get("required") is True:
+                errors.append(f"{prefix}.required must be false for alias fields")
+        enum = metadata.get("enum")
+        if enum is not None:
+            if not isinstance(enum, list) or not enum or not all(isinstance(value, str) and value for value in enum):
+                errors.append(f"{prefix}.enum must be a non-empty list of strings when present")
     return errors
 
 

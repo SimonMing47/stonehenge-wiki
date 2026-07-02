@@ -4,6 +4,27 @@ from copy import deepcopy
 from typing import Any
 
 
+def field_contract(
+    required: bool,
+    field_type: str,
+    description: str = "",
+    *,
+    alias_for: str | None = None,
+    enum: list[str] | None = None,
+) -> dict[str, Any]:
+    contract: dict[str, Any] = {
+        "required": required,
+        "type": field_type,
+    }
+    if description:
+        contract["description"] = description
+    if alias_for:
+        contract["alias_for"] = alias_for
+    if enum:
+        contract["enum"] = enum
+    return contract
+
+
 ROUTES: list[dict[str, Any]] = [
     {
         "method": "GET",
@@ -75,7 +96,9 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "sources",
         "summary": "List source registry records, optionally including missing files.",
-        "query": {"include_missing": "optional bool"},
+        "query": {
+            "include_missing": field_contract(False, "bool", "Include missing/deleted source records."),
+        },
         "cli": "--list-sources [--include-missing-sources]",
     },
     {
@@ -84,7 +107,10 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "sources",
         "summary": "Return source metadata, redacted preview, versions, reviews, risks, and wiki sections.",
-        "query": {"path": "required source path", "preview_chars": "optional int"},
+        "query": {
+            "path": field_contract(True, "string", "Source relative path."),
+            "preview_chars": field_contract(False, "int", "Maximum redacted preview characters."),
+        },
         "cli": "--source-detail PATH",
     },
     {
@@ -93,7 +119,10 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "sources",
         "summary": "List source version metadata snapshots.",
-        "query": {"path": "optional source path", "limit": "optional int"},
+        "query": {
+            "path": field_contract(False, "string", "Optional source relative path filter."),
+            "limit": field_contract(False, "int", "Maximum version records to return."),
+        },
         "cli": "--list-source-versions [--source-history PATH] [--source-history-limit N]",
     },
     {
@@ -110,7 +139,10 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "sources",
         "summary": "List source review and quarantine events.",
-        "query": {"path": "optional source path", "limit": "optional int"},
+        "query": {
+            "path": field_contract(False, "string", "Optional source relative path filter."),
+            "limit": field_contract(False, "int", "Maximum review records to return."),
+        },
         "cli": "--list-source-reviews [--source-review-path PATH]",
     },
     {
@@ -119,7 +151,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "audit",
         "summary": "Return recent audit events.",
-        "query": {"limit": "optional int"},
+        "query": {"limit": field_contract(False, "int", "Maximum audit events to return.")},
         "cli": "--audit-log [--audit-limit N]",
     },
     {
@@ -137,9 +169,9 @@ ROUTES: list[dict[str, Any]] = [
         "category": "wiki",
         "summary": "List compiled wiki section records.",
         "query": {
-            "source_path": "optional source path",
-            "path": "optional alias for source_path",
-            "limit": "optional int",
+            "source_path": field_contract(False, "string", "Optional source relative path filter."),
+            "path": field_contract(False, "string", "Alias for source_path.", alias_for="source_path"),
+            "limit": field_contract(False, "int", "Maximum wiki sections to return."),
         },
         "cli": "--list-wiki-sections [--wiki-section-source PATH] [--wiki-section-limit N]",
     },
@@ -149,7 +181,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "wiki",
         "summary": "List compiled wiki pages for same-page browsing.",
-        "query": {"limit": "optional int"},
+        "query": {"limit": field_contract(False, "int", "Maximum wiki pages to return.")},
         "cli": None,
     },
     {
@@ -158,7 +190,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "wiki",
         "summary": "Return one compiled wiki page by relative path.",
-        "query": {"path": "required wiki page path"},
+        "query": {"path": field_contract(True, "string", "Compiled wiki page relative path.")},
         "cli": None,
     },
     {
@@ -167,7 +199,11 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "wiki",
         "summary": "Search the compiled wiki section index without vector/RAG storage.",
-        "query": {"q": "required query", "query": "optional alias for q", "limit": "optional int"},
+        "query": {
+            "q": field_contract(True, "string", "Search query."),
+            "query": field_contract(False, "string", "Alias for q.", alias_for="q"),
+            "limit": field_contract(False, "int", "Maximum search results to return."),
+        },
         "cli": "--search-wiki QUERY [--wiki-section-limit N]",
     },
     {
@@ -184,7 +220,10 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "reports",
         "summary": "Return enterprise readiness gates.",
-        "query": {"groups": "optional repeated group", "group": "optional repeated group alias"},
+        "query": {
+            "groups": field_contract(False, "string[]", "Optional repeated question group names."),
+            "group": field_contract(False, "string[]", "Alias for groups.", alias_for="groups"),
+        },
         "cli": "--readiness-report [--group GROUP]",
     },
     {
@@ -201,7 +240,11 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "qa",
         "summary": "Answer one question through the compiled wiki knowledge layer.",
-        "body": {"id": "optional question id", "title": "required question", "level": "optional level"},
+        "body": {
+            "id": field_contract(False, "string", "Optional question id."),
+            "title": field_contract(True, "string", "Question title/content."),
+            "level": field_contract(False, "string", "Optional question difficulty level."),
+        },
         "cli": "--ask QUESTION [--id ID] [--level LEVEL]",
     },
     {
@@ -210,7 +253,11 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "read",
         "category": "qa",
         "summary": "Explain retrieval, safety, and evidence routing for one question.",
-        "body": {"id": "optional question id", "title": "required question", "level": "optional level"},
+        "body": {
+            "id": field_contract(False, "string", "Optional question id."),
+            "title": field_contract(True, "string", "Question title/content."),
+            "level": field_contract(False, "string", "Optional question difficulty level."),
+        },
         "cli": "--explain-ask QUESTION [--id ID] [--level LEVEL]",
     },
     {
@@ -227,7 +274,11 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "sources",
         "summary": "Import a local file or public URL into docs and rebuild source metadata.",
-        "body": {"source": "required path or URL", "title": "optional title", "category": "optional category"},
+        "body": {
+            "source": field_contract(True, "string", "Local path or public URL to import."),
+            "title": field_contract(False, "string", "Optional source title."),
+            "category": field_contract(False, "string", "Target docs category."),
+        },
         "cli": "--import-source PATH_OR_URL [--import-title TITLE] [--import-category CATEGORY]",
     },
     {
@@ -237,11 +288,16 @@ ROUTES: list[dict[str, Any]] = [
         "category": "sources",
         "summary": "Set source status to active or quarantined and record a review event.",
         "body": {
-            "path": "required source path",
-            "rel_path": "optional alias for path",
-            "status": "required active|quarantined",
-            "reason": "optional",
-            "actor": "optional",
+            "path": field_contract(True, "string", "Source relative path."),
+            "rel_path": field_contract(False, "string", "Alias for path.", alias_for="path"),
+            "status": field_contract(
+                True,
+                "string",
+                "Source status.",
+                enum=["active", "quarantined"],
+            ),
+            "reason": field_contract(False, "string", "Optional review reason."),
+            "actor": field_contract(False, "string", "Optional reviewer identity."),
         },
         "cli": "--set-source-status PATH --source-status active|quarantined",
     },
@@ -259,7 +315,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "qa",
         "summary": "Run one or more question groups and write answer files.",
-        "body": {"groups": "optional group or group list"},
+        "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": "--group GROUP",
     },
     {
@@ -268,7 +324,10 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "workbench",
         "summary": "Generate a presentation brief file from a topic.",
-        "body": {"topic": "required topic", "slide_count": "optional int"},
+        "body": {
+            "topic": field_contract(True, "string", "Presentation brief topic."),
+            "slide_count": field_contract(False, "int", "Requested slide count."),
+        },
         "cli": "--generate-brief TOPIC [--slide-count N]",
     },
     {
@@ -285,7 +344,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "reports",
         "summary": "Evaluate question groups and return quality metrics.",
-        "body": {"groups": "optional group or group list"},
+        "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": "--evaluation-report [--group GROUP]",
     },
     {
@@ -294,7 +353,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "reports",
         "summary": "Write question evaluation reports to output/reports.",
-        "body": {"groups": "optional group or group list"},
+        "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": "--export-evaluation-report [--group GROUP]",
     },
     {
@@ -303,7 +362,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "reports",
         "summary": "Return enterprise readiness gates using explicit POST group selection.",
-        "body": {"groups": "optional group or group list"},
+        "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": None,
     },
     {
@@ -312,7 +371,7 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "reports",
         "summary": "Write enterprise readiness report files.",
-        "body": {"groups": "optional group or group list"},
+        "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": "--export-readiness-report [--group GROUP]",
     },
     {
@@ -321,7 +380,10 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "reports",
         "summary": "Write a metadata-only release bundle.",
-        "body": {"groups": "optional group or group list", "include_evaluation": "optional bool"},
+        "body": {
+            "groups": field_contract(False, "string|string[]", "Optional question group or group list."),
+            "include_evaluation": field_contract(False, "bool", "Include evaluation artifacts in the bundle."),
+        },
         "cli": "--export-release-bundle [--group GROUP] [--release-include-evaluation]",
     },
     {
@@ -338,7 +400,11 @@ ROUTES: list[dict[str, Any]] = [
         "scope": "admin",
         "category": "llm",
         "summary": "Validate one named LLM agent and optionally run a live probe.",
-        "body": {"agent_name": "required agent name", "agent": "optional alias for agent_name", "live": "optional bool"},
+        "body": {
+            "agent_name": field_contract(True, "string", "Named LLM agent to test."),
+            "agent": field_contract(False, "string", "Alias for agent_name.", alias_for="agent_name"),
+            "live": field_contract(False, "bool", "Run a live chat-completions probe."),
+        },
         "cli": "--test-llm-agent AGENT [--test-llm-live]",
     },
 ]
@@ -347,7 +413,7 @@ ROUTES: list[dict[str, Any]] = [
 def api_contract() -> dict[str, Any]:
     return {
         "status": "ok",
-        "schema_version": 1,
+        "schema_version": 2,
         "name": "Stonehenge Wiki REST API",
         "project": "stonehenge-wiki",
         "auth": {

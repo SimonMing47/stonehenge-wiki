@@ -314,9 +314,9 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 默认监听 `127.0.0.1:8765`。
 
 - `GET /health`：健康检查和索引统计
-- `GET /api/contract`：机器可读 REST API 契约，包含 route、scope、CLI 映射和 no-RAG 边界说明
+- `GET /api/contract`：机器可读 REST API 契约，schema v2 包含 route、scope、query/body 字段 required/type/alias/enum 元数据、CLI 映射和 no-RAG 边界说明
 
-`python3 -m stonehenge_wiki.contract_checks` 会静态校验 API contract 与 `server.py` 的 route/scope/query/body、Rust CLI flag/path 是否一致；该检查已纳入 CI。
+`python3 -m stonehenge_wiki.contract_checks` 会静态校验 API contract 与 `server.py` 的 route/scope/query/body 字段、字段元数据、Rust CLI flag/path 是否一致；该检查已纳入 CI。
 - `GET /`：浏览器控制台
 - `GET /index`：文件、批注和持久化状态
 - `GET /sources?include_missing=1`：来源注册表，包含 origin、hash、大小、状态和最后索引时间

@@ -63,6 +63,8 @@ For API access, make sure the Stonehenge Wiki REST service is already running, t
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --api-contract
 ```
 
+`--api-contract` returns schema v2 with route scope, CLI mapping, and structured query/body field metadata (`required`, `type`, `alias_for`, `enum`).
+
 Then open `http://127.0.0.1:8765/` for the browser console.
 
 ## LLM Agent Configuration
