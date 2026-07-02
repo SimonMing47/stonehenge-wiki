@@ -527,6 +527,47 @@ class StonehengeWikiPlatform:
     def list_sources(self, include_missing: bool = False) -> list[dict[str, Any]]:
         return self.store.list_sources(include_missing=include_missing)
 
+    def source_detail(self, rel_path: str, preview_chars: int = 8000) -> dict[str, Any]:
+        normalized = rel_path.strip().lstrip("/")
+        safe_path = Path(normalized)
+        if not normalized or safe_path.is_absolute() or ".." in safe_path.parts:
+            return {"error": "invalid_path"}
+
+        source = next((item for item in self.list_sources(include_missing=True) if item["rel_path"] == normalized), None)
+        if not source:
+            return {"error": "not_found", "path": normalized}
+
+        record = self.full_index.by_path.get(normalized)
+        active = normalized in self.index.by_path
+        comments = [comment.summary() for comment in (record.comments if record else [])]
+        raw_preview = ""
+        redacted_text = ""
+        if record:
+            redacted_text = redact_sensitive_text(record.text)
+            raw_preview = redacted_text[: max(0, min(preview_chars, 20000))]
+        risks = [
+            finding
+            for finding in self.source_risk_report().get("findings", [])
+            if finding.get("source_path") == normalized
+        ]
+        return {
+            "status": "ok",
+            "path": normalized,
+            "source": source,
+            "active": active,
+            "preview": {
+                "available": bool(record),
+                "text": raw_preview,
+                "char_count": len(redacted_text),
+                "truncated": bool(record and len(redacted_text) > len(raw_preview)),
+            },
+            "comments": comments,
+            "versions": self.list_source_versions(rel_path=normalized, limit=20),
+            "reviews": self.list_source_reviews(rel_path=normalized, limit=20),
+            "wiki_sections": self.list_wiki_sections(source_path=normalized, limit=20),
+            "risks": risks,
+        }
+
     def list_source_versions(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_source_versions(rel_path=rel_path, limit=limit)
 

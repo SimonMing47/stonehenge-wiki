@@ -89,6 +89,7 @@ cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 ```bash
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-sources
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-sources --include-missing-sources
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-detail docs/03_学习材料/Knowledge-Notes.md
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-source-versions
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-history docs/03_学习材料/Knowledge-Notes.md
 ```
@@ -303,6 +304,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 - `GET /`：浏览器控制台
 - `GET /index`：文件、批注和持久化状态
 - `GET /sources?include_missing=1`：来源注册表，包含 origin、hash、大小、状态和最后索引时间
+- `GET /sources/detail?path=docs/03_学习材料/Knowledge-Notes.md`：来源详情，包含 metadata、脱敏抽取预览、版本、审核、风险和关联 wiki 区段
 - `GET /sources/history?path=docs/03_学习材料/Knowledge-Notes.md`：来源版本历史，只记录路径、hash、大小和观测次数，不复制原始正文
 - `GET /sources/risk`：来源风险扫描，检查提示注入、权限黑名单、密钥位置、危险代码、抽取失败和 TODO 风险
 - `GET /sources/reviews?path=docs/00_inbox/risky.md`：来源审批/隔离历史
@@ -327,7 +329,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 
-如果设置了 `STONEHENGE_WIKI_API_TOKEN` 或 `STONEHENGE_WIKI_READ_TOKEN`，请求需携带 `X-STONEHENGE-WIKI-TOKEN`。`STONEHENGE_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/pages`、`/wiki/page`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`STONEHENGE_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、工作台生成、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
+如果设置了 `STONEHENGE_WIKI_API_TOKEN` 或 `STONEHENGE_WIKI_READ_TOKEN`，请求需携带 `X-STONEHENGE-WIKI-TOKEN`。`STONEHENGE_WIKI_READ_TOKEN` 可访问 `/index`、`/sources`、`/sources/detail`、`/sources/history`、`/sources/risk`、`/sources/reviews`、`/audit`、`/wiki/lint`、`/wiki/sections`、`/wiki/pages`、`/wiki/page`、`/wiki/search`、`/reports/governance`、`/files/...`、`/ask` 和 `/explain`；`STONEHENGE_WIKI_API_TOKEN` 是管理 token，可调用所有接口，包括导入、来源隔离/恢复、重建索引、编译 wiki、运行题组、工作台生成、导出治理报告和运行质量评估。控制台右上角的 `API token` 输入框会把 token 保存到浏览器本地存储并随请求发送。
 
 ## Skill 调用
 

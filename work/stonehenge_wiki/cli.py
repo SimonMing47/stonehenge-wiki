@@ -25,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--list-sources", action="store_true", help="Print source registry records as JSON")
     parser.add_argument("--include-missing-sources", action="store_true", help="Include missing source registry records")
     parser.add_argument("--list-source-versions", action="store_true", help="Print source version history records as JSON")
+    parser.add_argument("--source-detail", help="Print source metadata, extracted preview, risks, reviews, and wiki sections")
     parser.add_argument("--source-history", help="Print version history for one source registry path")
     parser.add_argument("--source-history-limit", type=int, default=50, help="Version record count for source history")
     parser.add_argument("--source-risk-report", action="store_true", help="Print source risk scan report as JSON")
@@ -99,6 +100,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_source_versions:
         print_json({"versions": platform.list_source_versions(limit=args.source_history_limit)})
+        return 0
+
+    if args.source_detail:
+        print_json(platform.source_detail(args.source_detail))
         return 0
 
     if args.source_history:

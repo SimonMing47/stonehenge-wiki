@@ -38,6 +38,7 @@ For an index inspection:
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --dump-index
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-sources
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-source-versions
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-detail "docs/03_学习材料/Knowledge-Notes.md"
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-history "docs/03_学习材料/Knowledge-Notes.md"
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-wiki-sections --wiki-section-limit 20
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --search-wiki "SQLite SELECT" --wiki-section-limit 5

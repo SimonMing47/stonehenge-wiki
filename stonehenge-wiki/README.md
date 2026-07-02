@@ -24,6 +24,12 @@ stonehenge-wiki/.state/wiki.sqlite
 
 来源注册表支持 `active`、`quarantined`、`missing` 状态。`quarantined` 来源仍保留路径、hash、版本和风险记录，但不会进入问答、工作台生成和编译后的 `wiki/` 知识面。命中 `Permission.json.file.deny` 的来源会被策略自动隔离。
 
+Raw 页面和 REST CLI 支持查看来源详情，包括 metadata、脱敏抽取预览、版本、审核、风险和关联 wiki 区段：
+
+```bash
+./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-detail docs/03_学习材料/Knowledge-Notes.md
+```
+
 ## LLM Agent
 
 `config.json` 中的 `llm.agents` 支持独立 agent 配置。当前默认 agent 为 `opencode`，通过 `~/.hermes/.env` 读取 `DEEPSEEK_API_KEY`，provider 标记为 `opencode-hermes-deepseek`。Rust CLI 仍然只调用 REST API，不直接调用 opencode 或 Python。

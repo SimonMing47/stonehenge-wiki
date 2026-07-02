@@ -11,6 +11,8 @@ const state = {
   wikiPages: [],
   wikiPage: null,
   sourceRisk: null,
+  sourceDetail: null,
+  sourceDetailError: null,
   explanation: null,
   llm: null,
   llmConfig: null,
@@ -64,6 +66,15 @@ const I18N = {
     "sources.import_btn": "导入",
     "sources.title": "原始源",
     "sources.comments_title": "注释",
+    "sources.detail_title": "来源详情",
+    "sources.detail_hint": "选择一个来源查看抽取预览。",
+    "sources.view_detail": "查看",
+    "sources.preview_title": "抽取预览",
+    "sources.meta_title": "元数据",
+    "sources.versions_title": "版本",
+    "sources.reviews_title": "审核",
+    "sources.sections_title": "Wiki 区段",
+    "sources.risks_title": "风险",
     "question_groups.title": "问题组",
     "question_groups.subtitle": "question/group-*.md",
     "question_groups.placeholder": "group-1",
@@ -259,6 +270,15 @@ const I18N = {
     "sources.import_btn": "Import",
     "sources.title": "Raw",
     "sources.comments_title": "Comments",
+    "sources.detail_title": "Source Detail",
+    "sources.detail_hint": "Select a source to inspect extracted preview.",
+    "sources.view_detail": "View",
+    "sources.preview_title": "Extracted preview",
+    "sources.meta_title": "Metadata",
+    "sources.versions_title": "Versions",
+    "sources.reviews_title": "Reviews",
+    "sources.sections_title": "Wiki sections",
+    "sources.risks_title": "Risks",
     "question_groups.title": "Question Groups",
     "question_groups.subtitle": "question/group-*.md",
     "question_groups.placeholder": "group-1",
@@ -526,6 +546,7 @@ async function refreshAll() {
 
     renderHealth();
     renderIndex();
+    renderSourceDetail();
     renderAudit();
     renderGovernance();
     renderReadiness();
@@ -868,7 +889,10 @@ function fileRow(file, source) {
   const status = source?.status || "active";
   return `
     <div class="source-row">
-      <strong>${escapeHtml(file.path)}</strong>
+      <div class="source-row-title">
+        <strong>${escapeHtml(file.path)}</strong>
+        <button type="button" data-source-detail="${escapeHtml(file.path)}">${translate("sources.view_detail")}</button>
+      </div>
       <div class="meta">
         <span class="${status === "active" ? "ok" : "blocked"}">${escapeHtml(status)}</span>
         <span>${escapeHtml(origin)}</span>
@@ -880,6 +904,112 @@ function fileRow(file, source) {
         <span>${escapeHtml(tags)}</span>
         <span>${Number(file.comment_count || 0)} ${translate("status.comments")}</span>
       </div>
+    </div>
+  `;
+}
+
+async function loadSourceDetail(path) {
+  if (!path) return;
+  el("sourceDetailStatus").textContent = translate("status.loading");
+  try {
+    const result = await api(`/sources/detail?path=${encodeURIComponent(path)}`);
+    if (result.error) {
+      state.sourceDetail = null;
+      state.sourceDetailError = result.error;
+      el("sourceDetailStatus").textContent = `${translate("status.failed")} · ${result.error}`;
+    } else {
+      state.sourceDetail = result;
+      state.sourceDetailError = null;
+      el("sourceDetailStatus").textContent = result.path || translate("status.complete");
+    }
+  } catch (error) {
+    state.sourceDetail = null;
+    state.sourceDetailError = error.message;
+    el("sourceDetailStatus").textContent = `${translate("status.failed")} · ${error.message}`;
+  }
+  renderSourceDetail();
+}
+
+function renderSourceDetail() {
+  const detail = state.sourceDetail;
+  if (!detail) {
+    el("sourceDetail").innerHTML = `<span class="muted">${escapeHtml(state.sourceDetailError || translate("sources.detail_hint"))}</span>`;
+    if (!state.sourceDetailError) {
+      el("sourceDetailStatus").textContent = translate("sources.detail_hint");
+    }
+    return;
+  }
+  const source = detail.source || {};
+  const preview = detail.preview || {};
+  const metaItems = [
+    ["path", detail.path],
+    ["status", source.status],
+    ["origin", source.origin_type],
+    ["category", source.category],
+    ["suffix", source.suffix],
+    ["size", source.size],
+    ["sha", source.sha256 ? String(source.sha256).slice(0, 16) : ""],
+    ["active", detail.active ? "true" : "false"],
+    ["versions", source.version_count],
+    ["wiki sections", source.wiki_section_count],
+  ];
+  const versionRows = (detail.versions || []).map((item) => `
+    <div class="detail-row">
+      <strong>${escapeHtml(String(item.sha256 || "").slice(0, 16))}</strong>
+      <span>${escapeHtml(item.last_seen_at || item.first_seen_at || "")}</span>
+      <span>${escapeHtml(String(item.observation_count || 0))}</span>
+    </div>
+  `).join("");
+  const reviewRows = (detail.reviews || []).map((item) => `
+    <div class="detail-row">
+      <strong>${escapeHtml(item.status || "")}</strong>
+      <span>${escapeHtml(item.actor || "")}</span>
+      <span>${escapeHtml(item.reason || item.created_at || "")}</span>
+    </div>
+  `).join("");
+  const riskRows = (detail.risks || []).map((item) => `
+    <div class="detail-row">
+      <strong>${escapeHtml(item.code || "")}</strong>
+      <span>${escapeHtml(item.severity || "")}</span>
+      <span>${escapeHtml(item.message || "")}</span>
+    </div>
+  `).join("");
+  const sectionRows = (detail.wiki_sections || []).map(wikiSectionRow).join("");
+  const commentRows = (detail.comments || []).map((comment) => `<div class="detail-row"><span>${escapeHtml(comment)}</span></div>`).join("");
+  el("sourceDetail").innerHTML = `
+    <div class="source-detail-grid">
+      <section>
+        <h3>${translate("sources.meta_title")}</h3>
+        <div class="detail-kv">
+          ${metaItems.filter(([, value]) => value !== undefined && value !== null && value !== "").map(([key, value]) => `
+            <div><span>${escapeHtml(key)}</span><strong>${escapeHtml(value)}</strong></div>
+          `).join("")}
+        </div>
+      </section>
+      <section>
+        <h3>${translate("sources.preview_title")}</h3>
+        <pre class="source-preview">${escapeHtml(preview.text || "") || escapeHtml(translate("status.no_evidence"))}</pre>
+      </section>
+      <section>
+        <h3>${translate("sources.versions_title")}</h3>
+        ${versionRows || emptyRow(translate("status.no_evidence"))}
+      </section>
+      <section>
+        <h3>${translate("sources.reviews_title")}</h3>
+        ${reviewRows || emptyRow(translate("status.no_evidence"))}
+      </section>
+      <section>
+        <h3>${translate("sources.risks_title")}</h3>
+        ${riskRows || emptyRow(translate("status.no_source_risks"))}
+      </section>
+      <section>
+        <h3>${translate("status.comments")}</h3>
+        ${commentRows || emptyRow(translate("status.no_comments"))}
+      </section>
+      <section>
+        <h3>${translate("sources.sections_title")}</h3>
+        ${sectionRows || emptyRow(translate("status.no_compiled_sections"))}
+      </section>
     </div>
   `;
 }
@@ -1995,6 +2125,11 @@ document.addEventListener("click", (event) => {
   const removeCategoryBtn = event.target.closest("[data-remove-category]");
   if (removeCategoryBtn) {
     removeCategoryMapping(removeCategoryBtn);
+    return;
+  }
+  const sourceDetailBtn = event.target.closest("[data-source-detail]");
+  if (sourceDetailBtn) {
+    loadSourceDetail(sourceDetailBtn.dataset.sourceDetail || "");
     return;
   }
   const button = event.target.closest("[data-source-status]");

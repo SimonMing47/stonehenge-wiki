@@ -232,6 +232,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("wikiTreeList", index_html)
             self.assertIn("wikiGraph", index_html)
             self.assertIn("wikiPagePreview", index_html)
+            self.assertIn("sourceDetail", index_html)
             self.assertIn("refreshAll", app_js)
             self.assertIn("renderPage", app_js)
             self.assertIn("hashchange", app_js)
@@ -241,6 +242,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("importSource", app_js)
             self.assertIn("wiki_sections", app_js)
             self.assertIn("sourceRisk", app_js)
+            self.assertIn("loadSourceDetail", app_js)
+            self.assertIn("/sources/detail", app_js)
             self.assertIn("Source Risk Review", index_html)
             self.assertIn("Readiness Gates", index_html)
             self.assertIn("token scopes", app_js)
@@ -252,6 +255,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("runEvaluationBtn", index_html)
             self.assertIn(".wiki-reader", styles_css)
             self.assertIn(".wiki-page-row", styles_css)
+            self.assertIn(".source-detail-grid", styles_css)
             self.assertIn(".page.active", styles_css)
             self.assertEqual(health["status"], "ok")
             self.assertEqual(sources["sources"], [])
@@ -309,6 +313,9 @@ class PlatformSmokeTest(unittest.TestCase):
                     bad_index = http_get_status(base + "/index", headers=bad_headers)
                     read_index = json.loads(http_get(base + "/index", headers=read_headers))
                     read_sources = json.loads(http_get(base + "/sources", headers=read_headers))
+                    read_source_detail = json.loads(
+                        http_get(base + "/sources/detail?path=docs/00_inbox/auth.md", headers=read_headers)
+                    )
                     read_source_history = json.loads(http_get(base + "/sources/history", headers=read_headers))
                     read_source_risk = json.loads(http_get(base + "/sources/risk", headers=read_headers))
                     read_source_reviews = json.loads(http_get(base + "/sources/reviews", headers=read_headers))
@@ -383,6 +390,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(bad_index, 401)
             self.assertEqual(len(read_index["files"]), 1)
             self.assertEqual(len(read_sources["sources"]), 1)
+            self.assertEqual(read_source_detail["path"], "docs/00_inbox/auth.md")
             self.assertEqual(len(read_source_history["versions"]), 1)
             self.assertEqual(read_source_risk["status"], "ok")
             self.assertEqual(read_source_reviews["reviews"], [])
@@ -935,6 +943,7 @@ class PlatformSmokeTest(unittest.TestCase):
             source = incoming / "knowledge-notes.md"
             source.write_text(
                 "企业知识库导入说明：Knowledge Notes 应进入 inbox。\n"
+                "API_KEY=redaction-marker-value\n"
                 "TODO: 补充验收清单,to:李四,end_date:20261231\n",
                 encoding="utf-8",
             )
@@ -967,6 +976,14 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(registry[0]["status"], "active")
             self.assertEqual(len(registry[0]["sha256"]), 64)
             self.assertEqual(registry[0]["version_count"], 1)
+            detail = platform.source_detail(imported_rel)
+            self.assertEqual(detail["status"], "ok")
+            self.assertEqual(detail["path"], imported_rel)
+            self.assertIn("Knowledge Notes", detail["preview"]["text"])
+            self.assertIn("[REDACTED]", detail["preview"]["text"])
+            self.assertNotIn("redaction-marker-value", detail["preview"]["text"])
+            self.assertEqual(len(detail["versions"]), 1)
+            self.assertEqual(len(detail["comments"]), 1)
 
             versions = platform.list_source_versions(imported_rel)
             self.assertEqual(len(versions), 1)
@@ -989,6 +1006,12 @@ class PlatformSmokeTest(unittest.TestCase):
                 code = cli_main(["--wiki-root", str(wiki), "--source-history", imported_rel])
             self.assertEqual(code, 0)
             self.assertEqual(len(json.loads(version_output.getvalue())["versions"]), 2)
+
+            detail_output = io.StringIO()
+            with contextlib.redirect_stdout(detail_output):
+                code = cli_main(["--wiki-root", str(wiki), "--source-detail", imported_rel])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(detail_output.getvalue())["path"], imported_rel)
 
             ask_answer = platform.ask("Knowledge Notes 验收清单是什么")
             self.assertEqual(set(ask_answer.keys()), {"id", "title", "level", "answer"})
@@ -1040,6 +1063,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 index = json.loads(http_get(base + "/index"))
                 source_list = json.loads(http_get(base + "/sources?include_missing=1"))
                 source_history = json.loads(http_get(base + "/sources/history?path=docs/00_inbox/Ops-Console.html"))
+                source_detail = json.loads(http_get(base + "/sources/detail?path=docs/00_inbox/Ops-Console.html"))
                 governance = json.loads(http_get(base + "/reports/governance"))
                 exported_api = json.loads(http_post(base + "/reports/governance/export", {}))
                 report_bytes = http_get_bytes(base + exported_api["download_url"])
@@ -1056,6 +1080,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertGreaterEqual(index["source_registry"][0]["version_count"], 1)
             self.assertEqual(len(source_list["sources"]), 2)
             self.assertEqual(len(source_history["versions"]), 1)
+            self.assertEqual(source_detail["path"], "docs/00_inbox/Ops-Console.html")
+            self.assertIn("NotebookLM", source_detail["preview"]["text"])
             self.assertEqual({item["status"] for item in source_list["sources"]}, {"active", "missing"})
             self.assertEqual(governance["report"]["summary"]["status"], "attention")
             self.assertIn(b"Stonehenge Wiki Governance Report", report_bytes)

@@ -151,6 +151,14 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
                     encode_query(value)
                 )));
             }
+            "--source-detail" => {
+                index += 1;
+                let value = required_value(args, index, "--source-detail")?;
+                selected = Some(get(&format!(
+                    "/sources/detail?path={}",
+                    encode_query(value)
+                )));
+            }
             "--source-history-limit" | "--audit-limit" | "--wiki-section-limit" => {
                 index += 1;
                 limit = required_value(args, index, args[index - 1].as_str())?.to_string();
@@ -602,6 +610,7 @@ Read commands:
   --health
   --dump-index
   --list-sources [--include-missing-sources]
+  --source-detail PATH
   --list-source-versions [--source-history PATH] [--source-history-limit N]
   --source-risk-report
   --list-source-reviews [--source-review-path PATH]

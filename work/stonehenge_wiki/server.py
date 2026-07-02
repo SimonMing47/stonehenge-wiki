@@ -58,6 +58,21 @@ class PlatformHandler(BaseHTTPRequestHandler):
                 return
             include_missing = parse_qs(parsed.query).get("include_missing", ["0"])[0] in {"1", "true", "yes"}
             return self.write_json({"sources": self.stonehenge_wiki_platform.list_sources(include_missing=include_missing)})
+        if parsed.path == "/sources/detail":
+            if not self.ensure_authorized("read"):
+                return
+            query = parse_qs(parsed.query)
+            rel_path = query.get("path", [""])[0]
+            try:
+                preview_chars = int(query.get("preview_chars", ["8000"])[0])
+            except ValueError:
+                return self.write_json({"error": "invalid_preview_chars"}, HTTPStatus.BAD_REQUEST)
+            result = self.stonehenge_wiki_platform.source_detail(rel_path, preview_chars=preview_chars)
+            if result.get("error") == "invalid_path":
+                return self.write_json(result, HTTPStatus.BAD_REQUEST)
+            if result.get("error") == "not_found":
+                return self.write_json(result, HTTPStatus.NOT_FOUND)
+            return self.write_json(result)
         if parsed.path == "/sources/history":
             if not self.ensure_authorized("read"):
                 return

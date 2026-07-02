@@ -8,6 +8,7 @@
 - 增加贡献规范，明确分支、PR、review、验证和禁止事项。
 - 增加 opencode 独立 LLM agent 配置说明，复用本机 Hermes DeepSeek API 并完成服务端问答验证。
 - 增加 LLM agent 连接诊断：`POST /llm/test`、Rust CLI `--test-llm-agent`、Agents 页面测试按钮和审计记录。
+- 增加 Raw 来源详情：`GET /sources/detail`、Rust CLI `--source-detail`、同页脱敏抽取预览、版本、审核、风险和 wiki 区段。
 
 ## 0.1.0
 

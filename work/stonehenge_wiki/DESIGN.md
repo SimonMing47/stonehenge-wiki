@@ -208,6 +208,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 
 知识与来源：
 - `GET /sources`, `GET /sources/history`, `GET /sources/risk`, `GET /sources/reviews`
+- `GET /sources/detail`
 - `POST /sources/import`, `POST /sources/status`
 
 问答：
@@ -295,6 +296,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 - [x] no-RAG 架构落地（compiled wiki 为主）
 - [x] Rust REST CLI/skill/API/console 统一平台层
 - [x] 来源治理与隔离机制
+- [x] Raw 来源详情：metadata、脱敏抽取预览、版本、审核、风险和 wiki 区段
 - [x] 审计与治理报告
 - [x] 就绪度门禁与评估报告
 - [x] opencode 独立 LLM agent 配置与 Hermes DeepSeek 复用
