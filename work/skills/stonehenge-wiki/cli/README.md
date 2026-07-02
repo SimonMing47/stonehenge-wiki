@@ -10,7 +10,13 @@ Local skill binary:
 ./work/skills/stonehenge-wiki/scripts/build_skill_cli.sh
 ```
 
-Linux release entry:
+`build_skill_cli.sh` builds three entry points into `work/skills/stonehenge-wiki/bin`:
+
+- `stonehenge-wiki` (默认入口)
+- `stonehenge-wiki-linux` (Linux 命名入口)
+- `stonehenge-wiki-windows.exe` (Windows 打包入口；无交叉编译 target 时会回退 host 产物提示)
+
+Manual build commands (if needed):
 
 ```bash
 cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-linux
@@ -19,7 +25,7 @@ cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 Windows release entry:
 
 ```powershell
-cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-windows
+cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --target x86_64-pc-windows-gnu --bin stonehenge-wiki-windows
 ```
 
 ## Use

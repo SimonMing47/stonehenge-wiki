@@ -6,6 +6,7 @@ use std::time::Duration;
 
 const DEFAULT_URL: &str = "http://127.0.0.1:8765";
 const TOKEN_HEADER: &str = "X-STONEHENGE-WIKI-TOKEN";
+const CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone, Copy)]
 pub enum CliPlatform {
@@ -26,6 +27,7 @@ enum Action {
     Get { path: String },
     Post { path: String, body: String },
     Help,
+    Version,
 }
 
 #[derive(Debug)]
@@ -35,9 +37,9 @@ struct HttpUrl {
     path_prefix: String,
 }
 
-pub fn run(_platform: CliPlatform) -> ! {
+pub fn run(platform: CliPlatform) -> ! {
     let args: Vec<String> = env::args_os().skip(1).map(os_string_to_string).collect();
-    match run_client(&args) {
+    match run_client(platform, &args) {
         Ok(code) => std::process::exit(code),
         Err(err) => {
             eprintln!("{err}");
@@ -46,11 +48,15 @@ pub fn run(_platform: CliPlatform) -> ! {
     }
 }
 
-fn run_client(args: &[String]) -> Result<i32, String> {
+fn run_client(platform: CliPlatform, args: &[String]) -> Result<i32, String> {
     let config = parse_args(args)?;
     match config.action {
         Action::Help => {
             print_help();
+            Ok(0)
+        }
+        Action::Version => {
+            print_version(platform);
             Ok(0)
         }
         Action::Get { path } => request(
@@ -103,6 +109,9 @@ fn parse_args(args: &[String]) -> Result<CliConfig, String> {
 fn parse_action(args: &[String]) -> Result<Action, String> {
     if args.iter().any(|arg| arg == "-h" || arg == "--help") {
         return Ok(Action::Help);
+    }
+    if args.iter().any(|arg| arg == "-v" || arg == "--version") {
+        return Ok(Action::Version);
     }
     if args.iter().any(|arg| arg == "--serve") {
         return Err("stonehenge-wiki CLI is REST-only. Start the Stonehenge Wiki API service separately, then call this CLI with --url.".to_string());
@@ -600,12 +609,13 @@ fn print_help() {
     println!(
         r#"stonehenge-wiki REST API CLI
 
-Usage:
+  Usage:
   stonehenge-wiki [--url http://127.0.0.1:8765] [--token TOKEN] <command flags>
 
 Connection:
   --url URL                 Stonehenge Wiki REST API base URL (env: STONEHENGE_WIKI_URL)
   --token TOKEN             API token (env: STONEHENGE_WIKI_TOKEN)
+  -v, --version             Show CLI version.
 
 Read commands:
   --health
@@ -642,4 +652,13 @@ Write commands:
 The CLI only calls the REST API. It does not start the REST service or execute local project code.
 "#
     );
+}
+
+fn print_version(platform: CliPlatform) {
+    let platform_name = match platform {
+        CliPlatform::Auto => "auto",
+        CliPlatform::Linux => "linux",
+        CliPlatform::Windows => "windows",
+    };
+    println!("stonehenge-wiki CLI {CLI_VERSION} ({platform_name})");
 }
