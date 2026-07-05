@@ -1448,6 +1448,7 @@ async function loadWikiPage(path, options = {}) {
     }
     renderWikiRelations(result, state.wikiRelations);
   } catch (error) {
+    state.wikiPage = null;
     el("wikiPageTitle").textContent = translate("wiki.preview");
     el("wikiPageMeta").textContent = translate("status.failed");
     state.wikiRelations = [];
