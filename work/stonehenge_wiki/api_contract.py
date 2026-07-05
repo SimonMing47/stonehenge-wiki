@@ -25,6 +25,12 @@ def field_contract(
     return contract
 
 
+def response_contract(required: list[str] | None = None) -> dict[str, Any]:
+    if required is None:
+        required = []
+    return {"required": required}
+
+
 ROUTES: list[dict[str, Any]] = [
     {
         "method": "GET",
@@ -65,6 +71,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "runtime",
         "summary": "Return platform health, counters, auth state, and LLM readiness.",
         "cli": "--health",
+        "response": response_contract(["status", "wiki_root", "database_path", "knowledge_mode", "rag", "store"]),
     },
     {
         "method": "GET",
@@ -73,6 +80,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "runtime",
         "summary": "Return the machine-readable REST API contract.",
         "cli": "--api-contract",
+        "response": response_contract(["status", "schema_version", "name", "route_count", "routes"]),
     },
     {
         "method": "GET",
@@ -162,6 +170,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "List recent job run records.",
         "query": {"limit": field_contract(False, "int", "Maximum jobs to return.")},
         "cli": "--jobs [--jobs-limit N]",
+        "response": response_contract(["jobs"]),
     },
     {
         "method": "POST",
@@ -174,6 +183,7 @@ ROUTES: list[dict[str, Any]] = [
             "attempt": field_contract(False, "int", "Optional retry attempt override, used for audit trace only."),
         },
         "cli": "--jobs-retry JOB_ID",
+        "response": response_contract(["retry_of", "attempt", "job_type", "result", "status"]),
     },
     {
         "method": "GET",

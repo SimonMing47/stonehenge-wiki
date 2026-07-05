@@ -66,6 +66,28 @@ class ApiContractTest(unittest.TestCase):
 
         self.assertTrue(any("alias_for points to missing field" in error for error in errors))
 
+    def test_contract_shape_rejects_invalid_response_metadata(self) -> None:
+        contract = api_contract()
+        route = dict(contract["routes"][0])
+        route["response"] = {"required": ("health", "wiki_root"), "fields": {"mode": "string"}}
+        routes = [route]
+        errors = validate_contract_shape(contract | {"route_count": len(routes)}, routes)
+        self.assertTrue(any("response.required must be a list of strings" in error for error in errors))
+
+        route = dict(contract["routes"][0])
+        route["response"] = {"required": ["ok", "status"], "fields": {"status": "unsupported_type"}}
+        routes = [route]
+        errors = validate_contract_shape(contract | {"route_count": len(routes)}, routes)
+        self.assertTrue(any("has unsupported type" in error for error in errors))
+
+    def test_contract_shape_rejects_missing_response_required(self) -> None:
+        contract = api_contract()
+        route = dict(contract["routes"][0])
+        route["response"] = {}
+        routes = [route]
+        errors = validate_contract_shape(contract | {"route_count": len(routes)}, routes)
+        self.assertTrue(any("response.required is required" in error for error in errors))
+
     def test_server_route_extraction_tracks_parameterized_routes(self) -> None:
         routes = extract_server_routes()
 

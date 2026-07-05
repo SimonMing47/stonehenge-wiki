@@ -11,6 +11,7 @@ from .api_contract import ROUTES, api_contract
 VALID_METHODS = {"GET", "POST"}
 VALID_SCOPES = {"public", "read", "admin"}
 VALID_FIELD_TYPES = {"string", "int", "bool", "string[]", "string|string[]", "object"}
+VALID_RESPONSE_FIELD_TYPES = {"list", "object", "string", "int", "bool", "number", "null", "any"}
 PATH_PARAM_PREFIXES = {
     "/assets/{path}": "/assets/",
     "/files/{path}": "/files/",
@@ -142,6 +143,11 @@ def validate_contract_shape(contract: dict[str, Any], routes: list[dict[str, Any
                         fields=route[field_kind],
                     )
                 )
+        response = route.get("response")
+        if response is not None and not isinstance(response, dict):
+            errors.append(f"route #{index} {method} {path} has invalid response contract")
+        elif isinstance(response, dict):
+            errors.extend(validate_response_metadata(route_index=index, method=str(method), path=str(path), response=response))
         key = (str(method), str(path))
         if key in seen:
             errors.append(f"duplicate route contract entry: {method} {path}")
@@ -191,6 +197,35 @@ def validate_field_metadata(
         if enum is not None:
             if not isinstance(enum, list) or not enum or not all(isinstance(value, str) and value for value in enum):
                 errors.append(f"{prefix}.enum must be a non-empty list of strings when present")
+    return errors
+
+
+def validate_response_metadata(
+    *,
+    route_index: int,
+    method: str,
+    path: str,
+    response: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    prefix = f"route #{route_index} {method} {path} response"
+    required_fields = response.get("required")
+    if required_fields is not None:
+        if not isinstance(required_fields, list) or not all(isinstance(name, str) for name in required_fields):
+            errors.append(f"{prefix}.required must be a list of strings")
+        elif len(required_fields) != len(set(required_fields)):
+            errors.append(f"{prefix}.required contains duplicated keys")
+    else:
+        errors.append(f"{prefix}.required is required")
+    fields = response.get("fields")
+    if fields is not None and not isinstance(fields, dict):
+        errors.append(f"{prefix}.fields must be a dictionary when present")
+    elif isinstance(fields, dict):
+        for field_name, field_type in fields.items():
+            if not isinstance(field_name, str) or not field_name:
+                errors.append(f"{prefix}.fields has invalid field name")
+            elif not isinstance(field_type, str) or field_type not in VALID_RESPONSE_FIELD_TYPES:
+                errors.append(f"{prefix}.fields[{field_name}] has unsupported type: {field_type}")
     return errors
 
 
