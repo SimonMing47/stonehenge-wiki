@@ -119,6 +119,44 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertFalse(stale_source.exists())
             self.assertFalse(stale_topic.exists())
 
+    def test_jobs_api_retry(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-job-retry-") as tmp:
+            root = Path(tmp)
+            wiki = root / "stonehenge-wiki"
+            docs = wiki / "docs" / "01_技术总结"
+            question_dir = wiki / "question"
+            docs.mkdir(parents=True)
+            question_dir.mkdir(parents=True)
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "index.md").write_text("企业知识库建设流程。\n", encoding="utf-8")
+
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
+            httpd = build_server(platform, "127.0.0.1", 0)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                reindex = json.loads(http_post(base + "/reindex", {}))
+                jobs = json.loads(http_get(base + "/jobs?limit=10"))
+                self.assertGreater(len(jobs["jobs"]), 0)
+                latest_job = jobs["jobs"][0]
+                latest_id = latest_job["id"]
+                retry = json.loads(http_post(base + "/jobs/retry", {"job_id": latest_id}))
+                missing = json.loads(http_post(base + "/jobs/retry", {"job_id": 999999}))
+                after = json.loads(http_get(base + "/jobs?limit=20"))
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+                thread.join(timeout=5)
+
+            self.assertEqual(reindex["status"], "ok")
+            self.assertEqual(retry["status"], "ok")
+            self.assertEqual(missing["error"], "job_not_found")
+            self.assertGreaterEqual(len(after["jobs"]), len(jobs["jobs"]) + 1)
+            self.assertEqual(after["jobs"][0]["status"], "ok")
+
     def test_compiled_wiki_sections_cli_api_and_secret_filter(self) -> None:
         with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-sections-test-") as tmp:
             root = Path(tmp)

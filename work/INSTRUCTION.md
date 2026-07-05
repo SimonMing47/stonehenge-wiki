@@ -118,11 +118,23 @@ cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --import-source ./docs/source.pdf --import-title "知识库评估材料" --import-category 03_学习材料
 ```
 
-查看审计日志：
+    查看审计日志：
 
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --audit-log --audit-limit 20
-```
+    ```bash
+    ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --audit-log --audit-limit 20
+    ```
+
+    查看任务运行历史（支持限制数量）：
+
+    ```bash
+    ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --jobs --jobs-limit 20
+    ```
+
+    重试失败任务（按 job id）：
+
+    ```bash
+    ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --jobs-retry 12345
+    ```
 
 来源风险扫描：
 
@@ -354,6 +366,8 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 - `POST /reports/evaluation/export`：导出题组质量评估 Markdown/JSON 报告到 `output/reports/`
 - `POST /reindex`：重建索引
 - `POST /wiki/compile`：将 `docs/` 编译为 `wiki/` Markdown 知识层
+- `GET /jobs`：列出最近作业运行记录
+- `POST /jobs/retry`：按 `job_id` 重试历史作业；可选 `attempt` 仅用于审计溯源（默认使用历史记录中的重试次数）。
 
 导入接口会落盘到 `docs/<category>/`，支持 pdf、doc/docx、ppt/pptx、xls/xlsx、html、xml、md、代码和常见文本格式；私网、localhost、超大文件和 `Permission.json` 拒绝的路径会被阻断并记录审计。
 

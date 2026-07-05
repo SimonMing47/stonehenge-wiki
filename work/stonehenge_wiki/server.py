@@ -236,6 +236,10 @@ class PlatformHandler(BaseHTTPRequestHandler):
                     include_evaluation=include_evaluation,
                 )
             )
+        if parsed.path == "/jobs/retry":
+            job_id = body.get("job_id")
+            attempt = body.get("attempt")
+            return self.write_json(self.stonehenge_wiki_platform.retry_job(job_id, attempt=attempt))
         if parsed.path == "/llm/config":
             return self.write_json(self.stonehenge_wiki_platform.update_llm_config(body))
         if parsed.path == "/llm/test":

@@ -268,6 +268,80 @@ class StonehengeWikiPlatform:
         write_result_log(self.wiki_root, f"成功解析{len(question_files)}个题组、{total}道题目，已成功输出答案。")
         return results
 
+    def retry_job(
+        self,
+        job_id: str | int,
+        attempt: str | int | None = None,
+    ) -> dict[str, Any]:
+        record = self.store.get_job(job_id)
+        if record is None:
+            return {"status": "error", "error": "job_not_found", "job_id": str(job_id)}
+
+        job_type = str(record.get("job_type") or "")
+        input_data = record.get("input") if isinstance(record.get("input"), dict) else {}
+        if attempt is None:
+            attempt = self._coerce_int(input_data.get("attempt"), 0) + 1
+        else:
+            attempt = self._coerce_int(attempt, 0)
+
+        try:
+            if job_type == "reindex":
+                result = self.rebuild_index()
+            elif job_type == "wiki_compile":
+                result = self.compile_wiki()
+            elif job_type == "wiki_lint":
+                result = self.lint_wiki()
+            elif job_type == "source_import":
+                source = str(input_data.get("source", ""))
+                title = str(input_data.get("title", ""))
+                category = str(input_data.get("category", "00_inbox") or "00_inbox")
+                if not source:
+                    return {"status": "error", "error": "missing_retry_source", "job_id": record.get("id")}
+                result = self.ingest_source(source=source, title=title, category=category)
+            elif job_type == "question_group":
+                question_file = str(input_data.get("question_file", ""))
+                if not question_file:
+                    return {"status": "error", "error": "missing_retry_question_file", "job_id": record.get("id")}
+                result = self.run_groups(explicit_files=[Path(question_file)])
+            else:
+                return {"status": "error", "error": "retry_unsupported", "job_type": job_type, "job_id": record.get("id")}
+        except Exception as error:
+            message = f"{type(error).__name__}: {error}"
+            self.audit(
+                event_type="jobs.retry",
+                request_id=new_request_id(),
+                subject=str(record.get("id", "job")),
+                status="blocked",
+                blocked=True,
+                payload={
+                    "job_id": record.get("id"),
+                    "job_type": job_type,
+                    "attempt": attempt,
+                    "error": message,
+                },
+            )
+            return {"status": "error", "error": "retry_failed", "job_type": job_type, "job_id": record.get("id"), "message": message}
+
+        payload = {
+            "retry_of": record.get("id"),
+            "attempt": attempt,
+            "job_type": job_type,
+            "result": result,
+        }
+        if isinstance(result, list):
+            payload["status"] = "ok" if result else "warn"
+        else:
+            payload["status"] = str(result.get("status", "ok"))
+        self.audit(
+            event_type="jobs.retry",
+            request_id=new_request_id(),
+            subject=str(record.get("id", "job")),
+            status=payload["status"],
+            blocked=str(payload["status"]) not in {"ok", "pass"},
+            payload=payload,
+        )
+        return payload
+
     def evaluation_report(
         self,
         explicit_files: list[Path] | None = None,

@@ -161,7 +161,19 @@ ROUTES: list[dict[str, Any]] = [
         "category": "governance",
         "summary": "List recent job run records.",
         "query": {"limit": field_contract(False, "int", "Maximum jobs to return.")},
-        "cli": None,
+        "cli": "--jobs [--jobs-limit N]",
+    },
+    {
+        "method": "POST",
+        "path": "/jobs/retry",
+        "scope": "admin",
+        "category": "governance",
+        "summary": "Retry a failed or blocked job by job id.",
+        "body": {
+            "job_id": field_contract(True, "int", "The job run id to rerun."),
+            "attempt": field_contract(False, "int", "Optional retry attempt override, used for audit trace only."),
+        },
+        "cli": "--jobs-retry JOB_ID",
     },
     {
         "method": "GET",

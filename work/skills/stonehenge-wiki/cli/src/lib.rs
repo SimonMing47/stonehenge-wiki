@@ -140,6 +140,8 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
     let mut explain_question: Option<String> = None;
     let mut import_source: Option<String> = None;
     let mut source_status_path: Option<String> = None;
+    let mut jobs_retry: Option<String> = None;
+    let mut jobs = false;
     let mut deck_topic: Option<String> = None;
     let mut slide_count = "6".to_string();
     let mut selected: Option<Action> = None;
@@ -169,7 +171,10 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
                     encode_query(value)
                 )));
             }
-            "--source-history-limit" | "--audit-limit" | "--wiki-section-limit" => {
+            "--source-history-limit"
+            | "--audit-limit"
+            | "--wiki-section-limit"
+            | "--jobs-limit" => {
                 index += 1;
                 limit = required_value(args, index, args[index - 1].as_str())?.to_string();
             }
@@ -182,6 +187,14 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
                     "/sources/reviews?path={}",
                     encode_query(value)
                 )));
+            }
+            "--jobs" => {
+                jobs = true;
+                selected = Some(get("/jobs"));
+            }
+            "--jobs-retry" => {
+                index += 1;
+                jobs_retry = Some(required_value(args, index, "--jobs-retry")?.to_string());
             }
             "--list-wiki-sections" => selected = Some(get("/wiki/sections")),
             "--wiki-section-source" => {
@@ -332,6 +345,12 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
             ]),
         );
     }
+    if jobs {
+        action = get("/jobs");
+    }
+    if let Some(job_id) = jobs_retry {
+        action = post("/jobs/retry", &json_object(&[("job_id", &job_id)]));
+    }
     if let Some(topic) = deck_topic {
         action = post(
             "/slides/generate",
@@ -371,6 +390,9 @@ fn with_common_query(action: Action, limit: &str, include_missing: bool) -> Acti
                 path = append_query(&path, "limit", limit);
             }
             if path.starts_with("/sources/history") || path.starts_with("/sources/reviews") {
+                path = append_query(&path, "limit", limit);
+            }
+            if path == "/jobs" {
                 path = append_query(&path, "limit", limit);
             }
             if include_missing && path.starts_with("/sources") && !path.starts_with("/sources/") {
@@ -627,6 +649,8 @@ Read commands:
   --source-risk-report
   --list-source-reviews [--source-review-path PATH]
   --audit-log [--audit-limit N]
+  --jobs [--jobs-limit N]
+  --jobs-retry JOB_ID
   --list-wiki-sections [--wiki-section-source PATH] [--wiki-section-limit N]
   --search-wiki QUERY [--wiki-section-limit N]
   --lint-wiki

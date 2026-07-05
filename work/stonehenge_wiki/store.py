@@ -346,6 +346,27 @@ class SQLiteStore:
             jobs.append(job)
         return jobs
 
+    def get_job(self, job_id: str | int) -> dict[str, Any] | None:
+        try:
+            parsed_id = int(job_id)
+        except (TypeError, ValueError):
+            return None
+        with self.connect() as con:
+            row = con.execute(
+                """
+                SELECT id, created_at, job_type, status, input_json, output_json
+                FROM job_runs
+                WHERE id = ?
+                """,
+                (parsed_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        job = dict(row)
+        job["input"] = json.loads(job.pop("input_json") or "{}")
+        job["output"] = json.loads(job.pop("output_json") or "{}")
+        return job
+
     def list_sources(self, include_missing: bool = False) -> list[dict[str, Any]]:
         where = "" if include_missing else "WHERE s.status != 'missing'"
         with self.connect() as con:
