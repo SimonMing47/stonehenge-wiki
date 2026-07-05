@@ -144,6 +144,9 @@ class PlatformSmokeTest(unittest.TestCase):
                 latest_job = jobs["jobs"][0]
                 latest_id = latest_job["id"]
                 retry = json.loads(http_post(base + "/jobs/retry", {"job_id": latest_id}))
+                retry_with_attempt = json.loads(
+                    http_post(base + "/jobs/retry", {"job_id": latest_id, "attempt": 7})
+                )
                 missing = json.loads(http_post(base + "/jobs/retry", {"job_id": 999999}))
                 after = json.loads(http_get(base + "/jobs?limit=20"))
             finally:
@@ -154,6 +157,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(reindex["status"], "ok")
             self.assertEqual(retry["status"], "ok")
             self.assertEqual(missing["error"], "job_not_found")
+            self.assertEqual(retry_with_attempt["attempt"], 7)
             self.assertGreaterEqual(len(after["jobs"]), len(jobs["jobs"]) + 1)
             self.assertEqual(after["jobs"][0]["status"], "ok")
 

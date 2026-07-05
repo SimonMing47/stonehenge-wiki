@@ -130,10 +130,11 @@ cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
     ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --jobs --jobs-limit 20
     ```
 
-    重试失败任务（按 job id）：
+    重试失败任务（按 job id，可指定审计重试序号）：
 
     ```bash
     ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --jobs-retry 12345
+    ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --jobs-retry 12345 --jobs-retry-attempt 3
     ```
 
 来源风险扫描：

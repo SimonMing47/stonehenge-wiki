@@ -141,6 +141,7 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
     let mut import_source: Option<String> = None;
     let mut source_status_path: Option<String> = None;
     let mut jobs_retry: Option<String> = None;
+    let mut jobs_retry_attempt: Option<String> = None;
     let mut jobs = false;
     let mut deck_topic: Option<String> = None;
     let mut slide_count = "6".to_string();
@@ -187,6 +188,11 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
                     "/sources/reviews?path={}",
                     encode_query(value)
                 )));
+            }
+            "--jobs-retry-attempt" => {
+                index += 1;
+                jobs_retry_attempt =
+                    Some(required_value(args, index, "--jobs-retry-attempt")?.to_string());
             }
             "--jobs" => {
                 jobs = true;
@@ -349,7 +355,17 @@ fn parse_action(args: &[String]) -> Result<Action, String> {
         action = get("/jobs");
     }
     if let Some(job_id) = jobs_retry {
-        action = post("/jobs/retry", &json_object(&[("job_id", &job_id)]));
+        let body = if let Some(attempt) = jobs_retry_attempt {
+            let attempt = attempt.parse::<i64>().unwrap_or(0);
+            format!(
+                r#"{{"job_id":{},"attempt":{}}}"#,
+                json_string(&job_id),
+                attempt
+            )
+        } else {
+            json_object(&[("job_id", &job_id)])
+        };
+        action = post("/jobs/retry", &body);
     }
     if let Some(topic) = deck_topic {
         action = post(
@@ -650,7 +666,7 @@ Read commands:
   --list-source-reviews [--source-review-path PATH]
   --audit-log [--audit-limit N]
   --jobs [--jobs-limit N]
-  --jobs-retry JOB_ID
+  --jobs-retry JOB_ID [--jobs-retry-attempt N]
   --list-wiki-sections [--wiki-section-source PATH] [--wiki-section-limit N]
   --search-wiki QUERY [--wiki-section-limit N]
   --lint-wiki
