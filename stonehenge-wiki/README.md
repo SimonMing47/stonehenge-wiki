@@ -24,6 +24,16 @@ stonehenge-wiki/.state/wiki.sqlite
 
 来源注册表支持 `active`、`quarantined`、`missing` 状态。`quarantined` 来源仍保留路径、hash、版本和风险记录，但不会进入问答、工作台生成和编译后的 `wiki/` 知识面。命中 `Permission.json.file.deny` 的来源会被策略自动隔离。
 
+## 工程一致性检查
+
+建议每次改动文档、CLI、API 后执行：
+
+```bash
+python3 scripts/check_doc_consistency.py
+```
+
+脚本会校验 `INSTRUCTION.md`/`DESIGN.md`/`work/stonehenge_wiki/DESIGN.md` 中提到的命令与仓库实际 CLI flag 与 API 合约是否一致，避免历史文档与实现漂移。
+
 Raw 页面和 REST CLI 支持查看来源详情，包括 metadata、脱敏抽取预览、版本、审核、风险和关联 wiki 区段：
 
 ```bash

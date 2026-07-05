@@ -196,6 +196,24 @@ REST 自验证：
 ./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
 ```
 
+## 本地交付一致性与质量检查
+
+文档、CLI 与 API 对齐变更后，建议执行以下检查：
+
+```bash
+python3 scripts/check_doc_consistency.py
+PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks
+PYTHONPATH=work python3 -m unittest discover -s work/tests -q
+```
+
+该命令链对应三类质量门：
+
+- `scripts/check_doc_consistency.py`：检查 `README/INSTRUCTION/DESIGN` 文档与 CLI 实现/API 契约一致性
+- `contract_checks`：检查 API route / scope / query / body / Rust CLI flag 绑定一致性
+- 单元测试：覆盖服务、治理、审计和文件服务回归
+
+- `PYTHONPATH=work` 的设置请与项目里运行 `unit test` 的方式保持一致。
+
 ## LLM Agent 与 opencode 配置
 
 LLM 配置必须按 agent 隔离，不要把所有模型参数只堆在顶层 `llm` 字段里。`stonehenge-wiki/config.json` 的约定如下：
