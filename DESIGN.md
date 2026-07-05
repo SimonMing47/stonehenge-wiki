@@ -689,7 +689,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 ### P0
 
 - 给 REST API route contract 增加响应 schema 一致性检查。
-- 给 README/INSTRUCTION/DESIGN 增加一致性检查脚本。
+- ✅ 给 README/INSTRUCTION/DESIGN 增加一致性检查脚本。
 - 扩展 GitHub Actions，增加 release bundle 和 browser smoke 的可选门禁。
 
 ### P1

@@ -11,6 +11,7 @@
 - 增加 Raw 来源详情：`GET /sources/detail`、Rust CLI `--source-detail`、同页脱敏抽取预览、版本、审核、风险和 wiki 区段。
 - 增加机器可读 API 契约 v2：`GET /api/contract`、Python 兼容 CLI `--api-contract`、Rust REST CLI `--api-contract`，包含 query/body 字段 required/type/alias/enum 元数据。
 - 增加 API contract 一致性检查和 GitHub Actions CI，覆盖 Python compile、route/scope/query/body 字段元数据/CLI contract、unittest、Rust fmt/test 和 skill CLI build。
+- 增加文档一致性校验脚本 `scripts/check_doc_consistency.py`：自动校验 `README/INSTRUCTION/DESIGN` 中出现的 CLI flag 与 API 路径与 `api_contract.py` / CLI 实现保持一致。
 - 增强 release bundle manifest，可追踪生成者、artifact 数量、每个打包文件的 size/sha256，以及发布包自身 sha256。
 - 增加 GitHub PR 模板和 Bug/Feature issue forms，固化 3 人协作分工、验证命令、安全影响和 no-RAG/REST-only guardrails。
 - 升级 GitHub Actions `checkout`/`setup-python` major 版本，清理 Node 20 deprecation annotation，并增加 workflow 版本守护测试。
