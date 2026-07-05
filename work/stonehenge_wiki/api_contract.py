@@ -97,6 +97,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "index",
         "summary": "Return the persisted document and comment index.",
         "cli": "--dump-index",
+        "response": response_contract(["files", "comments", "presentations", "source_registry", "source_risks", "store"]),
     },
     {
         "method": "GET",
@@ -108,6 +109,7 @@ ROUTES: list[dict[str, Any]] = [
             "include_missing": field_contract(False, "bool", "Include missing/deleted source records."),
         },
         "cli": "--list-sources [--include-missing-sources]",
+        "response": response_contract(["sources"]),
     },
     {
         "method": "GET",
@@ -140,6 +142,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "sources",
         "summary": "Return source risk scan summary and details.",
         "cli": "--source-risk-report",
+        "response": response_contract(["status", "summary", "findings", "sources", "by_code", "by_severity"]),
     },
     {
         "method": "GET",
@@ -152,6 +155,7 @@ ROUTES: list[dict[str, Any]] = [
             "limit": field_contract(False, "int", "Maximum review records to return."),
         },
         "cli": "--list-source-reviews [--source-review-path PATH]",
+        "response": response_contract(["reviews"]),
     },
     {
         "method": "GET",
@@ -161,6 +165,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "Return recent audit events.",
         "query": {"limit": field_contract(False, "int", "Maximum audit events to return.")},
         "cli": "--audit-log [--audit-limit N]",
+        "response": response_contract(["events"]),
     },
     {
         "method": "GET",
@@ -192,6 +197,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "wiki",
         "summary": "Validate compiled wiki files and section metadata.",
         "cli": "--lint-wiki",
+        "response": response_contract(["status", "issue_count"]),
     },
     {
         "method": "GET",
@@ -205,6 +211,7 @@ ROUTES: list[dict[str, Any]] = [
             "limit": field_contract(False, "int", "Maximum wiki sections to return."),
         },
         "cli": "--list-wiki-sections [--wiki-section-source PATH] [--wiki-section-limit N]",
+        "response": response_contract(["sections"]),
     },
     {
         "method": "GET",
@@ -214,6 +221,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "List compiled wiki pages for same-page browsing.",
         "query": {"limit": field_contract(False, "int", "Maximum wiki pages to return.")},
         "cli": None,
+        "response": response_contract(["pages", "count"]),
     },
     {
         "method": "GET",
@@ -223,6 +231,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "Return one compiled wiki page by relative path.",
         "query": {"path": field_contract(True, "string", "Compiled wiki page relative path.")},
         "cli": None,
+        "response": response_contract(["status", "path", "markdown"]),
     },
     {
         "method": "GET",
@@ -236,6 +245,7 @@ ROUTES: list[dict[str, Any]] = [
             "limit": field_contract(False, "int", "Maximum search results to return."),
         },
         "cli": "--search-wiki QUERY [--wiki-section-limit N]",
+        "response": response_contract(["status", "query", "sections"]),
     },
     {
         "method": "GET",
@@ -244,6 +254,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "reports",
         "summary": "Return the governance report.",
         "cli": "--governance-report",
+        "response": response_contract(["status", "report"]),
     },
     {
         "method": "GET",
@@ -256,6 +267,7 @@ ROUTES: list[dict[str, Any]] = [
             "group": field_contract(False, "string[]", "Alias for groups.", alias_for="groups"),
         },
         "cli": "--readiness-report [--group GROUP]",
+        "response": response_contract(["status", "report"]),
     },
     {
         "method": "GET",
@@ -264,6 +276,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "llm",
         "summary": "Return sanitized LLM and agent configuration.",
         "cli": None,
+        "response": response_contract(["llm", "source_categories"]),
     },
     {
         "method": "POST",
@@ -368,6 +381,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "reports",
         "summary": "Write the governance report to output/reports.",
         "cli": "--export-governance-report",
+        "response": response_contract(["status", "report", "path", "download_url"]),
     },
     {
         "method": "POST",
@@ -377,6 +391,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "Evaluate question groups and return quality metrics.",
         "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": "--evaluation-report [--group GROUP]",
+        "response": response_contract(["status", "report"]),
     },
     {
         "method": "POST",
@@ -386,6 +401,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "Write question evaluation reports to output/reports.",
         "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": "--export-evaluation-report [--group GROUP]",
+        "response": response_contract(["status", "report", "path", "json_path", "download_url", "json_download_url"]),
     },
     {
         "method": "POST",
@@ -395,6 +411,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "Return enterprise readiness gates using explicit POST group selection.",
         "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": None,
+        "response": response_contract(["status", "report"]),
     },
     {
         "method": "POST",
@@ -404,6 +421,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "Write enterprise readiness report files.",
         "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": "--export-readiness-report [--group GROUP]",
+        "response": response_contract(["status", "report", "path", "json_path", "download_url", "json_download_url"]),
     },
     {
         "method": "POST",
@@ -424,6 +442,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "llm",
         "summary": "Update LLM and named agent configuration.",
         "cli": None,
+        "response": response_contract(["status"]),
     },
     {
         "method": "POST",

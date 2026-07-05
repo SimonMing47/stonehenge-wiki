@@ -15,6 +15,7 @@ from urllib.parse import quote
 
 from stonehenge_wiki.extractors import extract_docx
 from stonehenge_wiki.answerer import QuestionAnswerer
+from stonehenge_wiki.api_contract import api_contract
 from stonehenge_wiki.cli import main as cli_main
 from stonehenge_wiki.llm import LLMAnswer, LLMClient, build_context
 from stonehenge_wiki.indexer import WikiIndex
@@ -26,6 +27,24 @@ from stonehenge_wiki.server import build_server
 
 
 class PlatformSmokeTest(unittest.TestCase):
+    @staticmethod
+    def _response_contract_required_fields() -> dict[tuple[str, str], list[str]]:
+        contract = api_contract()
+        return {
+            (str(route["method"]), str(route["path"])): list(route["response"]["required"])
+            for route in contract["routes"]
+            if isinstance(route.get("response"), dict) and isinstance(route["response"].get("required"), list)
+        }
+
+    def _assert_required_fields_present(self, payload: dict[str, object], method: str, path: str) -> None:
+        required = self._response_contract_required_fields().get((method, path), [])
+        missing = [field for field in required if field not in payload]
+        self.assertEqual(
+            [],
+            missing,
+            f"{method} {path} missing required fields: {missing}; payload keys={sorted(payload.keys())}",
+        )
+
     def test_group_run_persistence_audit_and_repair(self) -> None:
         with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-test-") as tmp:
             root = Path(tmp)
@@ -149,6 +168,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 )
                 missing = json.loads(http_post(base + "/jobs/retry", {"job_id": 999999}))
                 after = json.loads(http_get(base + "/jobs?limit=20"))
+                health = json.loads(http_get(base + "/health"))
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -160,6 +180,14 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(retry_with_attempt["attempt"], 7)
             self.assertGreaterEqual(len(after["jobs"]), len(jobs["jobs"]) + 1)
             self.assertEqual(after["jobs"][0]["status"], "ok")
+
+            self.assertIsInstance(jobs["jobs"], list)
+            self.assertGreaterEqual(len(jobs["jobs"]), 1)
+            self.assertIsInstance(jobs["jobs"][0]["id"], (str, int))
+            self._assert_required_fields_present(jobs, "GET", "/jobs")
+            self._assert_required_fields_present(health, "GET", "/health")
+            self._assert_required_fields_present(retry, "POST", "/jobs/retry")
+            self._assert_required_fields_present(retry_with_attempt, "POST", "/jobs/retry")
 
     def test_compiled_wiki_sections_cli_api_and_secret_filter(self) -> None:
         with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-sections-test-") as tmp:
@@ -316,6 +344,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn(".source-detail-grid", styles_css)
             self.assertIn(".page.active", styles_css)
             self.assertEqual(health["status"], "ok")
+            self._assert_required_fields_present(health, "GET", "/health")
+            self._assert_required_fields_present(api_contract, "GET", "/api/contract")
             self.assertEqual(sources["sources"], [])
             self.assertEqual(source_risk["summary"]["risk_count"], 0)
             self.assertIn(lint["status"], {"ok", "error"})
