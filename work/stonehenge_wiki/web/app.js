@@ -18,6 +18,8 @@ const state = {
   explanation: null,
   llm: null,
   llmConfig: null,
+  wikiRelations: [],
+  wikiRelationsError: null,
   wikiTreeFilter: "",
   wikiPageIndex: null,
 };
@@ -1425,94 +1427,18 @@ function normalizeWikiPath(value) {
   return String(value || "").replace(/\.md$/i, "").replace(/^\/+/, "").toLowerCase();
 }
 
-function resolveWikiPathCandidate(candidate) {
-  if (!candidate) return "";
-  const raw = String(candidate).trim().replace(/\.md$/i, "");
-  if (!raw) return "";
-  return raw.includes("/") || raw.includes(".") ? raw : raw.replace(/\s+/g, "-");
-}
-
-function parseWikiLinksFromMarkdown(markdown) {
-  const found = [];
-  const pattern = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-  let match;
-  while ((match = pattern.exec(markdown || "")) !== null) {
-    const target = String(match[1] || "").trim();
-    if (!target || target.startsWith("http")) {
-      continue;
-    }
-    const normalized = target.split("#", 1)[0].trim();
-    if (normalized) {
-      found.push(normalized);
-    }
+function relationReasonLabel(reason) {
+  switch (String(reason || "")) {
+    case "same_source":
+      return translate("wiki.graph_source");
+    case "same_kind":
+      return translate("wiki.graph_kind");
+    case "same_folder":
+      return translate("wiki.graph_folder");
+    case "wiki_link":
+    default:
+      return translate("wiki.graph_link");
   }
-  return found;
-}
-
-function findWikiPageByLink(candidate, currentPage) {
-  const lookup = state.wikiPageIndex || {};
-  const raw = resolveWikiPathCandidate(candidate);
-  if (!raw) return "";
-  if (lookup.byPath?.[candidate]) {
-    return candidate;
-  }
-  if (lookup.byPath?.[`${raw}.md`]) {
-    return `${raw}.md`;
-  }
-  if (lookup.byPathStem?.[raw]) {
-    return lookup.byPathStem[raw][0]?.path || "";
-  }
-  const currentSource = String(currentPage?.source_path || "");
-  if (currentSource) {
-    for (const item of Object.values(lookup.byPath || {})) {
-      if (item.source_path === currentSource && item.path.endsWith(`/${raw}.md`)) {
-        return item.path;
-      }
-    }
-  }
-  const titleMatches = lookup.byTitle?.[raw.toLowerCase()];
-  return titleMatches?.[0]?.path || "";
-}
-
-function extractGraphRelations(page, markdown) {
-  const current = page || {};
-  const relations = [];
-  const existing = new Set();
-  const addRelation = (targetPath, reason) => {
-    if (!targetPath || targetPath === current.path) return;
-    if (existing.has(targetPath)) return;
-    const target = (state.wikiPageIndex?.byPath || {})[targetPath];
-    if (!target) return;
-    existing.add(targetPath);
-    relations.push({
-      path: target.path,
-      title: target.title || target.path,
-      reason,
-    });
-  };
-
-  const linkTargets = parseWikiLinksFromMarkdown(markdown || "");
-  linkTargets.forEach((target) => {
-    const resolved = findWikiPageByLink(target, current);
-    addRelation(resolved, translate("wiki.graph_link"));
-  });
-
-  for (const candidate of state.wikiPages || []) {
-    if (candidate.path === current.path) continue;
-    if (current.source_path && candidate.source_path && current.source_path === candidate.source_path) {
-      addRelation(candidate.path, translate("wiki.graph_source"));
-    }
-    if (candidate.kind === current.kind && current.kind) {
-      addRelation(candidate.path, translate("wiki.graph_kind"));
-    }
-    const currentFolder = String(candidate.path).split("/")[0];
-    const currentSelfFolder = String(current.path).split("/")[0];
-    if (currentFolder && currentFolder === currentSelfFolder) {
-      addRelation(candidate.path, translate("wiki.graph_folder"));
-    }
-  }
-
-  return relations.slice(0, 12);
 }
 
 async function ensureWikiPagePreview() {
@@ -1532,15 +1458,32 @@ async function loadWikiPage(path, options = {}) {
   if (!options.quiet) {
     el("wikiPageMeta").textContent = translate("status.loading");
   }
+  state.wikiRelations = [];
+  state.wikiRelationsError = null;
   try {
     const result = await api(`/wiki/page?path=${encodeURIComponent(path)}`);
+    const pagePath = result?.page?.path || path;
     state.wikiPage = result;
     renderWikiPagePreview();
     renderWikiPageList();
+
+    const relationsResult = await safeApiCall(`/wiki/relations?path=${encodeURIComponent(pagePath)}&limit=12`);
+    if (relationsResult.ok) {
+      state.wikiRelations = relationsResult.data?.relations || [];
+      state.wikiRelationsError = null;
+    } else {
+      state.wikiRelations = [];
+      state.wikiRelationsError = relationsResult.error || translate("status.failed");
+    }
+    renderWikiRelations(result, state.wikiRelations);
   } catch (error) {
     el("wikiPageTitle").textContent = translate("wiki.preview");
     el("wikiPageMeta").textContent = translate("status.failed");
+    state.wikiRelations = [];
+    state.wikiRelationsError = error.message;
     el("wikiPagePreview").innerHTML = `<div class="answer-status blocked">${escapeHtml(error.message)}</div>`;
+    el("wikiGraph").innerHTML = `<div class="wiki-graph-empty blocked">${escapeHtml(error.message)}</div>`;
+    el("wikiGraphStatus").textContent = translate("status.failed");
   }
 }
 
@@ -1559,15 +1502,24 @@ function renderWikiPagePreview() {
   el("wikiPageTitle").textContent = page.title || page.path;
   el("wikiPageMeta").textContent = meta;
   el("wikiPagePreview").innerHTML = markdownToHtml(detail.markdown || "");
-  renderWikiRelations(detail);
+  renderWikiRelations(detail, state.wikiRelations);
 }
 
-function renderWikiRelations(detail) {
+function renderWikiRelations(detail, relations = []) {
   const page = detail.page || {};
-  const relations = extractGraphRelations(page, detail.markdown || "");
-  el("wikiGraphStatus").textContent = `${relations.length} ${translate("wiki.relation")}`;
-  el("wikiGraph").innerHTML = relations.length
-    ? relations
+  if (!page.path) {
+    el("wikiGraphStatus").textContent = translate("status.select_article");
+    return;
+  }
+  if (state.wikiRelationsError) {
+    el("wikiGraphStatus").textContent = translate("status.failed");
+    el("wikiGraph").innerHTML = `<div class="wiki-graph-empty blocked">${escapeHtml(state.wikiRelationsError)}</div>`;
+    return;
+  }
+  const safeRelations = Array.isArray(relations) ? relations : [];
+  el("wikiGraphStatus").textContent = `${safeRelations.length} ${translate("wiki.relation")}`;
+  el("wikiGraph").innerHTML = safeRelations.length
+    ? safeRelations
         .map((relation) => {
           return `
             <div class="wiki-graph-row">
@@ -1575,7 +1527,7 @@ function renderWikiRelations(detail) {
                 ${escapeHtml(relation.title || relation.path)}
               </button>
               <span class="wiki-graph-arrow">↔</span>
-              <span class="wiki-graph-reason muted">${escapeHtml(relation.reason || "")}</span>
+              <span class="wiki-graph-reason muted">${escapeHtml(relationReasonLabel(relation.reason))}</span>
             </div>
           `;
         })
