@@ -176,6 +176,43 @@ class PlatformHandler(BaseHTTPRequestHandler):
             return self.write_json(self.stonehenge_wiki_platform.readiness_report(groups=groups))
         return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
 
+    def do_HEAD(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path in {"/", "/console"}:
+            return self.write_static_headers("index.html")
+        if parsed.path == "/favicon.ico":
+            return self.write_static_headers("favicon.svg")
+        if parsed.path.startswith("/assets/"):
+            return self.write_static_headers(parsed.path.removeprefix("/assets/"))
+        if parsed.path == "/health":
+            return self.write_head_json(self.stonehenge_wiki_platform.health())
+        if parsed.path == "/api/contract":
+            auth_status = self.auth_error_status("read")
+            if auth_status is not None:
+                return self.write_head_status(auth_status)
+            return self.write_head_json(api_contract())
+        if parsed.path == "/index":
+            auth_status = self.auth_error_status("read")
+            if auth_status is not None:
+                return self.write_head_status(auth_status)
+            return self.write_head_json({"status": "ok"})
+        if parsed.path == "/sources":
+            auth_status = self.auth_error_status("read")
+            if auth_status is not None:
+                return self.write_head_status(auth_status)
+            return self.write_head_json({"status": "ok"})
+        if parsed.path == "/wiki/lint":
+            auth_status = self.auth_error_status("read")
+            if auth_status is not None:
+                return self.write_head_status(auth_status)
+            return self.write_head_json({"status": "ok"})
+        if parsed.path == "/llm/config":
+            auth_status = self.auth_error_status("admin")
+            if auth_status is not None:
+                return self.write_head_status(auth_status)
+            return self.write_head_json({"status": "ok"})
+        return self.write_head_status(HTTPStatus.NOT_FOUND)
+
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         required_scope = "public" if parsed.path in {"/ask", "/explain"} else "admin"
@@ -304,6 +341,21 @@ class PlatformHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def write_head_json(self, data: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
+        payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+
+    def write_head_status(self, status: HTTPStatus) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def write_no_content(self) -> None:
         self.send_response(HTTPStatus.NO_CONTENT)
         self.send_header("Cache-Control", "no-store")
@@ -322,6 +374,17 @@ class PlatformHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+
+    def write_static_headers(self, rel_name: str) -> None:
+        static_root = Path(__file__).resolve().parent / "web"
+        target = (static_root / rel_name).resolve()
+        if not target.is_file() or static_root.resolve() not in target.parents:
+            return self.write_head_status(HTTPStatus.NOT_FOUND)
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(target.stat().st_size))
+        self.end_headers()
 
     def write_wiki_file(self, rel_name: str) -> None:
         safe_rel = unquote(rel_name).strip("/")

@@ -342,6 +342,8 @@ class PlatformSmokeTest(unittest.TestCase):
                 source_risk = json.loads(http_get(base + "/sources/risk"))
                 lint = json.loads(http_get(base + "/wiki/lint"))
                 favicon_status = http_get_status(base + "/favicon.ico")
+                head_root_status = http_head_status(base + "/")
+                head_health_status = http_head_status(base + "/health")
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -357,6 +359,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn(("GET", "/sources/detail"), contract_paths)
             self.assertIn(("POST", "/llm/test"), contract_paths)
             self.assertEqual(contract_paths, cli_contract_paths)
+            self.assertEqual(head_root_status, 200)
+            self.assertEqual(head_health_status, 200)
             self.assertIn("Stonehenge Wiki", index_html)
             self.assertIn('href="/assets/favicon.svg"', index_html)
             self.assertIn("authName", index_html)
@@ -1615,6 +1619,15 @@ def http_get_with_headers(url: str, headers: dict[str, str] | None = None) -> tu
 
 def http_get_status(url: str, headers: dict[str, str] | None = None) -> int:
     request = urllib.request.Request(url, headers=headers or {}, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def http_head_status(url: str, headers: dict[str, str] | None = None) -> int:
+    request = urllib.request.Request(url, headers=headers or {}, method="HEAD")
     try:
         with urllib.request.urlopen(request, timeout=5) as response:
             return response.status
