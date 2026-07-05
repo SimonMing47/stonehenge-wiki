@@ -192,7 +192,11 @@ http://127.0.0.1:8765/
 ./work/scripts/server.sh stop
 ./work/scripts/server.sh restart
 ./work/scripts/server.sh tail
+
+./work/scripts/health_check.sh
 ```
+
+`server.sh status` 返回码：`0=ok`、`1=degraded`、`2=blocked`。`health_check.sh` 会透传同一返回码，适合用于 CI 健康闸门。
 
 可用环境变量：`STONEHENGE_WIKI_HOST` / `STONEHENGE_WIKI_PORT` / `STONEHENGE_WIKI_ROOT`，也可通过 `--host`、`--port`、`--wiki-root` 显式覆盖参数。
 

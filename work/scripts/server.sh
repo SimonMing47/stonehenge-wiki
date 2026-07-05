@@ -2,13 +2,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-WIKI_ROOT="${STONEHENGE_WIKI_ROOT:-$REPO_ROOT/stonehenge-wiki}"
+WORK_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$WORK_ROOT/.." && pwd)"
+PYTHONPATH_DEFAULT="$WORK_ROOT"
+WIKI_ROOT="${STONEHENGE_WIKI_ROOT:-$WORK_ROOT/stonehenge-wiki}"
 HOST="${STONEHENGE_WIKI_HOST:-127.0.0.1}"
 PORT="${STONEHENGE_WIKI_PORT:-8765}"
-PID_FILE="${STONEHENGE_WIKI_SERVER_PID_FILE:-$REPO_ROOT/.stonehenge-wiki-server.pid}"
-LOG_FILE="${STONEHENGE_WIKI_SERVER_LOG:-$REPO_ROOT/.stonehenge-wiki-server.log}"
+PID_FILE="${STONEHENGE_WIKI_SERVER_PID_FILE:-$WORK_ROOT/.stonehenge-wiki-server.pid}"
+LOG_FILE="${STONEHENGE_WIKI_SERVER_LOG:-$WORK_ROOT/.stonehenge-wiki-server.log}"
 HEALTH_TIMEOUT="${STONEHENGE_WIKI_HEALTH_TIMEOUT:-15}"
+STATUS_OK=0
+STATUS_DEGRADED=1
+STATUS_BLOCKED=2
 JSON_MODE=0
 
 COMMAND="${1:-start}"
@@ -187,7 +192,7 @@ start_server() {
   fi
 
   mkdir -p "$(dirname "$LOG_FILE")"
-  nohup env PYTHONPATH="$REPO_ROOT" python3 -m stonehenge_wiki.cli \
+  nohup env PYTHONPATH="${STONEHENGE_WIKI_PYTHONPATH:-$PYTHONPATH_DEFAULT}" python3 -m stonehenge_wiki.cli \
     --wiki-root "$WIKI_ROOT" --serve --host "$HOST" --port "$PORT" \
     >>"$LOG_FILE" 2>&1 &
   local pid="$!"
@@ -257,35 +262,74 @@ stop_server() {
 }
 
 status_server() {
-  if ((JSON_MODE == 1)); then
-    status_server_json
-    return
+  local status_code=0
+  local status="degraded"
+
+  status_code=$(status_code)
+  if ((status_code == STATUS_OK)); then
+    status="ok"
+  elif ((status_code == STATUS_DEGRADED)); then
+    status="degraded"
+  else
+    status="blocked"
   fi
 
+  if ((JSON_MODE == 1)); then
+    status_server_json "$status_code" "$status"
+    return "$status_code"
+  fi
+
+  if ((status_code == STATUS_OK)); then
+    echo "Server running and healthy."
+    return "$STATUS_OK"
+  fi
+
+  if ((status_code == STATUS_DEGRADED)); then
+    if is_running; then
+      local pid
+      pid="$(read_pid)"
+      echo "Server running but health check failed. PID: $pid"
+    else
+      local listener_pid
+      listener_pid="$(port_listener_pid || true)"
+      if [[ -n "$listener_pid" ]]; then
+        echo "Server process is not tracked by local PID file, but port $PORT is in use (PID: $listener_pid)."
+      else
+        echo "Server not running."
+      fi
+    fi
+    return "$STATUS_DEGRADED"
+  fi
+
+  echo "Port $PORT is blocked by another process or cannot determine status."
+  return "$STATUS_BLOCKED"
+}
+
+status_code() {
   if is_running; then
-    local pid
-    pid="$(read_pid)"
-    echo "Server running (PID: $pid)"
     if check_health; then
-      echo "Health check: OK"
+      echo "$STATUS_OK"
       return 0
     fi
-    echo "Health check: failed"
-    return 1
+
+    echo "$STATUS_DEGRADED"
+    return 0
   fi
 
   local on_port
   on_port="$(port_listener_pid || true)"
   if [[ -n "$on_port" ]]; then
-    echo "Server process is not tracked by local PID file, but port $PORT is in use (PID: $on_port)."
-    return 1
+    echo "$STATUS_BLOCKED"
+    return 0
   fi
 
-  echo "Server not running."
-  return 1
+  echo "$STATUS_DEGRADED"
+  return 0
 }
 
 status_server_json() {
+  local status_code="$1"
+  local status="$2"
   local pid
   local on_port
   local health="unknown"
@@ -322,11 +366,11 @@ status_server_json() {
     return 1
   fi
 
-  python3 - "$pid" "$on_port" "$health" "$lstart" "$etime" "$cpu" "$mem" "$rss" "$command" "$HOST" "$PORT" "$WIKI_ROOT" "$LOG_FILE" "$PID_FILE" <<'PY'
+  python3 - "$status_code" "$status" "$pid" "$on_port" "$health" "$lstart" "$etime" "$cpu" "$mem" "$rss" "$command" "$HOST" "$PORT" "$WIKI_ROOT" "$LOG_FILE" "$PID_FILE" <<'PY'
 import json
 import sys
 
-pid, on_port, health, lstart, etime, cpu, mem, rss, command, host, port, wiki_root, log_file, pid_file = sys.argv[1:]
+status_code, status, pid, on_port, health, lstart, etime, cpu, mem, rss, command, host, port, wiki_root, log_file, pid_file = sys.argv[1:]
 
 payload = {
     "server": {
@@ -337,6 +381,8 @@ payload = {
         "log_file": log_file,
     },
     "status": {
+        "state": status,
+        "code": int(status_code),
         "running": bool(pid),
         "pid": pid or None,
         "port_listener_pid": on_port or None,
