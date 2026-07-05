@@ -188,6 +188,7 @@ http://127.0.0.1:8765/
 ```bash
 ./work/scripts/server.sh start
 ./work/scripts/server.sh status
+./work/scripts/server.sh inspect
 ./work/scripts/server.sh stop
 ./work/scripts/server.sh restart
 ./work/scripts/server.sh tail

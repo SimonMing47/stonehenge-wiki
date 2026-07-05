@@ -8,6 +8,8 @@ HOST="${STONEHENGE_WIKI_HOST:-127.0.0.1}"
 PORT="${STONEHENGE_WIKI_PORT:-8765}"
 PID_FILE="${STONEHENGE_WIKI_SERVER_PID_FILE:-$REPO_ROOT/.stonehenge-wiki-server.pid}"
 LOG_FILE="${STONEHENGE_WIKI_SERVER_LOG:-$REPO_ROOT/.stonehenge-wiki-server.log}"
+HEALTH_TIMEOUT="${STONEHENGE_WIKI_HEALTH_TIMEOUT:-15}"
+JSON_MODE=0
 
 COMMAND="${1:-start}"
 shift || true
@@ -34,9 +36,17 @@ while (($# > 0)); do
       LOG_FILE="$2"
       shift 2
       ;;
+    --json)
+      JSON_MODE=1
+      shift
+      ;;
+    --health-timeout)
+      HEALTH_TIMEOUT="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1" >&2
-      echo "Use: $0 {start|stop|status|restart|tail|help} [--host HOST] [--port PORT] [--wiki-root PATH]" >&2
+      echo "Use: $0 {start|stop|status|restart|inspect|tail|help} [--host HOST] [--port PORT] [--wiki-root PATH]" >&2
       exit 1
       ;;
   esac
@@ -48,12 +58,13 @@ fi
 
 USAGE=$(cat <<'EOF'
 Usage:
-  server.sh [start|stop|status|restart|tail|help] [options]
+  server.sh [start|stop|status|restart|inspect|tail|help] [options]
 
 Commands:
   start    Start Stonehenge Wiki REST service
   stop     Stop the running service
   status   Show process + health status
+  inspect  Show machine-readable status snapshot
   restart  Restart the service
   tail     Tail service log
   help     Show this help
@@ -64,6 +75,8 @@ Options:
   --wiki-root PATH       Wiki root directory (default: ./stonehenge-wiki)
   --pid-file PATH        PID file path (default: .stonehenge-wiki-server.pid)
   --log-file PATH        Log file path (default: .stonehenge-wiki-server.log)
+  --health-timeout SEC   Health wait timeout for start/inspect (default: 15)
+  --json                 Output JSON for status/inspect
 EOF
 )
 
@@ -115,7 +128,7 @@ check_health() {
 }
 
 wait_for_health() {
-  local timeout=15
+  local timeout=$HEALTH_TIMEOUT
   local tries=0
 
   while ((tries < timeout)); do
@@ -244,6 +257,11 @@ stop_server() {
 }
 
 status_server() {
+  if ((JSON_MODE == 1)); then
+    status_server_json
+    return
+  fi
+
   if is_running; then
     local pid
     pid="$(read_pid)"
@@ -267,6 +285,74 @@ status_server() {
   return 1
 }
 
+status_server_json() {
+  local pid
+  local on_port
+  local health="unknown"
+  local lstart=""
+  local etime=""
+  local cpu=""
+  local mem=""
+  local rss=""
+  local command=""
+
+  if is_running; then
+    pid="$(read_pid)"
+  fi
+
+  if [[ -n "${pid:-}" ]] && check_health; then
+    health="ok"
+  elif [[ -n "${pid:-}" ]]; then
+    health="failed"
+  fi
+
+  if [[ -n "${pid:-}" ]]; then
+    lstart="$(ps -p "$pid" -o lstart= 2>/dev/null | sed 's/^ *//')"
+    etime="$(ps -p "$pid" -o etime= 2>/dev/null | sed 's/^ *//')"
+    cpu="$(ps -p "$pid" -o %cpu= 2>/dev/null | sed 's/^ *//')"
+    mem="$(ps -p "$pid" -o %mem= 2>/dev/null | sed 's/^ *//')"
+    rss="$(ps -p "$pid" -o rss= 2>/dev/null | sed 's/^ *//')"
+    command="$(ps -p "$pid" -o command= 2>/dev/null | sed 's/^ *//')"
+  fi
+
+  on_port="$(port_listener_pid || true)"
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "{\"error\":\"python3 required for JSON mode\"}" >&2
+    return 1
+  fi
+
+  python3 - "$pid" "$on_port" "$health" "$lstart" "$etime" "$cpu" "$mem" "$rss" "$command" "$HOST" "$PORT" "$WIKI_ROOT" "$LOG_FILE" "$PID_FILE" <<'PY'
+import json
+import sys
+
+pid, on_port, health, lstart, etime, cpu, mem, rss, command, host, port, wiki_root, log_file, pid_file = sys.argv[1:]
+
+payload = {
+    "server": {
+        "host": host,
+        "port": int(port),
+        "wiki_root": wiki_root,
+        "pid_file": pid_file,
+        "log_file": log_file,
+    },
+    "status": {
+        "running": bool(pid),
+        "pid": pid or None,
+        "port_listener_pid": on_port or None,
+        "health": health,
+        "started_at": lstart or None,
+        "elapsed": etime or None,
+        "cpu_percent": cpu or None,
+        "mem_percent": mem or None,
+        "rss_kb": rss or None,
+        "command": command or None,
+    },
+}
+print(json.dumps(payload, ensure_ascii=False, indent=2))
+PY
+}
+
 tail_server() {
   if [[ -f "$LOG_FILE" ]]; then
     tail -f "$LOG_FILE"
@@ -284,6 +370,9 @@ case "$COMMAND" in
     stop_server
     ;;
   status)
+    status_server
+    ;;
+  inspect)
     status_server
     ;;
   restart)
