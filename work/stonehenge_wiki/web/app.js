@@ -21,7 +21,6 @@ const state = {
   wikiRelations: [],
   wikiRelationsError: null,
   wikiTreeFilter: "",
-  wikiPageIndex: null,
 };
 
 const pages = new Set(["ask", "wiki", "studio", "sources", "agents", "governance", "audit"]);
@@ -565,7 +564,6 @@ async function refreshAll() {
     state.wikiPages = wikiPages.ok ? (wikiPages.data.pages || []) : [];
     state.sourceRisk = sourceRisk.ok ? sourceRisk.data : state.sourceRisk;
     state.jobs = jobs.ok ? (jobs.data.jobs || []) : [];
-    state.wikiPageIndex = buildWikiPageIndex(state.wikiPages);
     if (llmConfig.ok) {
       state.llmConfig = llmConfig.data;
     }
@@ -1398,19 +1396,6 @@ function renderWikiTreeGroups(groups, filter) {
   }
 
   return emptyRow(translate("status.no_compiled_articles"));
-}
-
-function buildWikiPageIndex(pages) {
-  const byPath = {};
-  for (const page of pages || []) {
-    if (!page?.path) {
-      continue;
-    }
-    byPath[page.path] = page;
-  }
-  return {
-    byPath,
-  };
 }
 
 function relationReasonLabel(reason) {
