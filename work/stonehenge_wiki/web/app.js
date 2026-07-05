@@ -1402,29 +1402,15 @@ function renderWikiTreeGroups(groups, filter) {
 
 function buildWikiPageIndex(pages) {
   const byPath = {};
-  const byPathStem = {};
-  const byTitle = {};
   for (const page of pages || []) {
     if (!page?.path) {
       continue;
     }
     byPath[page.path] = page;
-    const stem = normalizeWikiPath(page.path);
-    byPathStem[stem] = byPathStem[stem] || [];
-    byPathStem[stem].push(page);
-    const titleKey = String(page.title || page.path).trim().toLowerCase();
-    byTitle[titleKey] = byTitle[titleKey] || [];
-    byTitle[titleKey].push(page);
   }
   return {
     byPath,
-    byPathStem,
-    byTitle,
   };
-}
-
-function normalizeWikiPath(value) {
-  return String(value || "").replace(/\.md$/i, "").replace(/^\/+/, "").toLowerCase();
 }
 
 function relationReasonLabel(reason) {
