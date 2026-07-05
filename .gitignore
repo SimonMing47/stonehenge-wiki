@@ -8,6 +8,9 @@ work/skills/stonehenge-wiki/bin/
 work/skills/stonehenge-wiki/cli/target/
 stonehenge-wiki/.env
 work/.venv/
+work/.stonehenge-wiki-server.pid
+work/.stonehenge-wiki-server.log
+work/stonehenge-wiki/.state/
 stonehenge-wiki/.state/
 stonehenge-wiki/output/fixed/
 stonehenge-wiki/output/presentations/
