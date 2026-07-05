@@ -352,6 +352,96 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn('aria-label="Stonehenge Wiki"', favicon_svg)
             self.assertEqual(favicon_status, 200)
 
+    def test_action_endpoints_contract_fields(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-action-contract-") as tmp:
+            root = Path(tmp)
+            wiki = root / "stonehenge-wiki"
+            docs = wiki / "docs" / "04_常用命令"
+            question_dir = wiki / "question"
+            docs.mkdir(parents=True)
+            question_dir.mkdir()
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "sqlite.md").write_text("SQLite SELECT 查询知识库。\n", encoding="utf-8")
+            (question_dir / "group-contract.md").write_text(
+                json.dumps(
+                    [
+                        {"id": "contract-1", "title": "统计 md 文件数量", "level": "简单"},
+                        {"id": "contract-2", "title": "统计 TODO 批注数量", "level": "简单"},
+                    ],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            incoming = root / "incoming.md"
+            incoming.write_text("外部导入文档：用于契约回归。\n", encoding="utf-8")
+
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
+            httpd = build_server(platform, "127.0.0.1", 0)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                ask = json.loads(http_post(base + "/ask", {"title": "SQLite SELECT", "id": "q-ask", "level": "中等"}))
+                explain = json.loads(http_post(base + "/explain", {"title": "SQLite SELECT", "id": "q-exp", "level": "中等"}))
+                reindex = json.loads(http_post(base + "/reindex", {}))
+                imported = json.loads(
+                    http_post(base + "/sources/import", {"source": str(incoming), "title": "Incoming", "category": "00_inbox"})
+                )
+                status = json.loads(
+                    http_post(
+                        base + "/sources/status",
+                        {"path": imported["path"], "status": "quarantined", "reason": "contract-check", "actor": "ci"},
+                    )
+                )
+                compiled = json.loads(http_post(base + "/wiki/compile", {}))
+                run_groups = json.loads(http_post(base + "/groups/run", {"groups": ["group-contract"]}))
+                slide = json.loads(http_post(base + "/slides/generate", {"topic": "SQLite SELECT", "slide_count": 4}))
+                compile_pages = json.loads(http_get(base + "/wiki/pages?limit=20"))
+                page = json.loads(http_get(base + "/wiki/page?path=" + quote(compile_pages["pages"][0]["path"], safe="")))
+                release = json.loads(http_post(base + "/reports/release/export", {"groups": ["group-contract"]}))
+                llm_config_update = json.loads(
+                    http_post(
+                        base + "/llm/config",
+                        {
+                            "enabled": False,
+                            "default_agent": "default",
+                            "category_agents": {},
+                            "runtime_mode": "api",
+                            "runtime_command": "",
+                            "agents": {
+                                "default": {
+                                    "enabled": False,
+                                    "provider": "",
+                                    "model": "",
+                                    "base_url": "",
+                                    "api_key_env": "",
+                                }
+                            },
+                        },
+                    )
+                )
+                llm_test = json.loads(http_post(base + "/llm/test", {"agent_name": "default"}))
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+                thread.join(timeout=5)
+
+            self._assert_required_fields_present(ask, "POST", "/ask")
+            self._assert_required_fields_present(explain, "POST", "/explain")
+            self._assert_required_fields_present(reindex, "POST", "/reindex")
+            self._assert_required_fields_present(imported, "POST", "/sources/import")
+            self._assert_required_fields_present(status, "POST", "/sources/status")
+            self._assert_required_fields_present(compiled, "POST", "/wiki/compile")
+            self._assert_required_fields_present(run_groups, "POST", "/groups/run")
+            self._assert_required_fields_present(slide, "POST", "/slides/generate")
+            self._assert_required_fields_present(page, "GET", "/wiki/page")
+            self._assert_required_fields_present(release, "POST", "/reports/release/export")
+            self._assert_required_fields_present(llm_config_update, "POST", "/llm/config")
+            self._assert_required_fields_present(llm_test, "POST", "/llm/test")
+
     def test_http_read_and_admin_token_scopes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-auth-test-") as tmp:
             root = Path(tmp)

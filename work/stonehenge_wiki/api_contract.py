@@ -231,7 +231,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "Return one compiled wiki page by relative path.",
         "query": {"path": field_contract(True, "string", "Compiled wiki page relative path.")},
         "cli": None,
-        "response": response_contract(["status", "path", "markdown"]),
+        "response": response_contract(["status", "page", "markdown"]),
     },
     {
         "method": "GET",
@@ -290,6 +290,7 @@ ROUTES: list[dict[str, Any]] = [
             "level": field_contract(False, "string", "Optional question difficulty level."),
         },
         "cli": "--ask QUESTION [--id ID] [--level LEVEL]",
+        "response": response_contract(["id", "title", "level", "answer"]),
     },
     {
         "method": "POST",
@@ -303,6 +304,7 @@ ROUTES: list[dict[str, Any]] = [
             "level": field_contract(False, "string", "Optional question difficulty level."),
         },
         "cli": "--explain-ask QUESTION [--id ID] [--level LEVEL]",
+        "response": response_contract(["status", "id", "title", "level", "route", "terms", "safety", "records", "evidence", "wiki"]),
     },
     {
         "method": "POST",
@@ -311,6 +313,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "index",
         "summary": "Rebuild and persist the file/comment/source index.",
         "cli": "--reindex",
+        "response": response_contract(["status", "store", "files", "all_files", "comments", "all_comments", "database_path"]),
     },
     {
         "method": "POST",
@@ -324,6 +327,7 @@ ROUTES: list[dict[str, Any]] = [
             "category": field_contract(False, "string", "Target docs category."),
         },
         "cli": "--import-source PATH_OR_URL [--import-title TITLE] [--import-category CATEGORY]",
+        "response": response_contract(["status", "path"]),
     },
     {
         "method": "POST",
@@ -344,6 +348,7 @@ ROUTES: list[dict[str, Any]] = [
             "actor": field_contract(False, "string", "Optional reviewer identity."),
         },
         "cli": "--set-source-status PATH --source-status active|quarantined",
+        "response": response_contract(["status", "path"]),
     },
     {
         "method": "POST",
@@ -352,6 +357,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "wiki",
         "summary": "Compile docs into the maintained Markdown wiki layer.",
         "cli": "--compile-wiki",
+        "response": response_contract(["wiki_dir", "source_pages", "topic_pages", "removed_pages", "index", "log"]),
     },
     {
         "method": "POST",
@@ -361,6 +367,7 @@ ROUTES: list[dict[str, Any]] = [
         "summary": "Run one or more question groups and write answer files.",
         "body": {"groups": field_contract(False, "string|string[]", "Optional question group or group list.")},
         "cli": "--group GROUP",
+        "response": response_contract(["results"]),
     },
     {
         "method": "POST",
@@ -373,6 +380,7 @@ ROUTES: list[dict[str, Any]] = [
             "slide_count": field_contract(False, "int", "Requested slide count."),
         },
         "cli": "--generate-brief TOPIC [--slide-count N]",
+        "response": response_contract(["status", "topic", "deck", "download_url", "slide_count"]),
     },
     {
         "method": "POST",
@@ -434,6 +442,7 @@ ROUTES: list[dict[str, Any]] = [
             "include_evaluation": field_contract(False, "bool", "Include evaluation artifacts in the bundle."),
         },
         "cli": "--export-release-bundle [--group GROUP] [--release-include-evaluation]",
+        "response": response_contract(["status", "path", "download_url", "manifest", "size", "sha256", "manifest_sha256"]),
     },
     {
         "method": "POST",
@@ -442,7 +451,7 @@ ROUTES: list[dict[str, Any]] = [
         "category": "llm",
         "summary": "Update LLM and named agent configuration.",
         "cli": None,
-        "response": response_contract(["status"]),
+        "response": response_contract(["status", "llm"]),
     },
     {
         "method": "POST",
@@ -456,6 +465,7 @@ ROUTES: list[dict[str, Any]] = [
             "live": field_contract(False, "bool", "Run a live chat-completions probe."),
         },
         "cli": "--test-llm-agent AGENT [--test-llm-live]",
+        "response": response_contract(["status", "agent_name", "ready", "checks"]),
     },
 ]
 
