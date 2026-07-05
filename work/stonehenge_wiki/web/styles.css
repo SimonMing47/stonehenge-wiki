@@ -1095,6 +1095,29 @@ h3 {
   gap: 10px;
 }
 
+.source-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.source-row-actions a {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: #1b2430;
+  text-decoration: none;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.source-row-actions a:hover {
+  border-color: var(--accent);
+}
+
 .source-row-title button {
   flex: 0 0 auto;
 }

@@ -311,12 +311,19 @@ class PlatformHandler(BaseHTTPRequestHandler):
 
     def write_wiki_file(self, rel_name: str) -> None:
         safe_rel = unquote(rel_name).strip("/")
-        if not safe_rel.startswith("output/"):
+        if safe_rel.startswith("output/"):
+            disposition = "attachment"
+            fallback_name = "download.pptx"
+            allow_root = (self.stonehenge_wiki_platform.wiki_root / "output").resolve()
+        elif safe_rel.startswith("docs/"):
+            disposition = "inline"
+            fallback_name = ""
+            allow_root = (self.stonehenge_wiki_platform.wiki_root / "docs").resolve()
+        else:
             return self.write_json({"error": "forbidden"}, HTTPStatus.FORBIDDEN)
         root = self.stonehenge_wiki_platform.wiki_root.resolve()
-        output_root = (root / "output").resolve()
         target = (root / safe_rel).resolve()
-        if output_root not in target.parents:
+        if allow_root not in target.parents:
             return self.write_json({"error": "forbidden"}, HTTPStatus.FORBIDDEN)
         if not target.is_file():
             return self.write_json({"error": "not_found"}, HTTPStatus.NOT_FOUND)
@@ -324,7 +331,14 @@ class PlatformHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
         encoded_name = quote(target.name)
-        self.send_header("Content-Disposition", f"attachment; filename=\"download.pptx\"; filename*=UTF-8''{encoded_name}")
+        if fallback_name:
+            header_name = quote(fallback_name)
+        else:
+            header_name = encoded_name
+        self.send_header(
+            "Content-Disposition",
+            f"{disposition}; filename=\"{header_name}\"; filename*=UTF-8''{encoded_name}",
+        )
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()

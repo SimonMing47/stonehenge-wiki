@@ -1090,6 +1090,9 @@ class PlatformSmokeTest(unittest.TestCase):
                     http_post(base + "/slides/generate", {"topic": "SQLite SELECT 命令", "slide_count": 4})
                 )
                 deck_bytes = http_get_bytes(base + result["download_url"])
+                raw_source_bytes, raw_source_headers = http_get_with_headers(
+                    base + "/files/" + quote("docs/04_常用命令/database.md", safe="")
+                )
                 index = json.loads(http_get(base + "/index"))
                 traversal_status = http_get_status(base + "/files/output/../Permission.json")
             finally:
@@ -1101,6 +1104,8 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertEqual(result["slide_count"], 4)
             self.assertTrue(result["deck"].endswith(".pptx"))
             self.assertGreater(len(deck_bytes), 1000)
+            self.assertIn("SQLite SELECT 命令", raw_source_bytes.decode("utf-8"))
+            self.assertEqual(raw_source_headers.get("content-disposition"), 'inline; filename="database.md"; filename*=UTF-8\'\'database.md')
             self.assertEqual(index["presentations"][0]["deck"], result["deck"])
             self.assertEqual(traversal_status, 403)
             text, _ = extract_docx_like_pptx(wiki / result["deck"])
@@ -1550,6 +1555,13 @@ def http_get_bytes(url: str, headers: dict[str, str] | None = None) -> bytes:
     request = urllib.request.Request(url, headers=headers or {}, method="GET")
     with urllib.request.urlopen(request, timeout=5) as response:
         return response.read()
+
+
+def http_get_with_headers(url: str, headers: dict[str, str] | None = None) -> tuple[bytes, dict[str, str]]:
+    request = urllib.request.Request(url, headers=headers or {}, method="GET")
+    with urllib.request.urlopen(request, timeout=5) as response:
+        header_map = {key.lower(): value for key, value in response.headers.items()}
+        return response.read(), header_map
 
 
 def http_get_status(url: str, headers: dict[str, str] | None = None) -> int:

@@ -71,6 +71,7 @@ const I18N = {
     "sources.detail_title": "来源详情",
     "sources.detail_hint": "选择一个来源查看抽取预览。",
     "sources.view_detail": "查看",
+    "sources.open_raw": "查看原始源",
     "sources.preview_title": "抽取预览",
     "sources.preview_chars": "预览字符数",
     "sources.meta_title": "元数据",
@@ -284,6 +285,7 @@ const I18N = {
     "sources.detail_title": "Source Detail",
     "sources.detail_hint": "Select a source to inspect extracted preview.",
     "sources.view_detail": "View",
+    "sources.open_raw": "Open raw",
     "sources.preview_title": "Extracted preview",
     "sources.preview_chars": "Preview chars",
     "sources.meta_title": "Metadata",
@@ -921,6 +923,13 @@ function renderIndex() {
   renderPresentations(presentations);
 }
 
+function encodePathForFiles(path) {
+  return String(path || "")
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
 function fileRow(file, source) {
   const tags = (file.tags || []).join(", ") || translate("status.untagged");
   const size = source ? `${Math.round(Number(source.size || 0) / 1024)} KB` : translate("status.untracked");
@@ -931,11 +940,15 @@ function fileRow(file, source) {
   const sections = `${sectionCount} ${sectionCount === 1 ? translate("status.section") : translate("status.sections")}`;
   const origin = source?.origin_type || "local";
   const status = source?.status || "active";
+  const rawUrl = file.path ? `/files/${encodePathForFiles(file.path)}` : "";
   return `
     <div class="source-row">
       <div class="source-row-title">
         <strong>${escapeHtml(file.path)}</strong>
-        <button type="button" data-source-detail="${escapeHtml(file.path)}">${translate("sources.view_detail")}</button>
+        <div class="source-row-actions">
+          <button type="button" data-source-detail="${escapeHtml(file.path)}">${translate("sources.view_detail")}</button>
+          ${rawUrl ? `<a href="${escapeHtml(rawUrl)}" target="_blank" rel="noreferrer">${translate("sources.open_raw")}</a>` : ""}
+        </div>
       </div>
       <div class="meta">
         <span class="${status === "active" ? "ok" : "blocked"}">${escapeHtml(status)}</span>

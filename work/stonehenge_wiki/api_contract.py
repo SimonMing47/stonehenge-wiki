@@ -87,7 +87,7 @@ ROUTES: list[dict[str, Any]] = [
         "path": "/files/{path}",
         "scope": "read",
         "category": "files",
-        "summary": "Download generated output files through the REST service.",
+        "summary": "Download generated output files and read source documents (raw) through the REST service.",
         "cli": None,
     },
     {
