@@ -262,6 +262,55 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("# sqlite.md", api_page["markdown"])
             self.assertEqual(traversal_status, 400)
 
+    def test_wiki_relations_api_and_platform_coverage(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-relations-") as tmp:
+            root = Path(tmp)
+            wiki = root / "stonehenge-wiki"
+            docs = wiki / "docs" / "04_常用命令"
+            docs.mkdir(parents=True)
+            question_dir = wiki / "question"
+            question_dir.mkdir()
+            (wiki / "output").mkdir()
+            (root / "result").mkdir()
+            (wiki / "Permission.json").write_text("{}", encoding="utf-8")
+            (docs / "source-a.md").write_text(
+                "主入口文档。\n\n请参考 [[source-b]]。\n",
+                encoding="utf-8",
+            )
+            (docs / "source-b.md").write_text("补充文档。\n", encoding="utf-8")
+
+            platform = StonehengeWikiPlatform.from_wiki_root(wiki)
+            platform.compile_wiki()
+
+            pages = platform.list_wiki_pages(limit=20)["pages"]
+            source_a = next(page for page in pages if page.get("source_path") == "docs/04_常用命令/source-a.md")
+            source_b = next(page for page in pages if page.get("source_path") == "docs/04_常用命令/source-b.md")
+
+            relations = platform.wiki_relations(source_a["path"], limit=6)
+            relation_paths = {item["path"] for item in relations.get("relations", [])}
+            self.assertEqual(relations.get("status"), "ok")
+            self.assertIn(source_b["path"], relation_paths)
+            self.assertIn("wiki_link", {item["reason"] for item in relations.get("relations", [])})
+
+            httpd = build_server(platform, "127.0.0.1", 0)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{httpd.server_address[1]}"
+                api_relations = json.loads(
+                    http_get(base + "/wiki/relations?path=" + quote(source_a["path"], safe="") + "&limit=6")
+                )
+                traversal_status = http_get_status(base + "/wiki/relations?path=../docs/secret.md")
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+                thread.join(timeout=5)
+
+            self.assertEqual(api_relations.get("status"), "ok")
+            self.assertGreaterEqual(api_relations.get("count", 0), 1)
+            self.assertTrue(any(item["path"] == source_b["path"] for item in api_relations.get("relations", [])))
+            self.assertEqual(traversal_status, 400)
+
     def test_http_console_assets_and_health(self) -> None:
         with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-web-test-") as tmp:
             root = Path(tmp)

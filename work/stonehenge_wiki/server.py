@@ -139,6 +139,20 @@ class PlatformHandler(BaseHTTPRequestHandler):
             if result.get("error") == "not_found":
                 return self.write_json(result, HTTPStatus.NOT_FOUND)
             return self.write_json(result)
+        if parsed.path == "/wiki/relations":
+            if not self.ensure_authorized("read"):
+                return
+            page_path = parse_qs(parsed.query).get("path", [""])[0]
+            try:
+                limit = int(parse_qs(parsed.query).get("limit", ["12"])[0])
+            except ValueError:
+                return self.write_json({"error": "invalid_limit"}, HTTPStatus.BAD_REQUEST)
+            result = self.stonehenge_wiki_platform.wiki_relations(page_path, limit=limit)
+            if result.get("error") == "invalid_path":
+                return self.write_json(result, HTTPStatus.BAD_REQUEST)
+            if result.get("error") == "not_found":
+                return self.write_json(result, HTTPStatus.NOT_FOUND)
+            return self.write_json(result)
         if parsed.path == "/llm/config":
             if not self.ensure_authorized("admin"):
                 return

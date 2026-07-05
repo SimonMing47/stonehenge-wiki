@@ -235,6 +235,19 @@ ROUTES: list[dict[str, Any]] = [
     },
     {
         "method": "GET",
+        "path": "/wiki/relations",
+        "scope": "read",
+        "category": "wiki",
+        "summary": "Return inferred knowledge graph relations for one wiki page.",
+        "query": {
+            "path": field_contract(True, "string", "Compiled wiki page relative path."),
+            "limit": field_contract(False, "int", "Maximum relations returned."),
+        },
+        "cli": None,
+        "response": response_contract(["status", "path", "relations", "count", "limit"]),
+    },
+    {
+        "method": "GET",
         "path": "/wiki/search",
         "scope": "read",
         "category": "wiki",

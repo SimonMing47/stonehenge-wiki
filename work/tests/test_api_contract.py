@@ -30,6 +30,8 @@ class ApiContractTest(unittest.TestCase):
         self.assertEqual(routes[("GET", "/sources/detail")]["query"]["path"]["required"], True)
         self.assertEqual(routes[("GET", "/sources/detail")]["query"]["preview_chars"]["type"], "int")
         self.assertEqual(routes[("GET", "/wiki/search")]["query"]["query"]["alias_for"], "q")
+        self.assertEqual(routes[("GET", "/wiki/relations")]["query"]["path"]["required"], True)
+        self.assertEqual(routes[("GET", "/wiki/relations")]["query"]["limit"]["type"], "int")
         self.assertEqual(routes[("GET", "/reports/readiness")]["query"]["groups"]["type"], "string[]")
         self.assertEqual(routes[("POST", "/sources/status")]["body"]["rel_path"]["alias_for"], "path")
         self.assertEqual(routes[("POST", "/sources/status")]["body"]["status"]["enum"], ["active", "quarantined"])
@@ -95,6 +97,7 @@ class ApiContractTest(unittest.TestCase):
         self.assertIn(("GET", "/assets/{path}"), routes)
         self.assertIn(("GET", "/files/{path}"), routes)
         self.assertIn(("POST", "/llm/test"), routes)
+        self.assertIn(("GET", "/wiki/relations"), routes)
 
     def test_server_scope_extraction_tracks_public_read_and_admin(self) -> None:
         scopes = extract_server_scopes()
@@ -112,6 +115,7 @@ class ApiContractTest(unittest.TestCase):
         self.assertEqual(fields[("GET", "/wiki/sections")]["query"], {"source_path", "path", "limit"})
         self.assertEqual(fields[("GET", "/wiki/search")]["query"], {"q", "query", "limit"})
         self.assertEqual(fields[("GET", "/reports/readiness")]["query"], {"groups", "group"})
+        self.assertEqual(fields[("GET", "/wiki/relations")]["query"], {"path", "limit"})
         self.assertEqual(fields[("POST", "/sources/status")]["body"], {"path", "rel_path", "status", "reason", "actor"})
         self.assertEqual(fields[("POST", "/llm/test")]["body"], {"agent_name", "agent", "live"})
 

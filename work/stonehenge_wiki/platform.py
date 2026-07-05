@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 import zipfile
 from datetime import datetime, timezone
@@ -24,6 +25,9 @@ from .security import PermissionGuard
 from .source_risk import MANDATORY_QUARANTINE_CODES, scan_source_risks
 from .store import SQLiteStore
 from .wiki_compiler import WikiCompiler
+
+
+WIKI_LINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
 
 
 class StonehengeWikiPlatform:
@@ -745,6 +749,141 @@ class StonehengeWikiPlatform:
 
     def list_wiki_sections(self, source_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_wiki_sections(source_path=source_path, limit=limit)
+
+    def _build_wiki_page_lookup(
+        self,
+        pages: list[dict[str, Any]],
+    ) -> tuple[dict[str, dict[str, Any]], dict[str, list[dict[str, Any]]], dict[str, list[dict[str, Any]]]]:
+        by_path: dict[str, dict[str, Any]] = {}
+        by_stem: dict[str, list[dict[str, Any]]] = {}
+        by_source_stem: dict[str, list[dict[str, Any]]] = {}
+        by_title: dict[str, list[dict[str, Any]]] = {}
+        for page in pages:
+            path = str(page.get("path") or "")
+            title = str(page.get("title") or path).strip().lower()
+            if path:
+                by_path[path] = page
+                stem = Path(path).stem.lower()
+                by_stem.setdefault(stem, []).append(page)
+                source_path = str(page.get("source_path") or "")
+                if source_path:
+                    source_stem = Path(source_path).stem.lower()
+                    by_source_stem.setdefault(source_stem, []).append(page)
+            if title:
+                by_title.setdefault(title, []).append(page)
+        return by_path, by_stem, by_source_stem, by_title
+
+    def _normalize_wiki_link_candidate(self, value: str) -> str:
+        raw = str(value).strip()
+        if not raw or raw.startswith("http://") or raw.startswith("https://"):
+            return ""
+        return raw.split("#", 1)[0].strip().replace("\\", "/").strip("/")
+
+    def _resolve_wiki_link(
+        self,
+        link: str,
+        by_path: dict[str, dict[str, Any]],
+        by_stem: dict[str, list[dict[str, Any]]],
+        by_source_stem: dict[str, list[dict[str, Any]]],
+        by_title: dict[str, list[dict[str, Any]]],
+    ) -> str:
+        candidate = self._normalize_wiki_link_candidate(link)
+        if not candidate:
+            return ""
+        if candidate in by_path:
+            return candidate
+        if candidate in by_source_stem:
+            matches = by_source_stem[candidate]
+            if matches:
+                return str(matches[0].get("path", "") or "")
+        if not candidate.lower().endswith(".md") and f"{candidate}.md" in by_path:
+            return f"{candidate}.md"
+        candidate_stem = Path(candidate).stem.lower()
+        if candidate_stem in by_stem:
+            matches = by_stem[candidate_stem]
+            if matches:
+                return str(matches[0].get("path", "") or "")
+        if candidate_stem in by_source_stem:
+            matches = by_source_stem[candidate_stem]
+            if matches:
+                return str(matches[0].get("path", "") or "")
+        if candidate in by_title:
+            matches = by_title[candidate]
+            if matches:
+                return str(matches[0].get("path", "") or "")
+        return ""
+
+    def _collect_wiki_graph_relations(self, page: dict[str, Any], pages: list[dict[str, Any]], limit: int = 12) -> list[dict[str, Any]]:
+        current = page.get("page") if isinstance(page.get("page"), dict) else {}
+        current_path = str(current.get("path") or "")
+        if not current_path:
+            return []
+
+        current_source = str(current.get("source_path") or "")
+        current_kind = str(current.get("kind") or "")
+        current_folder = current_path.split("/", 1)[0]
+        seen: set[str] = set()
+        relations: list[dict[str, Any]] = []
+
+        by_path, by_stem, by_source_stem, by_title = self._build_wiki_page_lookup(pages)
+
+        def add_relation(target_path: str, reason: str) -> None:
+            normalized_target = self._normalize_wiki_link_candidate(target_path)
+            if not normalized_target:
+                return
+            if normalized_target == current_path:
+                return
+            if normalized_target in seen:
+                return
+            target = by_path.get(normalized_target)
+            if not target:
+                return
+            seen.add(normalized_target)
+            relations.append(
+                {
+                    "path": normalized_target,
+                    "title": str(target.get("title") or normalized_target),
+                    "reason": reason,
+                }
+            )
+
+        markdown = str(page.get("markdown") or "")
+        for match in WIKI_LINK_RE.finditer(markdown):
+            target = match.group(1) or ""
+            resolved = self._resolve_wiki_link(target, by_path, by_stem, by_source_stem, by_title)
+            add_relation(resolved, "wiki_link")
+
+        for candidate in pages:
+            candidate_path = str(candidate.get("path") or "")
+            if candidate_path == current_path:
+                continue
+            if not candidate_path:
+                continue
+            if current_source and str(candidate.get("source_path") or "") == current_source:
+                add_relation(candidate_path, "same_source")
+            if current_kind and str(candidate.get("kind") or "") == current_kind:
+                add_relation(candidate_path, "same_kind")
+            candidate_folder = candidate_path.split("/", 1)[0]
+            if current_folder and candidate_folder == current_folder:
+                add_relation(candidate_path, "same_folder")
+
+        relations.sort(key=lambda item: (item["reason"], item["path"]))
+        return relations[:max(0, limit)]
+
+    def wiki_relations(self, page_path: str, limit: int = 12) -> dict[str, Any]:
+        page = self.get_wiki_page(page_path)
+        if page.get("error"):
+            return page
+        pages_result = self.list_wiki_pages(limit=max(limit * 12, 200))
+        pages = pages_result.get("pages", [])
+        relations = self._collect_wiki_graph_relations(page, pages, limit=limit)
+        return {
+            "status": "ok",
+            "path": str(page.get("page", {}).get("path") or ""),
+            "relations": relations,
+            "count": len(relations),
+            "limit": limit,
+        }
 
     def search_wiki(self, query: str, limit: int = 10) -> dict[str, Any]:
         return {
