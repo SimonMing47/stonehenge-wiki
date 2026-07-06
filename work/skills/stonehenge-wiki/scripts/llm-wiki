@@ -5,10 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_URL="${LLM_WIKI_URL:-${STONEHENGE_WIKI_URL:-http://127.0.0.1:8765}}"
 TOKEN="${LLM_WIKI_TOKEN:-${STONEHENGE_WIKI_TOKEN:-${STONEHENGE_WIKI_API_TOKEN:-}}}"
 SCRIPTED_ROOT="${LLM_WIKI_ROOT:-}"
-OPENCODE_PROVIDER="${OPENCODE_PROVIDER:-hermes-deepseek}"
-OPENCODE_MODEL="${OPENCODE_MODEL:-deepseek-v4-pro}"
-OPENCODE_BASE_URL="${OPENCODE_BASE_URL:-https://api.deepseek.com/v1}"
-OPENCODE_RUNTIME_COMMAND="${OPENCODE_RUNTIME_COMMAND:-opencode run -m ${OPENCODE_PROVIDER}/${OPENCODE_MODEL} --pure --format json}"
+OPENCODE_PROVIDER="${OPENCODE_PROVIDER:-opencode-runtime}"
+OPENCODE_MODEL="${OPENCODE_MODEL:-default}"
+OPENCODE_BASE_URL="${OPENCODE_BASE_URL:-}"
+OPENCODE_RUNTIME_COMMAND="${OPENCODE_RUNTIME_COMMAND:-opencode run --pure --format json}"
 
 print_usage() {
   cat <<'USAGE'
@@ -25,8 +25,8 @@ Environment:
   LLM_WIKI_URL       REST base URL (default: http://127.0.0.1:8765)
   LLM_WIKI_TOKEN     X-STONEHENGE-WIKI-TOKEN value for admin API
   LLM_WIKI_ROOT      Default --wiki-root when omitted in command
-  OPENCODE_PROVIDER   opencode provider name (default: hermes-deepseek)
-  OPENCODE_MODEL      opencode model name (default: deepseek-v4-pro)
+  OPENCODE_PROVIDER   opencode provider name (default: opencode-runtime)
+  OPENCODE_MODEL      opencode model name (default: default)
 USAGE
 }
 
@@ -110,8 +110,8 @@ configure_llm() {
       "provider": "$provider",
       "model": "$model",
       "base_url": "$base_url",
-      "api_key_env": "DEEPSEEK_API_KEY",
-      "env_file": "~/.hermes/.env",
+      "api_key_env": "",
+      "env_file": "",
       "timeout_seconds": 120,
       "max_context_chars": 16000,
       "max_tokens": 900,
@@ -124,8 +124,8 @@ configure_llm() {
       "provider": "$provider",
       "model": "$model",
       "base_url": "$base_url",
-      "api_key_env": "DEEPSEEK_API_KEY",
-      "env_file": "~/.hermes/.env",
+      "api_key_env": "",
+      "env_file": "",
       "timeout_seconds": 120,
       "max_context_chars": 12000,
       "max_tokens": 800,

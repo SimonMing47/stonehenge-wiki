@@ -754,11 +754,13 @@ function addAgentRow() {
     "beforeend",
     llmAgentRow(uniqueName, {
       enabled: true,
-      provider: "deepseek",
-      model: "deepseek-chat",
-      base_url: "https://api.deepseek.com/v1",
-      api_key_env: "DEEPSEEK_API_KEY",
-      env_file: "~/.hermes/.env",
+      provider: "opencode-runtime",
+      model: "",
+      base_url: "",
+      api_key_env: "",
+      env_file: "",
+      runtime_mode: "opencode",
+      runtime_command: "opencode run --pure --format json",
     })
   );
 }

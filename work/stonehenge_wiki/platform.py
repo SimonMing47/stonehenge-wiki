@@ -970,14 +970,15 @@ class StonehengeWikiPlatform:
 
         client = self.llm_clients.get(requested) or LLMClient(agent_config)
         api_key_present = bool(client.api_key())
-        checks = {
-            "enabled": bool(agent_config.enabled),
-            "provider": bool(agent_config.provider),
-            "model": bool(agent_config.model),
-            "base_url": bool(agent_config.base_url),
-            "api_key_env": bool(agent_config.api_key_env),
-            "api_key_present": api_key_present,
-        }
+        checks = {"enabled": bool(agent_config.enabled)}
+        if agent_config.runtime_mode == "opencode":
+            checks["runtime_command"] = bool(agent_config.runtime_command)
+        else:
+            checks["provider"] = bool(agent_config.provider)
+            checks["model"] = bool(agent_config.model)
+            checks["base_url"] = bool(agent_config.base_url)
+            checks["api_key_env"] = bool(agent_config.api_key_env)
+            checks["api_key_present"] = api_key_present
         missing = [key for key, passed in checks.items() if not passed]
         ready = bool(client.ready)
         result: dict[str, Any] = {

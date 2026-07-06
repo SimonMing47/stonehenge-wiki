@@ -126,16 +126,16 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -q
 脚本行为：
 
 - 自动安装 `~/.opencode/bin/opencode`（缺失时）
-- 从 `~/.hermes/.env` 读取 `DEEPSEEK_API_KEY`
-- 写 `~/.config/opencode/hermes-deepseek.key`（`0600`）
-- 写 `~/.config/opencode/opencode.json`（`hermes-deepseek/deepseek-v4-pro`）
+- 从 `~/.hermes/.env` 读取可用密钥（优先 `OPENCODE_API_KEY`，找不到再尝试 `OPENAI_API_KEY` / `DEEPSEEK_API_KEY`）
+- 写 `~/.config/opencode/opencode-runtime.key`（`0600`）
+- 写 `~/.config/opencode/opencode.json`（provider/model 以本机 runtime 约定为准）
 
 ### 示例验证
 
 ```bash
 opencode --version
-opencode models hermes-deepseek
-opencode run -m hermes-deepseek/deepseek-v4-pro --pure --format json "只回复 OK"
+opencode models opencode-runtime
+opencode run --pure --format json "只回复 OK"
 ./work/skills/stonehenge-wiki/scripts/llm-wiki configure-opencode
 ./work/skills/stonehenge-wiki/scripts/llm-wiki health
 curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool

@@ -57,10 +57,10 @@ class ProjectTemplateTest(unittest.TestCase):
         self.assertTrue(script.exists())
         self.assertIn("configure_opencode_from_hermes.sh", skill)
         self.assertIn("configure_opencode_from_hermes.sh", instruction)
-        self.assertIn("DEEPSEEK_API_KEY", script_text)
-        self.assertIn("OPENCODE_PROVIDER=\"${OPENCODE_PROVIDER:-hermes-deepseek}\"", script_text)
-        self.assertIn("OPENCODE_MODEL=\"${OPENCODE_MODEL:-deepseek-v4-pro}\"", script_text)
-        self.assertIn("opencode run -m hermes-deepseek/deepseek-v4-pro", instruction)
+        self.assertTrue("DEEPSEEK_API_KEY" in script_text or "OPENAI_API_KEY" in script_text or "OPENCODE_API_KEY" in script_text)
+        self.assertIn("OPENCODE_PROVIDER=\"${OPENCODE_PROVIDER:-opencode-runtime}\"", script_text)
+        self.assertIn("OPENCODE_MODEL=\"${OPENCODE_MODEL:-default}\"", script_text)
+        self.assertIn("opencode run --pure --format json", instruction)
         self.assertNotRegex(script_text, r"sk-[A-Za-z0-9]{20,}")
 
 

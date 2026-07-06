@@ -127,9 +127,9 @@ Stonehenge Wiki Platform (work/stonehenge_wiki/platform.py)
    └─> 结果记录到任务运行与审计
 ```
 
-LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode` agent 使用本机 Hermes 的 `DEEPSEEK_API_KEY`，provider 标记为 `opencode-hermes-deepseek`，运行时通过 OpenAI-compatible REST endpoint 调用，不要求 Rust CLI 直接调用 opencode 或 Python。
+LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode` agent 使用本机 opencode runtime，不预置任何具体厂商模型名；仅使用 `runtime_mode=opencode` 与 `runtime_command` 接入。
 
-`POST /llm/test` 提供 agent 级诊断：默认检查启用状态、provider/model/base_url、环境变量和密钥可见性；`live=true` 时发起最小 chat completions 探活。诊断结果不返回密钥值，并写入 `llm.test` 审计事件。
+`POST /llm/test` 提供 agent 级诊断：默认检查启用状态和 runtime 运行态；`opencode` 模式检查 `runtime_command`，`api` 模式额外检查 `provider/model/base_url` 与密钥可见性；`live=true` 时发起最小 chat completions 探活。诊断结果不返回密钥值，并写入 `llm.test` 审计事件。
 
 ### 4.3 explain 链路
 

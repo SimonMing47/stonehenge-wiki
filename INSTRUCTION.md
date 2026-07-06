@@ -54,7 +54,7 @@ result/
 
 ### 系统初始化与调用（最小流程）
 
-1）配置 opencode（从本机 Hermes 读取 `DEEPSEEK_API_KEY`）
+1）配置 opencode（从本机 Hermes 配置读取可用的密钥，优先 `OPENCODE_API_KEY`，找不到再尝试 `OPENAI_API_KEY` / `DEEPSEEK_API_KEY`）
 
 ```bash
 ./work/skills/stonehenge-wiki/scripts/llm-wiki configure-opencode
@@ -154,7 +154,7 @@ LLM 配置必须按 agent 隔离，不要把所有模型参数只堆在顶层 `l
 - `llm.category_agents`：按知识类别路由到指定 agent，例如 `03_学习材料` 使用 `opencode`。
 - 顶层 `llm.provider/model/base_url/api_key_env/env_file` 保留为兼容字段，也会作为 agent 的 fallback。
 
-当前默认 agent 是 `opencode`，它复用本机 Hermes 中已经可用的 DeepSeek API：
+当前默认 runtime 是 `opencode`，默认配置不预置某个具体模型名：
 
 ```json
 {
@@ -164,11 +164,11 @@ LLM 配置必须按 agent 隔离，不要把所有模型参数只堆在顶层 `l
     "agents": {
       "opencode": {
         "enabled": true,
-        "provider": "opencode-hermes-deepseek",
-        "model": "deepseek-v4-pro",
-        "base_url": "https://api.deepseek.com/v1",
-        "api_key_env": "DEEPSEEK_API_KEY",
-        "env_file": "~/.hermes/.env",
+        "provider": "opencode-runtime",
+        "model": "",
+        "base_url": "",
+        "api_key_env": "",
+        "env_file": "",
         "timeout_seconds": 120,
         "max_context_chars": 16000,
         "max_tokens": 900,
@@ -179,7 +179,7 @@ LLM 配置必须按 agent 隔离，不要把所有模型参数只堆在顶层 `l
 }
 ```
 
-如果本机还没有 opencode，或 opencode 没有 LLM provider 配置，直接使用 skill 脚本从本机 Hermes 配置中抽取已验证可用的 DeepSeek API：
+如果本机还没有 opencode，或 opencode 没有 LLM provider 配置，直接使用 skill 脚本从本机 Hermes 配置中抽取可用 API：
 
 ```bash
 ./work/skills/stonehenge-wiki/scripts/configure_opencode_from_hermes.sh
@@ -188,15 +188,15 @@ LLM 配置必须按 agent 隔离，不要把所有模型参数只堆在顶层 `l
 脚本会执行三件事：
 
 - 如果 `opencode` 不存在，则安装到 `~/.opencode/bin`，并复用 shell 中已有的 PATH 配置。
-- 从 `~/.hermes/.env` 读取 `DEEPSEEK_API_KEY`，写入 `~/.config/opencode/hermes-deepseek.key`，权限固定为 `0600`。
-- 写入 `~/.config/opencode/opencode.json`，配置 OpenAI-compatible provider `hermes-deepseek/deepseek-v4-pro`。
+- 从 `~/.hermes/.env` 读取可用密钥（默认优先 `OPENCODE_API_KEY`，找不到再尝试 `OPENAI_API_KEY` / `DEEPSEEK_API_KEY`），写入 `~/.config/opencode/opencode-runtime.key`，权限固定为 `0600`。
+- 写入 `~/.config/opencode/opencode.json`，使用 provider `opencode-runtime`（模型名称可按实际环境定制）。
 
 手工配置时也遵循同样约定。密钥文件只放在用户目录，不提交到仓库：
 
 ```bash
 mkdir -p ~/.config/opencode
-grep '^DEEPSEEK_API_KEY=' ~/.hermes/.env | cut -d= -f2- > ~/.config/opencode/hermes-deepseek.key
-chmod 600 ~/.config/opencode/hermes-deepseek.key
+grep -E '^(OPENCODE_API_KEY|OPENAI_API_KEY|DEEPSEEK_API_KEY)=' ~/.hermes/.env | head -n 1 | cut -d= -f2- > ~/.config/opencode/opencode-runtime.key
+chmod 600 ~/.config/opencode/opencode-runtime.key
 ```
 
 `~/.config/opencode/opencode.json` 应使用 OpenAI-compatible provider，并通过 `{file:...}` 引用密钥文件：
@@ -204,19 +204,19 @@ chmod 600 ~/.config/opencode/hermes-deepseek.key
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "hermes-deepseek/deepseek-v4-pro",
-  "small_model": "hermes-deepseek/deepseek-v4-pro",
+  "model": "opencode-runtime/default",
+  "small_model": "opencode-runtime/default",
   "provider": {
-    "hermes-deepseek": {
+    "opencode-runtime": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Hermes DeepSeek",
+      "name": "Opencode Runtime",
       "options": {
-        "baseURL": "https://api.deepseek.com/v1",
-        "apiKey": "{file:~/.config/opencode/hermes-deepseek.key}"
+        "baseURL": "",
+        "apiKey": "{file:~/.config/opencode/opencode-runtime.key}"
       },
       "models": {
-        "deepseek-v4-pro": {
-          "name": "DeepSeek V4 Pro",
+        "default": {
+          "name": "Runtime model",
           "limit": {
             "context": 16000,
             "output": 900
@@ -225,7 +225,7 @@ chmod 600 ~/.config/opencode/hermes-deepseek.key
       }
     }
   },
-  "enabled_providers": ["hermes-deepseek"]
+  "enabled_providers": ["opencode-runtime"]
 }
 ```
 
@@ -233,15 +233,15 @@ chmod 600 ~/.config/opencode/hermes-deepseek.key
 
 ```bash
 opencode --version
-opencode models hermes-deepseek
-opencode run -m hermes-deepseek/deepseek-v4-pro --pure --format json "只回复 OK"
+opencode models opencode-runtime
+opencode run --pure --format json "只回复 OK"
 python3 -m json.tool stonehenge-wiki/config.json >/dev/null
 ./work/skills/stonehenge-wiki/scripts/llm-wiki health
 curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
 ./work/skills/stonehenge-wiki/scripts/llm-wiki ask --wiki-root ./stonehenge-wiki "SQLite SELECT 命令是什么"
 ```
 
-本机 2026-07-02 验证结果：opencode `1.17.13` 能列出 `hermes-deepseek/deepseek-v4-pro`，`opencode run` 最小请求返回 `OK`。
+验证点：`opencode models` 可见到 runtime provider，`opencode run` 返回 `OK`。
 
 注意：Skill 脚本 CLI 只调用 REST API，不直接调用 opencode，也不和 Python 解释器交互。opencode 配置用于统一本机 agent/provider/model 的命名和密钥来源；Stonehenge Wiki 后端通过 OpenAI-compatible REST endpoint 调用同一组能力。
 

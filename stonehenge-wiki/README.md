@@ -37,17 +37,19 @@ python3 scripts/check_doc_consistency.py
 Raw 页面和 REST CLI 支持查看来源详情，包括 metadata、脱敏抽取预览、版本、审核、风险和关联 wiki 区段：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-detail docs/03_学习材料/Knowledge-Notes.md
+curl -s "http://127.0.0.1:8765/sources/detail?path=docs/03_%E5%AD%A6%E4%B9%A0%E6%9D%90%E6%96%99/Knowledge-Notes.md" | python3 -m json.tool
 ```
 
 ## LLM Agent
 
-`config.json` 中的 `llm.agents` 支持独立 agent 配置。当前默认 agent 为 `opencode`，通过 `~/.hermes/.env` 读取 `DEEPSEEK_API_KEY`，provider 标记为 `opencode-hermes-deepseek`。Rust CLI 仍然只调用 REST API，不直接调用 opencode 或 Python。
+`config.json` 中的 `llm.agents` 支持独立 agent 配置。当前默认 agent 为 `opencode`，通过 `runtime_mode: opencode` 与 `runtime_command` 接入，不预置具体模型。
 
 可通过 REST CLI 测试 agent 配置和真实连接：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --test-llm-agent opencode --test-llm-live
+curl -s -X POST http://127.0.0.1:8765/llm/test \
+  -H 'Content-Type: application/json' \
+  -d '{"agent_name":"opencode","live":true}'
 ```
 
 ## 编译型 Wiki
@@ -56,8 +58,8 @@ Raw 页面和 REST CLI 支持查看来源详情，包括 metadata、脱敏抽取
 
 ```bash
 ./work/scripts/build_skill_cli.sh
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --compile-wiki
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --lint-wiki
+./work/skills/stonehenge-wiki/scripts/llm-wiki compile --wiki-root /path/to/stonehenge-wiki
+curl -s http://127.0.0.1:8765/wiki/lint | python3 -m json.tool
 ```
 
 平台会从 `docs/` 编译生成：
@@ -72,9 +74,8 @@ Raw 页面和 REST CLI 支持查看来源详情，包括 metadata、脱敏抽取
 运行：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --readiness-report --group group-demo
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-readiness-report --group group-demo
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-release-bundle --group group-demo
+curl -s -X GET "http://127.0.0.1:8765/reports/readiness" | python3 -m json.tool
+./work/skills/stonehenge-wiki/scripts/llm-wiki health
 ```
 
 导出的 Markdown 和 JSON 报告位于 `output/reports/readiness-report.*`。该报告以 pass/warn/fail 方式检查题组数量、权限安全、compiled wiki、no-RAG 架构、来源隔离、修复输出、审计、LLM 和 API token scope。release bundle 位于 `output/releases/`，只包含报告、题组、答案和 compiled wiki，不包含原始 `docs/` 或 `.state/wiki.sqlite`。
