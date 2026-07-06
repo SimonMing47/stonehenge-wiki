@@ -2,16 +2,10 @@
 
 ## 环境
 
-- 对外入口：`work/skills/stonehenge-wiki/bin/stonehenge-wiki`（Rust CLI）
-- 构建依赖：Rust / Cargo
+- 对外入口：`work/skills/stonehenge-wiki/scripts/llm-wiki`（skill 脚本 CLI）
+- 构建依赖：无需 Rust/Cargo（脚本调用方式不依赖本地 Rust 二进制）
 - 推荐依赖：`openpyxl`，用于更完整地读取 Excel 单元格批注并生成透视表/透视图文件
 - 推荐外部程序：LibreOffice / `soffice`，用于 `.doc/.ppt/.xls` 老式 Office 文件转换、索引和修复
-
-构建 skill CLI：
-
-```bash
-./work/scripts/build_skill_cli.sh
-```
 
 安装 LibreOffice 后，确保命令行可访问 `soffice` 或 `libreoffice`。
 
@@ -42,139 +36,59 @@ result/
 - CLI、Codex skill、HTTP API、浏览器控制台共用同一套平台核心，避免规则分叉。
 - API 可通过 `stonehenge-wiki/.env` 或环境变量配置 `STONEHENGE_WIKI_API_TOKEN` / `STONEHENGE_WIKI_READ_TOKEN`，开启 `X-STONEHENGE-WIKI-TOKEN` 分级鉴权。
 
-## CLI 入口
+## CLI 入口（推荐：skill 脚本）
 
-公开 CLI 位于 skill 目录下：
+系统默认 CLI 入口统一为 skill 脚本（不再以 Rust 二进制作为第一入口）：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --help
+./work/skills/stonehenge-wiki/scripts/llm-wiki
 ```
 
-CLI 是 REST API client，只通过 HTTP 调用 Stonehenge Wiki 服务，不启动本地服务、不执行项目源码。默认连接 `http://127.0.0.1:8765`；可通过 `--url`、`--token` 或 `STONEHENGE_WIKI_URL`、`STONEHENGE_WIKI_TOKEN` 指定服务地址和 token。
+该脚本是 HTTP wrapper，只调用 `127.0.0.1:8765` 的 REST API，不直接调用 Python，也不直接调用 opencode。
 
-平台还提供 Linux / Windows 两个 Rust 入口用于对应平台打包：
+### 环境参数
+
+- `LLM_WIKI_URL`：服务地址（默认 `http://127.0.0.1:8765`）
+- `LLM_WIKI_TOKEN`：`X-STONEHENGE-WIKI-TOKEN`
+- `LLM_WIKI_ROOT`：默认的 `--wiki-root`
+
+### 系统初始化与调用（最小流程）
+
+1）配置 opencode（从本机 Hermes 读取 `DEEPSEEK_API_KEY`）
 
 ```bash
-cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-linux
-cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-windows
+./work/skills/stonehenge-wiki/scripts/llm-wiki configure-opencode
 ```
 
-处理 `stonehenge-wiki/question/` 下全部 `group-*.md`：
+2）编译知识（传入真实的 `stonehenge-wiki` 根目录）
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki
+./work/skills/stonehenge-wiki/scripts/llm-wiki compile --wiki-root /path/to/stonehenge-wiki
 ```
 
-处理指定题组：
+3）编译完成后提问
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --group group-1
+./work/skills/stonehenge-wiki/scripts/llm-wiki ask --wiki-root /path/to/stonehenge-wiki --question-id api-1 --level 简单 "统计 docx 文件数量"
 ```
 
-单问调试：
+一键执行（配置 + 编译 + 提问）：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --ask "统计 docx 文件数量"
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --explain-ask "SQLite SELECT 命令是什么"
+./work/skills/stonehenge-wiki/scripts/llm-wiki quick-start --wiki-root /path/to/stonehenge-wiki --question-id api-1 --level 简单 "统计 docx 文件数量"
 ```
 
-索引检查：
+健康检查和能力核验：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --dump-index
+./work/skills/stonehenge-wiki/scripts/llm-wiki health
+./work/skills/stonehenge-wiki/scripts/llm-wiki api-contract
 ```
 
-来源注册表：
+服务端如果未启动，可先用：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-sources
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-sources --include-missing-sources
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-detail docs/03_学习材料/Knowledge-Notes.md
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-source-versions
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-history docs/03_学习材料/Knowledge-Notes.md
-```
-
-重建并持久化索引：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --reindex
-```
-
-导入知识源并自动重建索引：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --import-source ./docs/source.pdf --import-title "知识库评估材料" --import-category 03_学习材料
-```
-
-查看审计日志：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --audit-log --audit-limit 20
-```
-
-来源风险扫描：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-risk-report
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --set-source-status docs/00_inbox/risky.md --source-status quarantined --source-status-reason "prompt injection review"
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --set-source-status docs/00_inbox/risky.md --source-status active --source-status-reason "review complete"
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-source-reviews --source-review-path docs/00_inbox/risky.md
-```
-
-命中 `Permission.json.file.deny` 的来源会被策略自动隔离为 `quarantined`；隔离来源保留来源注册表、版本和风险记录，但不会进入问答、工作台生成或 compiled wiki 章节。
-
-治理报告：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --governance-report
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-governance-report
-```
-
-质量评估报告：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --evaluation-report --group group-1
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-evaluation-report --group group-1
-```
-
-企业交付门禁：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --readiness-report --group group-demo
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-readiness-report --group group-demo
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-release-bundle --group group-demo
-```
-
-readiness report 会检查引擎运行时、`stonehenge-wiki` 目录结构、Rust CLI/skill 入口、文件类型支持、20-30 题题组契约、安全网关、compiled wiki、no-RAG 架构、来源隔离、修复输出目录、SQLite 审计、LLM 连接和 API token scope。release bundle 会打包报告、题组、答案和 compiled wiki，不打包原始 `docs/` 文件或 `.state/wiki.sqlite`。`manifest.json` 会记录生成者、artifact 数量、每个打包文件的 `size`/`sha256`，API 响应还会返回发布包自身的 `sha256`。
-
-本地受保护运行可复制示例文件并填入真实 token：
-
-```bash
-cp stonehenge-wiki/.env.example stonehenge-wiki/.env
-```
-
-`stonehenge-wiki/.env` 会在 CLI、HTTP API、skill wrapper 和 readiness 入口启动时自动加载；shell 中已经设置的同名环境变量优先，不会被 `.env` 覆盖。`.env` 不应提交到 Git。
-
-编译 Markdown wiki：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --compile-wiki
-```
-
-查看和搜索编译后的 wiki 章节：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-wiki-sections --wiki-section-limit 20
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-wiki-sections --wiki-section-source docs/04_常用命令/sqlite.md
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --search-wiki "SQLite SELECT" --wiki-section-limit 5
-```
-
-浏览器控制台的 `Wiki` 页面提供 compiled wiki 文章列表和同页预览，可直接点开 `wiki/index.md`、`wiki/sources/*.md`、`wiki/topics/*.md` 查看内容，不会回退读取原始 `docs/`。
-
-检查 Markdown wiki：
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --lint-wiki
+./work/scripts/server.sh start
 ```
 
 REST API 服务启动后打开控制台：
@@ -203,14 +117,14 @@ http://127.0.0.1:8765/
 检查 REST API：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --api-contract
+./work/skills/stonehenge-wiki/scripts/llm-wiki health
+./work/skills/stonehenge-wiki/scripts/llm-wiki api-contract
 ```
 
 REST 自验证：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
+./work/skills/stonehenge-wiki/scripts/llm-wiki health
 ```
 
 ## 本地交付一致性与质量检查
@@ -226,7 +140,7 @@ PYTHONPATH=work python3 -m unittest discover -s work/tests -q
 该命令链对应三类质量门：
 
 - `scripts/check_doc_consistency.py`：检查 `README/INSTRUCTION/DESIGN` 文档与 CLI 实现/API 契约一致性
-- `contract_checks`：检查 API route / scope / query / body / Rust CLI flag 绑定一致性
+- `contract_checks`：检查 API route / scope / query / body / CLI 接口映射一致性
 - 单元测试：覆盖服务、治理、审计和文件服务回归
 
 - `PYTHONPATH=work` 的设置请与项目里运行 `unit test` 的方式保持一致。
@@ -322,15 +236,14 @@ opencode --version
 opencode models hermes-deepseek
 opencode run -m hermes-deepseek/deepseek-v4-pro --pure --format json "只回复 OK"
 python3 -m json.tool stonehenge-wiki/config.json >/dev/null
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
+./work/skills/stonehenge-wiki/scripts/llm-wiki health
 curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --test-llm-agent opencode --test-llm-live
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --ask "SQLite SELECT 命令是什么"
+./work/skills/stonehenge-wiki/scripts/llm-wiki ask --wiki-root ./stonehenge-wiki "SQLite SELECT 命令是什么"
 ```
 
-本机 2026-07-02 验证结果：opencode `1.17.13` 能列出 `hermes-deepseek/deepseek-v4-pro`，`opencode run` 最小请求返回 `OK`，Stonehenge Wiki `--test-llm-agent opencode --test-llm-live` 返回 `reply_preview: OK`。
+本机 2026-07-02 验证结果：opencode `1.17.13` 能列出 `hermes-deepseek/deepseek-v4-pro`，`opencode run` 最小请求返回 `OK`。
 
-注意：Stonehenge Wiki 的 Rust CLI 只调用 REST API，不直接调用 opencode，也不和 Python 解释器交互。opencode 配置用于统一本机 agent/provider/model 的命名和密钥来源；Stonehenge Wiki 后端通过 OpenAI-compatible REST endpoint 调用同一组能力。
+注意：Skill 脚本 CLI 只调用 REST API，不直接调用 opencode，也不和 Python 解释器交互。opencode 配置用于统一本机 agent/provider/model 的命名和密钥来源；Stonehenge Wiki 后端通过 OpenAI-compatible REST endpoint 调用同一组能力。
 
 开发验证：
 
@@ -338,10 +251,7 @@ curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
 python3 -m compileall -q work
 PYTHONPATH=work python3 -m stonehenge_wiki.contract_checks
 PYTHONPATH=work python3 -m unittest discover -s work/tests -q
-cargo fmt --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --check
-cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
-./work/scripts/build_skill_cli.sh
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
+./work/skills/stonehenge-wiki/scripts/llm-wiki health
 ```
 
 ## HTTP API
@@ -351,7 +261,7 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 - `GET /health`：健康检查和索引统计
 - `GET /api/contract`：机器可读 REST API 契约，schema v2 包含 route、scope、query/body 字段 required/type/alias/enum 元数据、CLI 映射和 no-RAG 边界说明
 
-`python3 -m stonehenge_wiki.contract_checks` 会静态校验 API contract 与 `server.py` 的 route/scope/query/body 字段、字段元数据、Rust CLI flag/path 是否一致；该检查已纳入 CI。
+`python3 -m stonehenge_wiki.contract_checks` 会静态校验 API contract 与 `server.py` 的 route/scope/query/body 字段、字段元数据，以及 CLI 能力映射是否一致；该检查已纳入 CI。
 - `GET /`：浏览器控制台
 - `GET /index`：文件、批注和持久化状态
 - `GET /sources?include_missing=1`：来源注册表，包含 origin、hash、大小、状态和最后索引时间
@@ -390,10 +300,10 @@ cargo test --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml
 work/skills/stonehenge-wiki/
 ```
 
-可直接调用 skill 下的 Rust CLI：
+可直接调用 skill 下的脚本：
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --group group-1
+./work/skills/stonehenge-wiki/scripts/llm-wiki quick-start --wiki-root /path/to/stonehenge-wiki --question-id api-1 "统计 docx 文件数量"
 ```
 
 如需安装到本机 Codex，可将 `work/skills/stonehenge-wiki` 复制到 `${CODEX_HOME:-$HOME/.codex}/skills/`。

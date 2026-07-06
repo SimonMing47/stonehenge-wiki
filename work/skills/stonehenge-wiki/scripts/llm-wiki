@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_URL="${LLM_WIKI_URL:-${STONEHENGE_WIKI_URL:-http://127.0.0.1:8765}}"
+TOKEN="${LLM_WIKI_TOKEN:-${STONEHENGE_WIKI_TOKEN:-${STONEHENGE_WIKI_API_TOKEN:-}}}"
+SCRIPTED_ROOT="${LLM_WIKI_ROOT:-}"
+OPENCODE_PROVIDER="${OPENCODE_PROVIDER:-hermes-deepseek}"
+OPENCODE_MODEL="${OPENCODE_MODEL:-deepseek-v4-pro}"
+OPENCODE_BASE_URL="${OPENCODE_BASE_URL:-https://api.deepseek.com/v1}"
+OPENCODE_RUNTIME_COMMAND="${OPENCODE_RUNTIME_COMMAND:-opencode run -m ${OPENCODE_PROVIDER}/${OPENCODE_MODEL} --pure --format json}"
+
+print_usage() {
+  cat <<'USAGE'
+Usage:
+  llm-wiki configure-opencode [--provider PROVIDER] [--model MODEL] [--base-url URL] [--runtime-command CMD]
+  llm-wiki compile [--wiki-root DIR]
+  llm-wiki ask [--wiki-root DIR] [--question-id ID] [--level LEVEL] "<question>"
+  llm-wiki quick-start [--wiki-root DIR] [--question-id ID] [--level LEVEL] "<question>"
+  llm-wiki health
+  llm-wiki api-contract
+  llm-wiki help
+
+Environment:
+  LLM_WIKI_URL       REST base URL (default: http://127.0.0.1:8765)
+  LLM_WIKI_TOKEN     X-STONEHENGE-WIKI-TOKEN value for admin API
+  LLM_WIKI_ROOT      Default --wiki-root when omitted in command
+  OPENCODE_PROVIDER   opencode provider name (default: hermes-deepseek)
+  OPENCODE_MODEL      opencode model name (default: deepseek-v4-pro)
+USAGE
+}
+
+json_escape() {
+  local value=$1
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+http_request() {
+  local method=$1
+  local path=$2
+  local body=${3-}
+  local url="${BASE_URL%/}${path}"
+  local tmp
+  tmp="$(mktemp)"
+
+  local curl_opts=(-sS --show-error --request "$method" "$url" --output "$tmp" -w '%{http_code}')
+  curl_opts+=(-H "Accept: application/json")
+  if [[ -n "$TOKEN" ]]; then
+    curl_opts+=(-H "X-STONEHENGE-WIKI-TOKEN: $TOKEN")
+  fi
+  if [[ "$method" == "POST" && -n "${body}" ]]; then
+    curl_opts+=(-H "Content-Type: application/json" --data "$body")
+  elif [[ "$method" == "POST" ]]; then
+    curl_opts+=(-H "Content-Type: application/json" --data "{}")
+  fi
+
+  local status
+  if ! status=$(curl "${curl_opts[@]}"); then
+    rm -f "$tmp"
+    echo "error: failed to call ${BASE_URL}${path}" >&2
+    return 2
+  fi
+  local output
+  output="$(cat "$tmp")"
+  rm -f "$tmp"
+
+  if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
+    printf '%s\n' "$output" | sed -n '1,6p'
+    echo "error: HTTP ${status} from ${path}" >&2
+    return 3
+  fi
+  printf '%s\n' "$output"
+}
+
+ensure_opencode_configured() {
+  if ! command -v opencode >/dev/null 2>&1; then
+    echo "error: opencode command not found. Install it first in ~/.opencode/bin or PATH." >&2
+    echo "tip: ./work/skills/stonehenge-wiki/scripts/configure_opencode_from_hermes.sh" >&2
+    return 11
+  fi
+
+  "${SCRIPT_DIR}/configure_opencode_from_hermes.sh"
+}
+
+configure_llm() {
+  local provider="$1"
+  local model="$2"
+  local base_url="$3"
+  local runtime_command="$4"
+
+  local category_payload
+  category_payload='{"00_业务总结":"opencode","01_技术总结":"opencode","03_学习材料":"opencode","04_运维研发":"opencode","05_研发规范":"opencode"}'
+  local payload
+  payload=$(
+    cat <<EOF
+{
+  "enabled": true,
+  "default_agent": "opencode",
+  "runtime_mode": "opencode",
+  "runtime_command": "$(json_escape "$runtime_command")",
+  "category_agents": $category_payload,
+  "agents": {
+    "opencode": {
+      "enabled": true,
+      "provider": "$provider",
+      "model": "$model",
+      "base_url": "$base_url",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "env_file": "~/.hermes/.env",
+      "timeout_seconds": 120,
+      "max_context_chars": 16000,
+      "max_tokens": 900,
+      "temperature": 0.1,
+      "runtime_mode": "opencode",
+      "runtime_command": "$(json_escape "$runtime_command")"
+    },
+    "default": {
+      "enabled": true,
+      "provider": "$provider",
+      "model": "$model",
+      "base_url": "$base_url",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "env_file": "~/.hermes/.env",
+      "timeout_seconds": 120,
+      "max_context_chars": 12000,
+      "max_tokens": 800,
+      "temperature": 0.1,
+      "runtime_mode": "opencode",
+      "runtime_command": "$(json_escape "$runtime_command")"
+    }
+  }
+}
+EOF
+  )
+
+  echo "Configuring llm runtime through /llm/config ..."
+  http_request POST "/llm/config" "$payload"
+}
+
+check_root_match() {
+  local wiki_root=$1
+  if [[ -z "$wiki_root" ]]; then
+    return 0
+  fi
+
+  local health
+  if ! health="$(http_request GET "/health")"; then
+    return 1
+  fi
+  if [[ "$health" != *"\"wiki_root\":\"$wiki_root\""* && "$health" != *"\"wiki_root\": \"$wiki_root\""* ]]; then
+    echo "warning: server is currently running with another wiki root."
+    echo "         provided: $wiki_root"
+    echo "      /health.wiki_root: $(printf '%s' "$health" | sed 's/.*\"wiki_root\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/')"
+    echo "         compile will still execute on the server's current root."
+  fi
+}
+
+cmd_configure_opencode() {
+  local provider="$OPENCODE_PROVIDER"
+  local model="$OPENCODE_MODEL"
+  local base_url="$OPENCODE_BASE_URL"
+  local runtime_command="$OPENCODE_RUNTIME_COMMAND"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --provider) provider="$2"; shift 2;;
+      --model) model="$2"; shift 2;;
+      --base-url) base_url="$2"; shift 2;;
+      --runtime-command) runtime_command="$2"; shift 2;;
+      --help|-h) print_usage; return 0;;
+      *) echo "error: unknown option: $1" >&2; print_usage; return 2;;
+    esac
+  done
+
+  ensure_opencode_configured
+  configure_llm "$provider" "$model" "$base_url" "$runtime_command"
+}
+
+cmd_compile() {
+  local wiki_root="${SCRIPTED_ROOT:-${LLM_WIKI_ROOT:-}}"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --wiki-root) wiki_root="$2"; shift 2;;
+      --help|-h) print_usage; return 0;;
+      *) echo "error: unknown option: $1" >&2; print_usage; return 2;;
+    esac
+  done
+
+  check_root_match "$wiki_root"
+  http_request POST "/wiki/compile"
+}
+
+cmd_ask() {
+  local wiki_root="${SCRIPTED_ROOT:-${LLM_WIKI_ROOT:-}}"
+  local question_id="api-1"
+  local level=""
+  local question=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --wiki-root) wiki_root="$2"; shift 2;;
+      --question-id) question_id="$2"; shift 2;;
+      --level) level="$2"; shift 2;;
+      --help|-h) print_usage; return 0;;
+      --*) echo "error: unknown option: $1" >&2; print_usage; return 2;;
+      *) 
+        if [[ -z "$question" ]]; then
+          question="$1"
+        else
+          echo "error: only one question is supported per call" >&2
+          return 2
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$question" ]]; then
+    echo "error: question is required" >&2
+    print_usage
+    return 2
+  fi
+
+  check_root_match "$wiki_root"
+  local body
+  body=$(cat <<EOF
+{"id":"$(json_escape "$question_id")","title":"$(json_escape "$question")","level":"$(json_escape "$level")"}
+EOF
+)
+  http_request POST "/ask" "$body"
+}
+
+cmd_health() {
+  http_request GET "/health"
+}
+
+cmd_contract() {
+  http_request GET "/api/contract"
+}
+
+cmd_quick_start() {
+  local wiki_root="${SCRIPTED_ROOT:-${LLM_WIKI_ROOT:-}}"
+  local question_id="api-1"
+  local level=""
+  local question=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --wiki-root) wiki_root="$2"; shift 2;;
+      --question-id) question_id="$2"; shift 2;;
+      --level) level="$2"; shift 2;;
+      --help|-h) print_usage; return 0;;
+      --*) echo "error: unknown option: $1" >&2; print_usage; return 2;;
+      *)
+        if [[ -z "$question" ]]; then
+          question="$1"
+        else
+          echo "error: only one question is supported per call" >&2
+          return 2
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$question" ]]; then
+    echo "error: question is required" >&2
+    print_usage
+    return 2
+  fi
+
+  cmd_configure_opencode
+  cmd_compile --wiki-root "$wiki_root"
+  cmd_ask --wiki-root "$wiki_root" --question-id "$question_id" --level "$level" "$question"
+}
+
+if [[ $# -eq 0 ]]; then
+  print_usage
+  exit 1
+fi
+
+SUBCOMMAND=$1
+shift
+
+case "$SUBCOMMAND" in
+  configure-opencode) cmd_configure_opencode "$@";;
+  compile) cmd_compile "$@";;
+  ask) cmd_ask "$@";;
+  quick-start) cmd_quick_start "$@";;
+  health) cmd_health "$@";;
+  api-contract) cmd_contract "$@";;
+  help|-h|--help) print_usage;;
+  *)
+    echo "error: unknown command: $SUBCOMMAND" >&2
+    print_usage
+    exit 2
+    ;;
+esac

@@ -53,3 +53,18 @@ class Question:
     title: str
     level: str = ""
 
+
+@dataclass
+class GoalRecord:
+    goal_id: str
+    source_path: str
+    todo: str
+    assignee: str | None
+    end_date: str | None
+    status: str
+    line: int | None = None
+    kind: str = ""
+    raw_text: str = ""
+    created_at: str = ""
+    state_updated_at: str = ""
+    updated_at: str | None = None

@@ -1,42 +1,23 @@
-# Stonehenge Wiki Skill CLI
+# Stonehenge Wiki Skill Wrapper CLI
 
-The public CLI for this skill lives under `work/skills/stonehenge-wiki/`.
-
-## Build
-
-Local skill binary:
+This skill uses a **shell wrapper CLI** as the primary call path:
 
 ```bash
-./work/scripts/build_skill_cli.sh
+./work/skills/stonehenge-wiki/scripts/llm-wiki
 ```
 
-`build_skill_cli.sh` builds the Rust CLI binaries by target into
+## Usage
 
-- `work/skills/stonehenge-wiki/bin/<os>-<arch>/stonehenge-wiki`
-
-在本机 host 上，脚本会额外维护 `work/skills/stonehenge-wiki/bin/stonehenge-wiki` 作为默认启动入口（指向 host 平台产物）。
-
-Manual build commands (if needed):
+The API service must already be running. The wrapper defaults to `http://127.0.0.1:8765`.
 
 ```bash
-cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-linux
+./work/skills/stonehenge-wiki/scripts/llm-wiki configure-opencode
+./work/skills/stonehenge-wiki/scripts/llm-wiki compile --wiki-root /path/to/stonehenge-wiki
+./work/skills/stonehenge-wiki/scripts/llm-wiki ask --wiki-root /path/to/stonehenge-wiki "统计 docx 文件数量"
+./work/skills/stonehenge-wiki/scripts/llm-wiki quick-start --wiki-root /path/to/stonehenge-wiki --question-id api-1 --level 简单 "统计 docx 文件数量"
+./work/skills/stonehenge-wiki/scripts/llm-wiki health
 ```
 
-Windows release entry:
+### Notes
 
-```powershell
-cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --target x86_64-pc-windows-gnu --bin stonehenge-wiki-windows
-```
-
-## Use
-
-The API service must already be running. The CLI defaults to `http://127.0.0.1:8765`.
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --help
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --health
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --ask "统计 docx 文件数量"
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --list-sources
-```
-
-The CLI only calls the REST API. It does not start the REST service or execute local project code.
+- This wrapper does not require Rust/Cargo at runtime and does not start services.

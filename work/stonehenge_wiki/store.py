@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import hashlib
+import re
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -113,6 +114,24 @@ class SQLiteStore:
                   actor TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_source_review_events_rel_path ON source_review_events(rel_path);
+                CREATE TABLE IF NOT EXISTS goals (
+                  goal_id TEXT PRIMARY KEY,
+                  source_path TEXT NOT NULL,
+                  todo TEXT NOT NULL,
+                  assignee TEXT,
+                  end_date TEXT,
+                  line INTEGER,
+                  kind TEXT NOT NULL,
+                  raw_text TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  state_updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_goals_source_path ON goals(source_path);
+                CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
+                CREATE INDEX IF NOT EXISTS idx_goals_assignee ON goals(assignee);
+                CREATE INDEX IF NOT EXISTS idx_goals_end_date ON goals(end_date);
                 DROP TABLE IF EXISTS document_chunks;
                 CREATE TABLE IF NOT EXISTS wiki_sections (
                   section_id TEXT PRIMARY KEY,
@@ -152,6 +171,7 @@ class SQLiteStore:
                 """,
                 [self._comment_row(comment, now) for comment in index.comments],
             )
+            self._sync_goals(con, index.comments, now)
             self._sync_source_registry(con, index, now)
 
     def save_wiki_sections(self, compiled_root: Path) -> None:
@@ -475,6 +495,11 @@ class SQLiteStore:
             quarantined_source_count = con.execute("SELECT COUNT(*) FROM source_registry WHERE status = 'quarantined'").fetchone()[0]
             source_version_count = con.execute("SELECT COUNT(*) FROM source_versions").fetchone()[0]
             source_review_count = con.execute("SELECT COUNT(*) FROM source_review_events").fetchone()[0]
+            goal_count = con.execute("SELECT COUNT(*) FROM goals").fetchone()[0]
+            open_goal_count = con.execute(
+                "SELECT COUNT(*) FROM goals WHERE status IN ('open', 'in_progress')"
+            ).fetchone()[0]
+            blocked_goal_count = con.execute("SELECT COUNT(*) FROM goals WHERE status = 'blocked'").fetchone()[0]
         return {
             "files": file_count,
             "comments": comment_count,
@@ -486,6 +511,9 @@ class SQLiteStore:
             "quarantined_sources": quarantined_source_count,
             "source_versions": source_version_count,
             "source_reviews": source_review_count,
+            "goals": goal_count,
+            "open_goals": open_goal_count,
+            "blocked_goals": blocked_goal_count,
         }
 
     def _file_row(self, record: DocumentRecord, indexed_at: str) -> tuple[Any, ...]:
@@ -595,6 +623,188 @@ class SQLiteStore:
             """,
             (rel_path, sha256, size, observed_at, observed_at),
         )
+
+    def _sync_goals(self, con: sqlite3.Connection, comments: list[CommentRecord], now: str) -> None:
+        active_ids: set[str] = set()
+        goal_rows: list[tuple[Any, ...]] = []
+        for comment in comments:
+            if not comment.todo:
+                continue
+            goal_id = build_goal_id(comment)
+            active_ids.add(goal_id)
+            raw_todo = comment.todo.strip()
+            assignee = (comment.assignee or "").strip() or None
+            end_date = normalize_goal_date(comment.end_date)
+            kind = str(comment.kind or "").strip() or "todo"
+            goal_rows.append(
+                (
+                    goal_id,
+                    comment.source_path,
+                    raw_todo,
+                    assignee,
+                    end_date,
+                    comment.line,
+                    kind,
+                    comment.raw_text,
+                    "open",
+                    now,
+                    now,
+                    now,
+                )
+            )
+        if goal_rows:
+            con.executemany(
+                """
+                INSERT INTO goals(
+                    goal_id, source_path, todo, assignee, end_date, line, kind, raw_text, status, created_at, updated_at, state_updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(goal_id) DO UPDATE SET
+                    source_path = excluded.source_path,
+                    todo = excluded.todo,
+                    assignee = excluded.assignee,
+                    end_date = excluded.end_date,
+                    line = excluded.line,
+                    kind = excluded.kind,
+                    raw_text = excluded.raw_text,
+                    updated_at = excluded.updated_at,
+                    state_updated_at = excluded.state_updated_at,
+                    status = CASE
+                        WHEN goals.status = 'archived' THEN goals.status
+                        ELSE excluded.status
+                    END
+                """,
+                goal_rows,
+            )
+        if active_ids:
+            placeholders = ",".join("?" for _ in active_ids)
+            con.execute(
+                f"""
+                UPDATE goals
+                SET status = 'archived', state_updated_at = ?
+                WHERE status != 'archived' AND goal_id NOT IN ({placeholders})
+                """,
+                (now, *sorted(active_ids)),
+            )
+
+    def list_goals(
+        self,
+        status: str | None = None,
+        assignee: str | None = None,
+        source_path: str | None = None,
+        search: str | None = None,
+        include_archived: bool = False,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        where = []
+        args: list[Any] = []
+        if not include_archived:
+            where.append("status != 'archived'")
+        if status:
+            where.append("status = ?")
+            args.append(status)
+        if assignee:
+            where.append("assignee = ?")
+            args.append(assignee)
+        if source_path:
+            where.append("source_path = ?")
+            args.append(source_path)
+        if search:
+            where.append("(todo LIKE ? OR source_path LIKE ? OR assignee LIKE ?)")
+            pattern = f"%{search}%"
+            args.extend([pattern, pattern, pattern])
+        clause = f"WHERE {' AND '.join(where)}" if where else ""
+        args.append(limit)
+        with self.connect() as con:
+            rows = con.execute(
+                f"""
+                SELECT goal_id, source_path, todo, assignee, end_date, line, kind, raw_text, status, created_at, updated_at, state_updated_at
+                FROM goals
+                {clause}
+                ORDER BY
+                    CASE status
+                        WHEN 'open' THEN 0
+                        WHEN 'in_progress' THEN 1
+                        WHEN 'blocked' THEN 2
+                        WHEN 'done' THEN 3
+                        ELSE 4
+                    END,
+                    COALESCE(end_date, '99999999') ASC,
+                    source_path ASC,
+                    goal_id ASC
+                LIMIT ?
+                """,
+                tuple(args),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_goal(self, goal_id: str) -> dict[str, Any] | None:
+        with self.connect() as con:
+            row = con.execute(
+                """
+                SELECT goal_id, source_path, todo, assignee, end_date, line, kind, raw_text, status, created_at, updated_at, state_updated_at
+                FROM goals
+                WHERE goal_id = ?
+                """,
+                (goal_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_goal_status(self, goal_id: str, status: str, assignee: str | None = None) -> dict[str, Any] | None:
+        now = utc_now()
+        with self.connect() as con:
+            if assignee is not None:
+                con.execute(
+                    """
+                    UPDATE goals
+                    SET status = ?, assignee = ?, state_updated_at = ?
+                    WHERE goal_id = ?
+                    """,
+                    (status, assignee, now, goal_id),
+                )
+            else:
+                con.execute(
+                    """
+                    UPDATE goals
+                    SET status = ?, state_updated_at = ?
+                    WHERE goal_id = ?
+                    """,
+                    (status, now, goal_id),
+                )
+            row = con.execute(
+                """
+                SELECT goal_id, source_path, todo, assignee, end_date, line, kind, raw_text, status, created_at, updated_at, state_updated_at
+                FROM goals
+                WHERE goal_id = ?
+                """,
+                (goal_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+
+def build_goal_id(comment: CommentRecord) -> str:
+    material = "|".join(
+        [
+            comment.source_path,
+            str(comment.line or ""),
+            comment.raw_text.replace("\n", " ")[:240],
+        ]
+    ).strip()
+    digest = hashlib.sha256(material.encode("utf-8")).hexdigest()[:24]
+    return f"goal-{digest}"
+
+
+def normalize_goal_date(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    cleaned = re.sub(r"\D", "", str(raw))
+    if not cleaned or len(cleaned) != 8:
+        return None
+    try:
+        datetime.strptime(cleaned, "%Y%m%d")
+    except ValueError:
+        return None
+    return cleaned
 
 
 def utc_now() -> str:

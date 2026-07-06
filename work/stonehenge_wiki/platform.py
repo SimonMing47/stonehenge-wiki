@@ -697,6 +697,52 @@ class StonehengeWikiPlatform:
     def list_source_reviews(self, rel_path: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.list_source_reviews(rel_path=rel_path, limit=limit)
 
+    def list_goals(
+        self,
+        status: str | None = None,
+        assignee: str | None = None,
+        source_path: str | None = None,
+        search: str | None = None,
+        include_archived: bool = False,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        return self.store.list_goals(
+            status=status,
+            assignee=assignee,
+            source_path=source_path,
+            search=search,
+            include_archived=include_archived,
+            limit=limit,
+        )
+
+    def get_goal(self, goal_id: str) -> dict[str, Any] | None:
+        if not goal_id:
+            return {"error": "missing_goal_id"}
+        return self.store.get_goal(goal_id)
+
+    def set_goal_status(
+        self,
+        goal_id: str,
+        status: str,
+        assignee: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_status = str(status or "").strip().lower()
+        valid_status = {"open", "in_progress", "blocked", "done", "archived"}
+        if not goal_id:
+            return {"error": "missing_goal_id"}
+        if normalized_status not in valid_status:
+            return {"error": "invalid_status", "status": normalized_status, "allowed": sorted(valid_status)}
+
+        goal = self.store.get_goal(goal_id)
+        if not goal:
+            return {"error": "goal_not_found", "goal_id": goal_id}
+
+        updated = self.store.update_goal_status(goal_id, normalized_status, assignee=assignee)
+        if not updated:
+            return {"error": "goal_not_found", "goal_id": goal_id}
+
+        return updated
+
     def set_source_status(
         self,
         rel_path: str,

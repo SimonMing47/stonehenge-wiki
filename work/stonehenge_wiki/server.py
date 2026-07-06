@@ -96,6 +96,34 @@ class PlatformHandler(BaseHTTPRequestHandler):
             rel_path = query.get("path", [""])[0] or None
             limit = int(query.get("limit", ["50"])[0])
             return self.write_json({"reviews": self.stonehenge_wiki_platform.list_source_reviews(rel_path=rel_path, limit=limit)})
+        if parsed.path == "/goals":
+            if not self.ensure_authorized("read"):
+                return
+            query = parse_qs(parsed.query)
+            if "goal_id" in query and query.get("goal_id", [""])[0].strip():
+                goal_id = query["goal_id"][0].strip()
+                result = self.stonehenge_wiki_platform.get_goal(goal_id)
+                if not result or result.get("error") == "missing_goal_id":
+                    return self.write_json({"error": "goal_not_found", "goal_id": goal_id}, HTTPStatus.NOT_FOUND)
+                return self.write_json(result)
+            status = query.get("status", [""])[0].strip() or None
+            assignee = query.get("assignee", [""])[0].strip() or None
+            source_path = query.get("source_path", [""])[0].strip() or None
+            search = query.get("search", [""])[0].strip() or None
+            include_archived = query.get("include_archived", ["0"])[0] in {"1", "true", "yes"}
+            try:
+                limit = int(query.get("limit", ["200"])[0])
+            except ValueError:
+                return self.write_json({"error": "invalid_limit"}, HTTPStatus.BAD_REQUEST)
+            goals = self.stonehenge_wiki_platform.list_goals(
+                status=status,
+                assignee=assignee,
+                source_path=source_path,
+                search=search,
+                include_archived=include_archived,
+                limit=limit,
+            )
+            return self.write_json({"goals": goals, "count": len(goals)})
         if parsed.path == "/audit":
             if not self.ensure_authorized("read"):
                 return
@@ -242,6 +270,23 @@ class PlatformHandler(BaseHTTPRequestHandler):
             reason = str(body.get("reason", ""))
             actor = str(body.get("actor", "api"))
             return self.write_json(self.stonehenge_wiki_platform.set_source_status(rel_path, status, reason=reason, actor=actor))
+        if parsed.path == "/goals/status":
+            goal_id = str(body.get("goal_id", body.get("id", ""))).strip()
+            status = str(body.get("status", "")).strip()
+            assignee = body.get("assignee")
+            if assignee is not None:
+                assignee = str(assignee).strip() or None
+            result = self.stonehenge_wiki_platform.set_goal_status(
+                goal_id=goal_id,
+                status=status,
+                assignee=assignee,
+            )
+            if result.get("error") == "missing_goal_id":
+                return self.write_json(result, HTTPStatus.BAD_REQUEST)
+            if result.get("error") in {"invalid_status", "goal_not_found"}:
+                status_code = HTTPStatus.BAD_REQUEST if result.get("error") == "invalid_status" else HTTPStatus.NOT_FOUND
+                return self.write_json(result, status_code)
+            return self.write_json(result)
         if parsed.path == "/wiki/compile":
             return self.write_json(self.stonehenge_wiki_platform.compile_wiki())
         if parsed.path == "/groups/run":

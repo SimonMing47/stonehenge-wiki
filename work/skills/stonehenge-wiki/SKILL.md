@@ -1,138 +1,89 @@
 ---
 name: stonehenge-wiki
-description: Run the repository-local Stonehenge Wiki system for deterministic document indexing, strict JSON answer generation, Office/code comment and TODO management, best-effort document repair, safe code-result queries, and Permission.json based high-risk command blocking. Use when Codex needs to answer stonehenge-wiki question groups, inspect the wiki index, run an ad-hoc wiki query, or call the CLI from a skill workflow.
+description: Run Stonehenge Wiki via the in-repo skill shell CLI. Use the local REST API only, from Codex or terminal, with a three-step path: configure opencode, compile docs, then ask.
 ---
 
 # Stonehenge Wiki
 
-## Workflow
+## Why this entry
 
-Use the bundled Rust CLI as the source of truth. From the repository root, build it once when needed:
-
-```bash
-./work/scripts/build_skill_cli.sh
-```
-
-The REST CLI entrypoint is:
+The skill entry for this repository is a shell script:
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --group group-1
+./work/skills/stonehenge-wiki/scripts/llm-wiki
 ```
 
-For all question groups:
+It is a thin HTTP wrapper over the running Stonehenge Wiki service (`http://127.0.0.1:8765` by default).
+It does not call Python code directly and does not start the service.
+
+### Environment variables
+
+- `LLM_WIKI_URL`: API base URL, default `http://127.0.0.1:8765`
+- `LLM_WIKI_TOKEN`: `X-STONEHENGE-WIKI-TOKEN` header value (optional)
+- `LLM_WIKI_ROOT`: default wiki root for `compile`/`ask`
+- `OPENCODE_PROVIDER`, `OPENCODE_MODEL`, `OPENCODE_BASE_URL`: optional runtime defaults
+
+## Recommended three-step workflow
+
+The default operational flow is:
+
+1) Configure opencode from local Hermes config (first-time setup)
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki
+./work/skills/stonehenge-wiki/scripts/llm-wiki configure-opencode
 ```
 
-For an ad-hoc question:
+2) Compile markdown knowledge from a real wiki root
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --ask "统计 docx 文件数量"
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --explain-ask "SQLite SELECT 命令是什么"
+./work/skills/stonehenge-wiki/scripts/llm-wiki compile --wiki-root /path/to/stonehenge-wiki
 ```
 
-For an index inspection:
+3) Ask a question after compile completes
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --dump-index
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-sources
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-source-versions
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-detail "docs/03_学习材料/Knowledge-Notes.md"
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --source-history "docs/03_学习材料/Knowledge-Notes.md"
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-wiki-sections --wiki-section-limit 20
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --search-wiki "SQLite SELECT" --wiki-section-limit 5
+./work/skills/stonehenge-wiki/scripts/llm-wiki ask --wiki-root /path/to/stonehenge-wiki --question-id api-1 --level 简单 "统计 docx 文件数量"
 ```
 
-For source ingestion:
+You can do all three in one command:
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --import-source ./docs/source.pdf --import-title "知识库评估材料" --import-category 03_学习材料
+./work/skills/stonehenge-wiki/scripts/llm-wiki quick-start --wiki-root /path/to/stonehenge-wiki --question-id api-1 --level 简单 "统计 docx 文件数量"
 ```
 
-For a workbench brief:
+## Other practical commands
 
 ```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --generate-brief "企业知识库建设方案" --slide-count 6
+./work/skills/stonehenge-wiki/scripts/llm-wiki health
+./work/skills/stonehenge-wiki/scripts/llm-wiki api-contract
 ```
-
-For API access, make sure the Stonehenge Wiki REST service is already running, then call:
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --api-contract
-```
-
-`--api-contract` returns schema v2 with route scope, CLI mapping, and structured query/body field metadata (`required`, `type`, `alias_for`, `enum`).
-
-Then open `http://127.0.0.1:8765/` for the browser console.
 
 ## LLM Agent Configuration
 
-Configure LLMs as named agents in `stonehenge-wiki/config.json`, not as one shared untracked shell setting. The runtime reads `llm.agents`, chooses `llm.default_agent`, and can route categories through `llm.category_agents`.
+Recommended operational way is still **agent-based configuration** in `stonehenge-wiki/config.json`.
+The default profile uses local `opencode` runtime mode.
 
-The default local profile is:
-
-- `default_agent`: `opencode`
-- `agents.opencode.provider`: `opencode-hermes-deepseek`
-- `agents.opencode.model`: `deepseek-v4-pro`
-- `agents.opencode.base_url`: `https://api.deepseek.com/v1`
-- `agents.opencode.api_key_env`: `DEEPSEEK_API_KEY`
-- `agents.opencode.env_file`: `~/.hermes/.env`
-
-If opencode is missing, or if it has no local LLM provider configured, bootstrap it from the local Hermes DeepSeek API without committing secrets:
+If opencode is not installed or lacks Hermes model wiring, run:
 
 ```bash
 ./work/skills/stonehenge-wiki/scripts/configure_opencode_from_hermes.sh
 ```
 
-The script reads `DEEPSEEK_API_KEY` from `~/.hermes/.env`, writes only `~/.config/opencode/hermes-deepseek.key` with mode `0600`, and writes `~/.config/opencode/opencode.json` with an OpenAI-compatible `hermes-deepseek/deepseek-v4-pro` provider. Do not store API keys in the repository.
+That script reads `~/.hermes/.env`, writes key/config under `~/.config/opencode/`, and does not modify repository files.
 
-Validate agent wiring before answering LLM-backed questions:
+## Validation sequence
 
 ```bash
-opencode --version
-opencode models hermes-deepseek
-opencode run -m hermes-deepseek/deepseek-v4-pro --pure --format json "只回复 OK"
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --url http://127.0.0.1:8765 --health
+./work/skills/stonehenge-wiki/scripts/configure_opencode_from_hermes.sh
+./work/skills/stonehenge-wiki/scripts/llm-wiki configure-opencode
+./work/skills/stonehenge-wiki/scripts/llm-wiki compile --wiki-root /path/to/stonehenge-wiki
+./work/skills/stonehenge-wiki/scripts/llm-wiki ask --wiki-root /path/to/stonehenge-wiki "统计 docx 文件数量"
+```
+
+Optional API-level checks:
+
+```bash
 curl -s http://127.0.0.1:8765/llm/config | python3 -m json.tool
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --test-llm-agent opencode --test-llm-live
+curl -s http://127.0.0.1:8765/health | python3 -m json.tool
 ```
 
-The Rust CLI remains a REST API client. It must not call Python or opencode directly.
-
-For audit review:
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --audit-log --audit-limit 20
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --governance-report
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --evaluation-report --group group-1
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --readiness-report --group group-demo
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --export-release-bundle --group group-demo
-```
-
-To compile, inspect, search, and validate the persistent Markdown wiki layer:
-
-```bash
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --compile-wiki
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --list-wiki-sections --wiki-section-limit 20
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --search-wiki "SQLite SELECT" --wiki-section-limit 5
-./work/skills/stonehenge-wiki/bin/stonehenge-wiki --lint-wiki
-```
-
-## Safety Rules
-
-Always let the CLI perform safety checks before reading, executing, or repairing target content. It calls the Stonehenge Wiki REST API, which loads `stonehenge-wiki/Permission.json`, blocks denied commands/files/write targets, blocks system/root/keychain password requests, restricts ordinary password retrieval to `docs/02_环境信息`, and returns the required JSON error object for high-risk requests. For HTTP calls, `stonehenge-wiki/.env` or the process environment can provide tokens: `STONEHENGE_WIKI_READ_TOKEN` is read-only and `STONEHENGE_WIKI_API_TOKEN` is the admin token for imports, reindexing, compilation, group runs, and workbench brief generation.
-
-## Outputs
-
-Imported sources are copied under `stonehenge-wiki/docs/<category>/` and reindexed. Question group answers are written to `stonehenge-wiki/output/<group>-answer.md` as a JSON array. Repair outputs are written under `stonehenge-wiki/output/fixed/`. Workbench briefs are written under `stonehenge-wiki/output/presentations/`. Governance reports are written under `stonehenge-wiki/output/reports/`. Successful runs append a short self-validation line to `result/output.md`. Runtime index, source registry, metadata-only source version history, compiled wiki section index, and audit data are stored in `stonehenge-wiki/.state/wiki.sqlite`.
-
-## Platform Builds
-
-The skill includes platform-specific Rust entrypoints for packaging:
-
-```bash
-cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-linux
-cargo build --release --manifest-path work/skills/stonehenge-wiki/cli/Cargo.toml --bin stonehenge-wiki-windows
-```

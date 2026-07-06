@@ -33,6 +33,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-risk-report", action="store_true", help="Print source risk scan report as JSON")
     parser.add_argument("--list-source-reviews", action="store_true", help="Print source review events as JSON")
     parser.add_argument("--source-review-path", help="Filter source review events by path")
+    parser.add_argument("--list-goals", action="store_true", help="Print goal records as JSON")
+    parser.add_argument("--goal-id", help="Get one goal by id")
+    parser.add_argument("--goal-status", choices=["open", "in_progress", "blocked", "done", "archived"], help="Goal status filter or target status")
+    parser.add_argument("--goal-assignee", help="Goal assignee filter or reassignment")
+    parser.add_argument("--goal-source", help="Filter goals by source path")
+    parser.add_argument("--goal-search", help="Search goals by todo/source/assignee keyword")
+    parser.add_argument("--goal-include-archived", action="store_true", help="Include archived goals")
+    parser.add_argument("--set-goal-status", help="Update status for a goal by id")
     parser.add_argument("--jobs", action="store_true", help="Print recent job run records as JSON")
     parser.add_argument("--jobs-limit", type=int, default=50, help="Job record count for --jobs")
     parser.add_argument("--set-source-status", help="Set source status for one registry path")
@@ -125,6 +133,39 @@ def main(argv: list[str] | None = None) -> int:
     if args.list_source_reviews:
         print_json({"reviews": platform.list_source_reviews(rel_path=args.source_review_path, limit=args.source_history_limit)})
         return 0
+
+    if args.list_goals:
+        state = platform.list_goals(
+            status=args.goal_status,
+            assignee=args.goal_assignee,
+            source_path=args.goal_source,
+            search=args.goal_search,
+            include_archived=args.goal_include_archived,
+        )
+        print_json({"goals": state, "count": len(state)})
+        return 0
+
+    if args.goal_id and not args.list_goals:
+        print_json(
+            {
+                "goal": platform.get_goal(args.goal_id),
+            }
+        )
+        return 0
+
+    if args.set_goal_status:
+        if not args.goal_status:
+            print('error: --set-goal-status requires --goal-status')
+            return 1
+        print_json(
+            platform.set_goal_status(
+                goal_id=args.set_goal_status,
+                status=args.goal_status,
+                assignee=args.goal_assignee,
+            )
+        )
+        return 0
+
     if args.jobs:
         print_json({"jobs": platform.jobs(limit=args.jobs_limit)})
         return 0
