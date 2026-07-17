@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 .playwright-cli/
 tmp/
+/dist/
 work/skills/stonehenge-wiki/bin/
 work/skills/stonehenge-wiki/cli/target/
 stonehenge-wiki/.env

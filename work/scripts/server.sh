@@ -5,7 +5,31 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$WORK_ROOT/.." && pwd)"
 PYTHONPATH_DEFAULT="$WORK_ROOT"
-WIKI_ROOT="${STONEHENGE_WIKI_ROOT:-$WORK_ROOT/stonehenge-wiki}"
+if [[ -n "${STONEHENGE_WIKI_PYTHON:-}" ]]; then
+  PYTHON_BIN="$STONEHENGE_WIKI_PYTHON"
+elif command -v python3.11 >/dev/null 2>&1; then
+  PYTHON_BIN="python3.11"
+else
+  PYTHON_BIN="python3"
+fi
+
+discover_wiki_root() {
+  local candidate
+  for candidate in \
+    "/app/code/judge-assets/01_01_llm_wiki" \
+    "$REPO_ROOT/llm-wiki" \
+    "$REPO_ROOT/stonehenge-wiki" \
+    "$WORK_ROOT/llm-wiki" \
+    "$WORK_ROOT/stonehenge-wiki"; do
+    if [[ -d "$candidate/docs" && -d "$candidate/question" && -f "$candidate/Permission.json" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  printf '%s\n' "$REPO_ROOT/llm-wiki"
+}
+
+WIKI_ROOT="${STONEHENGE_WIKI_ROOT:-${LLM_WIKI_ROOT:-$(discover_wiki_root)}}"
 HOST="${STONEHENGE_WIKI_HOST:-127.0.0.1}"
 PORT="${STONEHENGE_WIKI_PORT:-8765}"
 PID_FILE="${STONEHENGE_WIKI_SERVER_PID_FILE:-$WORK_ROOT/.stonehenge-wiki-server.pid}"
@@ -77,7 +101,7 @@ Commands:
 Options:
   --host HOST            Bind host (default: 127.0.0.1)
   --port PORT            Bind port (default: 8765)
-  --wiki-root PATH       Wiki root directory (default: ./stonehenge-wiki)
+  --wiki-root PATH       Wiki root (default: work sibling llm-wiki; fixture fallback: stonehenge-wiki)
   --pid-file PATH        PID file path (default: .stonehenge-wiki-server.pid)
   --log-file PATH        Log file path (default: .stonehenge-wiki-server.log)
   --health-timeout SEC   Health wait timeout for start/inspect (default: 15)
@@ -192,7 +216,7 @@ start_server() {
   fi
 
   mkdir -p "$(dirname "$LOG_FILE")"
-  nohup env PYTHONPATH="${STONEHENGE_WIKI_PYTHONPATH:-$PYTHONPATH_DEFAULT}" python3 -m stonehenge_wiki.cli \
+  nohup env PYTHONPATH="${STONEHENGE_WIKI_PYTHONPATH:-$PYTHONPATH_DEFAULT}" "$PYTHON_BIN" -m stonehenge_wiki.cli \
     --wiki-root "$WIKI_ROOT" --serve --host "$HOST" --port "$PORT" \
     >>"$LOG_FILE" 2>&1 &
   local pid="$!"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -27,6 +28,10 @@ class CommentRecord:
             parts.append(f"to:{self.assignee}")
         if self.end_date:
             parts.append(f"end_date:{self.end_date}")
+        if self.author:
+            parts.append(f"author:{self.author}")
+        if self.created:
+            parts.append(f"created:{self.created}")
         if not self.structured:
             text = " ".join(self.raw_text.split())
             parts.append(f"comment:{text[:160]}")
@@ -52,6 +57,7 @@ class Question:
     id: str
     title: str
     level: str = ""
+    answer_format: Any = None
 
 
 @dataclass

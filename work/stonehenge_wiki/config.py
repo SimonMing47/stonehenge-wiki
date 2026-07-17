@@ -7,19 +7,43 @@ from pathlib import Path
 from typing import Any
 
 
+def default_opencode_config() -> dict[str, Any]:
+    """Runtime defaults for evaluation roots that do not ship config.json."""
+    provider = os.environ.get("OPENCODE_PROVIDER", "zhipu").strip() or "zhipu"
+    model = os.environ.get("OPENCODE_MODEL", "glm-5.2").strip() or "glm-5.2"
+    runtime_command = (
+        os.environ.get("OPENCODE_RUNTIME_COMMAND", "opencode run --pure --format json").strip()
+        or "opencode run --pure --format json"
+    )
+    profile = {
+        "enabled": True,
+        "provider": provider,
+        "model": model,
+        "timeout_seconds": 120,
+        "max_context_chars": 16000,
+        "max_tokens": 900,
+        "temperature": 0.1,
+        "runtime_mode": "opencode",
+        "runtime_command": runtime_command,
+    }
+    return {
+        **profile,
+        "default_agent": "opencode",
+        "agents": {"opencode": dict(profile)},
+        "category_agents": {},
+    }
+
+
 @dataclass(frozen=True)
 class LLMConfig:
     enabled: bool = False
     provider: str = ""
     model: str = ""
-    base_url: str = ""
-    api_key_env: str = ""
-    env_file: Path | None = None
     timeout_seconds: int = 60
     max_context_chars: int = 12000
     max_tokens: int = 800
     temperature: float = 0.1
-    runtime_mode: str = "api"
+    runtime_mode: str = "opencode"
     runtime_command: str = ""
 
 
@@ -59,63 +83,74 @@ def load_config(wiki_root: Path) -> PlatformConfig:
     wiki_root = wiki_root.resolve()
     config_path = wiki_root / "config.json"
     data: dict[str, Any] = {}
+    if config_path.is_symlink():
+        raise ValueError("wiki config must not be a symbolic link")
     if config_path.exists():
-        data = json.loads(config_path.read_text(encoding="utf-8"))
+        try:
+            loaded = json.loads(config_path.read_text(encoding="utf-8"))
+            data = loaded if isinstance(loaded, dict) else {}
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            data = {}
 
     api = data.get("api", {}) if isinstance(data.get("api", {}), dict) else {}
-    load_env_files(wiki_root, data, api)
 
-    state_dir = resolve_under_wiki(wiki_root, data.get("state_dir", ".state"))
-    database_path = resolve_under_wiki(wiki_root, data.get("database_path", str(state_dir / "wiki.sqlite")))
+    # State paths are fixed below the wiki root. Judge-provided config cannot
+    # redirect SQLite writes into the host filesystem.
+    state_dir = wiki_root / ".state"
+    database_path = state_dir / "wiki.sqlite"
+    if state_dir.is_symlink() or database_path.is_symlink():
+        raise ValueError("wiki state path must not be a symbolic link")
 
-    llm = data.get("llm", {}) if isinstance(data.get("llm", {}), dict) else {}
-    base_profile = _build_llm_config(llm, {})
-    raw_agents = llm.get("agents", {})
-    if isinstance(raw_agents, dict) and raw_agents:
-        llm_agents = {
-            str(agent_name): _build_llm_config(value, base_profile.__dict__)
-            for agent_name, value in raw_agents.items()
-            if isinstance(value, dict)
-        }
-    else:
-        llm_agents = {}
-    if not llm_agents:
-        llm_agents["default"] = base_profile
-    if "default" not in llm_agents:
-        llm_agents["default"] = base_profile
-    raw_default_agent = str(llm.get("default_agent", "default"))
-    if raw_default_agent not in llm_agents:
-        raw_default_agent = "default"
-    raw_category_agents = llm.get("category_agents", llm.get("source_agents", {}))
-    llm_category_agents = {}
+    # The wiki root is judge-provided, untrusted input. It may tune harmless
+    # limits or disable the model for an offline fixture, but it must never
+    # select an executable, env file, credential source, or direct API mode.
+    # OpenCode provider/model/command settings come only from trusted process
+    # environment defaults and the user-level OpenCode configuration.
+    raw_llm = data.get("llm") if isinstance(data.get("llm"), dict) else {}
+    trusted_llm = default_opencode_config()
+    trusted_profile = dict(trusted_llm["agents"]["opencode"])
+    formal_judge_root = wiki_root == Path("/app/code/judge-assets/01_01_llm_wiki").resolve()
+    if not formal_judge_root:
+        trusted_profile["enabled"] = bool(raw_llm.get("enabled", trusted_profile["enabled"]))
+    for key, minimum, maximum in (
+        ("timeout_seconds", 10, 600),
+        ("max_context_chars", 2000, 64000),
+        ("max_tokens", 64, 4096),
+    ):
+        try:
+            trusted_profile[key] = max(minimum, min(int(raw_llm.get(key, trusted_profile[key])), maximum))
+        except (TypeError, ValueError):
+            pass
+    base_profile = _build_llm_config(trusted_profile, {})
+    llm_agents = {"opencode": base_profile}
+    raw_default_agent = "opencode"
+    raw_category_agents = raw_llm.get("category_agents", {})
+    llm_category_agents: dict[str, str] = {}
     if isinstance(raw_category_agents, dict):
-        for raw_category, raw_agent in raw_category_agents.items():
-            if isinstance(raw_category, str) and isinstance(raw_agent, str):
-                llm_category_agents[raw_category.strip()] = raw_agent.strip()
+        for raw_category in raw_category_agents:
+            if isinstance(raw_category, str) and raw_category.strip():
+                llm_category_agents[raw_category.strip()] = "opencode"
     return PlatformConfig(
         wiki_root=wiki_root,
         state_dir=state_dir,
         database_path=database_path,
-        api_host=str(api.get("host", data.get("api_host", "127.0.0.1"))),
-        api_port=int(api.get("port", data.get("api_port", 8765))),
+        api_host="127.0.0.1",
+        api_port=bounded_int(api.get("port", data.get("api_port", 8765)), 8765, 1, 65535),
         api_token_env=str(api.get("token_env", data.get("api_token_env", "STONEHENGE_WIKI_API_TOKEN"))),
         api_read_token_env=str(api.get("read_token_env", data.get("api_read_token_env", "STONEHENGE_WIKI_READ_TOKEN"))),
-        audit_enabled=bool(data.get("audit_enabled", True)),
-        persist_index=bool(data.get("persist_index", True)),
-        snippet_limit=int(data.get("snippet_limit", 8)),
+        audit_enabled=True,
+        persist_index=True,
+        snippet_limit=bounded_int(data.get("snippet_limit", 8), 8, 1, 100),
         llm=LLMConfig(
-            enabled=bool(llm.get("enabled", False)),
-            provider=str(llm.get("provider", "")),
-            model=str(llm.get("model", "")),
-            base_url=str(llm.get("base_url", "")),
-            api_key_env=str(llm.get("api_key_env", "")),
-            env_file=Path(str(llm["env_file"])).expanduser() if llm.get("env_file") else None,
-            timeout_seconds=int(llm.get("timeout_seconds", 60)),
-            max_context_chars=int(llm.get("max_context_chars", 12000)),
-            max_tokens=int(llm.get("max_tokens", 800)),
-            temperature=float(llm.get("temperature", 0.1)),
-            runtime_mode=str(llm.get("runtime_mode", base_profile.runtime_mode)).strip() or "api",
-            runtime_command=str(llm.get("runtime_command", base_profile.runtime_command)).strip(),
+            enabled=base_profile.enabled,
+            provider=base_profile.provider,
+            model=base_profile.model,
+            timeout_seconds=base_profile.timeout_seconds,
+            max_context_chars=base_profile.max_context_chars,
+            max_tokens=base_profile.max_tokens,
+            temperature=base_profile.temperature,
+            runtime_mode="opencode",
+            runtime_command=base_profile.runtime_command,
         ),
         llm_agents=llm_agents,
         llm_default_agent=raw_default_agent,
@@ -123,43 +158,12 @@ def load_config(wiki_root: Path) -> PlatformConfig:
     )
 
 
-def load_env_files(wiki_root: Path, data: dict[str, Any], api: dict[str, Any]) -> None:
-    env_files = [wiki_root / ".env"]
-    for value in [data.get("env_file"), api.get("env_file")]:
-        if value:
-            env_files.append(resolve_config_path(wiki_root, value))
-    for path in env_files:
-        load_env_file(path)
-
-
-def load_env_file(path: Path) -> None:
+def bounded_int(value: Any, default: int, minimum: int, maximum: int) -> int:
     try:
-        lines = path.expanduser().read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return
-    for raw in lines:
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip().removeprefix("export ").strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def resolve_config_path(wiki_root: Path, value: str | Path) -> Path:
-    path = Path(value).expanduser()
-    if path.is_absolute():
-        return path
-    return wiki_root / path
-
-
-def resolve_under_wiki(wiki_root: Path, value: str | Path) -> Path:
-    path = Path(value)
-    if path.is_absolute():
-        return path
-    return wiki_root / path
+        parsed = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return max(minimum, min(parsed, maximum))
 
 
 def _build_llm_config(payload: dict[str, Any], fallback: dict[str, Any]) -> LLMConfig:
@@ -167,21 +171,15 @@ def _build_llm_config(payload: dict[str, Any], fallback: dict[str, Any]) -> LLMC
         **fallback,
         **{str(key): value for key, value in payload.items() if isinstance(key, str)},
     }
-    runtime_mode = str(merged.get("runtime_mode", fallback.get("runtime_mode", "api"))).strip() or "api"
-    if runtime_mode not in {"api", "opencode"}:
-        runtime_mode = str(fallback.get("runtime_mode", "api"))
     return LLMConfig(
         enabled=bool(merged.get("enabled", fallback.get("enabled", False))),
         provider=str(merged.get("provider", fallback.get("provider", ""))),
         model=str(merged.get("model", fallback.get("model", ""))),
-        base_url=str(merged.get("base_url", fallback.get("base_url", ""))),
-        api_key_env=str(merged.get("api_key_env", fallback.get("api_key_env", ""))),
-        env_file=Path(str(merged.get("env_file"))).expanduser() if merged.get("env_file") else None,
         timeout_seconds=int(merged.get("timeout_seconds", fallback.get("timeout_seconds", 60))),
         max_context_chars=int(merged.get("max_context_chars", fallback.get("max_context_chars", 12000))),
         max_tokens=int(merged.get("max_tokens", fallback.get("max_tokens", 800))),
         temperature=float(merged.get("temperature", fallback.get("temperature", 0.1))),
-        runtime_mode=runtime_mode,
+        runtime_mode="opencode",
         runtime_command=str(merged.get("runtime_command", fallback.get("runtime_command", ""))).strip(),
     )
 
@@ -192,9 +190,6 @@ def llm_config_to_dict(name: str, config: LLMConfig) -> dict[str, Any]:
         "enabled": config.enabled,
         "provider": config.provider,
         "model": config.model,
-        "base_url": config.base_url,
-        "api_key_env": config.api_key_env,
-        "env_file": str(config.env_file) if config.env_file else "",
         "timeout_seconds": config.timeout_seconds,
         "max_context_chars": config.max_context_chars,
         "max_tokens": config.max_tokens,

@@ -17,7 +17,12 @@ def main(argv: list[str] | None = None) -> int:
         prog=os.environ.get("STONEHENGE_WIKI_CLI_NAME") or None,
         description="Enterprise Stonehenge Wiki platform CLI",
     )
-    parser.add_argument("--wiki-root", type=Path, default=default_wiki_root(), help="Path to stonehenge-wiki directory")
+    parser.add_argument(
+        "--wiki-root",
+        type=Path,
+        default=default_wiki_root(),
+        help="Path to the llm-wiki data directory (auto-detected when omitted)",
+    )
     parser.add_argument("--question", type=Path, action="append", help="Question group file path")
     parser.add_argument("--group", action="append", help="Group stem such as group-1")
     parser.add_argument("--ask", help="Answer one ad-hoc question and print JSON to stdout")
@@ -253,7 +258,36 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def default_wiki_root() -> Path:
-    return Path(__file__).resolve().parents[2] / "stonehenge-wiki"
+    """Resolve the data root used by the unpacked evaluation bundle.
+
+    The competition runner releases ``llm-wiki`` next to ``work``.  The
+    repository's checked-in fixture is historically named ``stonehenge-wiki``;
+    keeping it as a fallback lets the same executable run in development.
+    """
+    for env_name in ("LLM_WIKI_ROOT", "STONEHENGE_WIKI_ROOT"):
+        configured = os.environ.get(env_name, "").strip()
+        if configured:
+            return Path(configured).expanduser()
+    return discover_wiki_root(Path(__file__).resolve().parents[2])
+
+
+def discover_wiki_root(repo_root: Path) -> Path:
+    work_root = repo_root / "work"
+    candidates = (
+        Path("/app/code/judge-assets/01_01_llm_wiki"),
+        repo_root / "llm-wiki",
+        repo_root / "stonehenge-wiki",
+        work_root / "llm-wiki",
+        work_root / "stonehenge-wiki",
+    )
+    for candidate in candidates:
+        if (
+            (candidate / "docs").is_dir()
+            and (candidate / "question").is_dir()
+            and (candidate / "Permission.json").is_file()
+        ):
+            return candidate
+    return repo_root / "llm-wiki"
 
 
 def print_json(data: object) -> None:

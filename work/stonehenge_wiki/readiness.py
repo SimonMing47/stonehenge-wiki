@@ -269,7 +269,7 @@ def llm_gate(health: dict[str, Any]) -> dict[str, Any]:
         "Configured LLM provider",
         "pass" if ready else "warn",
         f"enabled={llm.get('enabled')} ready={llm.get('ready')} provider={llm.get('provider')} model={llm.get('model')}",
-        "Configure an API key if live AI answers are required in this environment.",
+        "Configure the OpenCode provider credential outside the wiki root if live Agent answers are required.",
     )
 
 

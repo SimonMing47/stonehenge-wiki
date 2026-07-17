@@ -84,8 +84,8 @@ Stonehenge Wiki Platform (work/stonehenge_wiki/platform.py)
 - `output/`：答案、评估报告、生成物（含演示稿文件）
 - `.state/wiki.sqlite`：系统状态、索引、审计
 - `Permission.json`：安全与高危规则
-- `config.json`：运行时开关、端口、LLM 配置、鉴权变量名等
-- `.env`：运行时凭证注入（可选）
+- `config.json`：非敏感运行开关、端口、鉴权变量名与 OpenCode 调用限额
+- 进程环境：由启动方注入 REST token；程序不会自动加载评测资产中的 `.env`
 
 ### 3.2 核心表与数据流
 
@@ -127,9 +127,13 @@ Stonehenge Wiki Platform (work/stonehenge_wiki/platform.py)
    └─> 结果记录到任务运行与审计
 ```
 
-LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode` agent 使用本机 opencode runtime，不预置任何具体厂商模型名；仅使用 `runtime_mode=opencode` 与 `runtime_command` 接入。
+LLM 裁决只通过用户级 OpenCode 配置接入。评测资产根中的 `config.json/.env` 不得选择
+可执行命令、凭据文件或直连模型接口；provider、GLM-5.2 模型与凭据由
+`configure_opencode.sh` 写入作品目录之外的 OpenCode 用户配置。
 
-`POST /llm/test` 提供 agent 级诊断：默认检查启用状态和 runtime 运行态；`opencode` 模式检查 `runtime_command`，`api` 模式额外检查 `provider/model/base_url` 与密钥可见性；`live=true` 时发起最小 chat completions 探活。诊断结果不返回密钥值，并写入 `llm.test` 审计事件。
+`POST /llm/test` 提供 OpenCode 诊断：默认检查启用状态、`runtime_mode=opencode` 和受限
+`runtime_command`；`live=true` 时通过 `opencode run --pure --format json` 发起最小探活。
+诊断结果不返回凭据值，并写入 `llm.test` 审计事件。
 
 ### 4.3 explain 链路
 
@@ -292,7 +296,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 - `HEAD` 在当前服务端口返回 `501`（标准 HTTP 行为，非功能故障）
 - Office 旧格式依赖外部转换能力（未安装 `soffice` 时会降级读取策略）
 - 演示物文件仍按历史约定使用 `.pptx` 后缀，属于产物格式属性，不代表页面文案要展示对应缩写
-- 文件系统与 token 配置由 `.env` 和环境变量共同控制，建议仅在受控环境下设置高权限 token
+- 文件系统策略来自 `Permission.json`；token 只从受控启动进程环境读取，不自动信任知识库内的 `.env`
 
 ---
 
@@ -304,7 +308,7 @@ LLM 通过 `config.json` 的 `llm.agents` 独立配置。当前默认 `opencode`
 - [x] Raw 来源详情：metadata、脱敏抽取预览、版本、审核、风险和 wiki 区段
 - [x] 审计与治理报告
 - [x] 就绪度门禁与评估报告
-- [x] opencode 独立 LLM agent 配置与 Hermes DeepSeek 复用
+- [x] OpenCode 独立 LLM agent 配置与环境变量凭证注入
 - [x] LLM agent 连接诊断 API、CLI 与 Agents 页面入口
 - [x] Web 页面“工作台”与“Stonehenge Wiki”命名统一
 

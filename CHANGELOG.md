@@ -6,7 +6,11 @@
 
 - 扩展项目级设计文档，补齐三人协作分工、里程碑、验证矩阵、风险清单和成熟项目路线图。
 - 增加贡献规范，明确分支、PR、review、验证和禁止事项。
-- 增加 opencode 独立 LLM agent 配置说明和 skill 级 Hermes 配置脚本，复用本机 Hermes DeepSeek API 并完成 opencode/服务端双层验证。
+- 增加 OpenCode 独立 LLM agent 配置脚本，支持保留判题平台预配置或通过环境变量安全注入 GLM-5.2 凭证。
+- 增加比赛级 Agent harness：固定格式确定性解析，整组题目由受限 OpenCode 子 Agent 批量裁决，知识问答与自由批注修复走严格 JSON 契约。
+- 强化 Permission、提示注入、代码执行与符号链接边界；黑名单文件不会被解析、哈希、下载、透视或修复流程读取。
+- 增加公开 8 题精确回归、210 文件/20 题规模回归、5 路并发稳定性回归与严格答案验证器。
+- 增加精确命名的比赛 ZIP allowlist 打包器、秘密扫描与反向结构验证。
 - 增加 LLM agent 连接诊断：`POST /llm/test`、Rust CLI `--test-llm-agent`、Agents 页面测试按钮和审计记录。
 - 增加 Raw 来源详情：`GET /sources/detail`、Rust CLI `--source-detail`、同页脱敏抽取预览、版本、审核、风险和 wiki 区段。
 - 增加机器可读 API 契约 v2：`GET /api/contract`、Python 兼容 CLI `--api-contract`、Rust REST CLI `--api-contract`，包含 query/body 字段 required/type/alias/enum 元数据。
@@ -18,5 +22,5 @@
 
 ## 0.1.0
 
-- 完成 Stonehenge Wiki 基线：REST API、Web Console、Rust REST CLI、Codex skill、compiled wiki、source governance、readiness/evaluation/release bundle。
+- 完成 Stonehenge Wiki 基线：REST API、Web Console、REST CLI wrapper、compiled wiki、source governance、readiness/evaluation/release bundle。
 - 统一品牌为 Stonehenge Wiki，并添加 `SW` favicon。

@@ -2,12 +2,31 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORK_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+REPO_ROOT="$(cd "$WORK_ROOT/.." && pwd)"
+
+discover_wiki_root() {
+  local candidate
+  for candidate in \
+    "/app/code/judge-assets/01_01_llm_wiki" \
+    "$REPO_ROOT/llm-wiki" \
+    "$REPO_ROOT/stonehenge-wiki" \
+    "$WORK_ROOT/llm-wiki" \
+    "$WORK_ROOT/stonehenge-wiki"; do
+    if [[ -d "$candidate/docs" && -d "$candidate/question" && -f "$candidate/Permission.json" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  printf '%s\n' "$REPO_ROOT/llm-wiki"
+}
+
 BASE_URL="${LLM_WIKI_URL:-${STONEHENGE_WIKI_URL:-http://127.0.0.1:8765}}"
 TOKEN="${LLM_WIKI_TOKEN:-${STONEHENGE_WIKI_TOKEN:-${STONEHENGE_WIKI_API_TOKEN:-}}}"
-SCRIPTED_ROOT="${LLM_WIKI_ROOT:-}"
-OPENCODE_PROVIDER="${OPENCODE_PROVIDER:-opencode-runtime}"
-OPENCODE_MODEL="${OPENCODE_MODEL:-default}"
-OPENCODE_BASE_URL="${OPENCODE_BASE_URL:-}"
+SCRIPTED_ROOT="${LLM_WIKI_ROOT:-${STONEHENGE_WIKI_ROOT:-$(discover_wiki_root)}}"
+OPENCODE_PROVIDER="${OPENCODE_PROVIDER:-zhipu}"
+OPENCODE_MODEL="${OPENCODE_MODEL:-glm-5.2}"
+OPENCODE_BASE_URL="${OPENCODE_BASE_URL:-https://open.bigmodel.cn/api/coding/paas/v4}"
 OPENCODE_RUNTIME_COMMAND="${OPENCODE_RUNTIME_COMMAND:-opencode run --pure --format json}"
 
 print_usage() {
@@ -25,8 +44,9 @@ Environment:
   LLM_WIKI_URL       REST base URL (default: http://127.0.0.1:8765)
   LLM_WIKI_TOKEN     X-STONEHENGE-WIKI-TOKEN value for admin API
   LLM_WIKI_ROOT      Default --wiki-root when omitted in command
-  OPENCODE_PROVIDER   opencode provider name (default: opencode-runtime)
-  OPENCODE_MODEL      opencode model name (default: default)
+  OPENCODE_PROVIDER   opencode provider name (default: zhipu)
+  OPENCODE_MODEL      opencode model name (default: glm-5.2)
+  OPENCODE_API_KEY    provider credential used by configure-opencode
 USAGE
 }
 
@@ -78,13 +98,19 @@ http_request() {
 }
 
 ensure_opencode_configured() {
+  local provider="$1"
+  local model="$2"
+  local base_url="$3"
   if ! command -v opencode >/dev/null 2>&1; then
     echo "error: opencode command not found. Install it first in ~/.opencode/bin or PATH." >&2
-    echo "tip: ./work/skills/stonehenge-wiki/scripts/configure_opencode_from_hermes.sh" >&2
+    echo "tip: ensure the scoring runtime exposes opencode in PATH" >&2
     return 11
   fi
 
-  "${SCRIPT_DIR}/configure_opencode_from_hermes.sh"
+  OPENCODE_PROVIDER="$provider" \
+  OPENCODE_MODEL="$model" \
+  OPENCODE_BASE_URL="$base_url" \
+  "${SCRIPT_DIR}/configure_opencode.sh"
 }
 
 configure_llm() {
@@ -92,7 +118,6 @@ configure_llm() {
   local model="$2"
   local base_url="$3"
   local runtime_command="$4"
-
   local category_payload
   category_payload='{"00_业务总结":"opencode","01_技术总结":"opencode","03_学习材料":"opencode","04_运维研发":"opencode","05_研发规范":"opencode"}'
   local payload
@@ -107,28 +132,9 @@ configure_llm() {
   "agents": {
     "opencode": {
       "enabled": true,
-      "provider": "$provider",
-      "model": "$model",
-      "base_url": "$base_url",
-      "api_key_env": "",
-      "env_file": "",
       "timeout_seconds": 120,
       "max_context_chars": 16000,
       "max_tokens": 900,
-      "temperature": 0.1,
-      "runtime_mode": "opencode",
-      "runtime_command": "$(json_escape "$runtime_command")"
-    },
-    "default": {
-      "enabled": true,
-      "provider": "$provider",
-      "model": "$model",
-      "base_url": "$base_url",
-      "api_key_env": "",
-      "env_file": "",
-      "timeout_seconds": 120,
-      "max_context_chars": 12000,
-      "max_tokens": 800,
       "temperature": 0.1,
       "runtime_mode": "opencode",
       "runtime_command": "$(json_escape "$runtime_command")"
@@ -146,6 +152,10 @@ check_root_match() {
   local wiki_root=$1
   if [[ -z "$wiki_root" ]]; then
     return 0
+  fi
+
+  if [[ -d "$wiki_root" ]]; then
+    wiki_root="$(cd "$wiki_root" && pwd)"
   fi
 
   local health
@@ -177,7 +187,7 @@ cmd_configure_opencode() {
     esac
   done
 
-  ensure_opencode_configured
+  ensure_opencode_configured "$provider" "$model" "$base_url"
   configure_llm "$provider" "$model" "$base_url" "$runtime_command"
 }
 

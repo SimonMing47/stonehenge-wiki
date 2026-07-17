@@ -11,7 +11,7 @@ from typing import Any
 from urllib.parse import quote
 
 from .answerer import QuestionAnswerer
-from .cli_io import load_questions, output_path_for_question_file, resolve_question_files, write_result_log
+from .cli_io import load_questions, output_path_for_question_file, resolve_question_files, write_json_atomic, write_result_log
 from .config import LLMConfig, PlatformConfig, llm_config_to_dict, load_config
 from .evaluation import build_evaluation_report
 from .indexer import WikiIndex
@@ -30,12 +30,30 @@ from .wiki_compiler import WikiCompiler
 WIKI_LINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
 
 
+def validate_wiki_root_layout(wiki_root: Path) -> Path:
+    raw_root = Path(wiki_root)
+    if raw_root.is_symlink():
+        raise ValueError("wiki root must not be a symbolic link")
+    root = raw_root.resolve()
+    for name in ("docs", "question", "output", ".state", "Permission.json", "config.json"):
+        candidate = root / name
+        if candidate.is_symlink():
+            raise ValueError(f"wiki layout entry must not be a symbolic link: {name}")
+        if not candidate.exists():
+            continue
+        resolved = candidate.resolve()
+        if resolved != root and root not in resolved.parents:
+            raise ValueError(f"wiki layout entry escapes the root: {name}")
+    return root
+
+
 class StonehengeWikiPlatform:
     def __init__(self, wiki_root: Path, config: PlatformConfig | None = None):
+        wiki_root = validate_wiki_root_layout(wiki_root)
         self.config = config or load_config(wiki_root)
         self.wiki_root = self.config.wiki_root
-        self.full_index = WikiIndex(self.wiki_root).build()
         self.guard = PermissionGuard(self.wiki_root)
+        self.full_index = WikiIndex(self.wiki_root, access_guard=self.guard).build()
         self.llm_default_agent = self.config.llm_default_agent
         self.llm_category_agents = dict(self.config.llm_category_agents)
         self.llm_clients = self.build_llm_clients()
@@ -91,11 +109,8 @@ class StonehengeWikiPlatform:
         except (TypeError, ValueError):
             return fallback
 
-    def _coerce_runtime_mode(self, value: Any, fallback: str = "api") -> str:
-        mode = str(value).strip().lower() if isinstance(value, str) else str(fallback)
-        if not mode:
-            mode = str(fallback)
-        return mode if mode in {"api", "opencode"} else (str(fallback) if str(fallback) in {"api", "opencode"} else "api")
+    def _coerce_runtime_mode(self, value: Any, fallback: str = "opencode") -> str:
+        return "opencode"
 
     def _coerce_runtime_command(self, value: Any, fallback: str = "") -> str:
         command = str(value).strip() if isinstance(value, str) else str(value).strip()
@@ -145,9 +160,14 @@ class StonehengeWikiPlatform:
         )
         return result
 
-    def answer_question(self, question: Question, request_id: str | None = None) -> dict[str, Any]:
+    def answer_question(
+        self,
+        question: Question,
+        request_id: str | None = None,
+        decision: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         request_id = request_id or new_request_id()
-        answer = self.answerer.answer(question)
+        answer = self.answerer.answer(question, decision=decision)
         blocked = "error_msg" in answer.get("answer", {})
         self.audit(
             event_type="question.answer",
@@ -160,7 +180,9 @@ class StonehengeWikiPlatform:
         return answer
 
     def ask(self, title: str, q_id: str = "adhoc-1", level: str = "") -> dict[str, Any]:
-        return self.answer_question(Question(id=q_id, title=title, level=level))
+        question = Question(id=q_id, title=title, level=level)
+        decision = self.answerer.plan_questions([question]).get(q_id)
+        return self.answer_question(question, decision=decision)
 
     def explain_question(self, title: str, q_id: str = "explain-1", level: str = "") -> dict[str, Any]:
         result = self.answerer.explain(Question(id=q_id, title=title, level=level))
@@ -248,10 +270,24 @@ class StonehengeWikiPlatform:
     def run_group_file(self, question_file: Path) -> dict[str, Any]:
         questions = load_questions(question_file)
         request_id = new_request_id()
-        answers = [self.answer_question(question, request_id=request_id) for question in questions]
+        decisions = self.answerer.plan_questions(questions)
+        detailed_answers = [
+            self.answer_question(question, request_id=request_id, decision=decisions.get(question.id))
+            for question in questions
+        ]
+        # The judge's answer-file contract contains only the stable question id
+        # and its answer payload. Title/level remain available through the REST
+        # response and audit trail, but extra keys in group files can fail strict
+        # comparison against the published reference format.
+        answers = [
+            {"id": item["id"], "answer": item["answer"]}
+            for item in detailed_answers
+        ]
         output_file = output_path_for_question_file(self.wiki_root, question_file)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        output_file.write_text(json.dumps(answers, ensure_ascii=False, indent=2), encoding="utf-8")
+        output_rel = output_file.relative_to(self.wiki_root).as_posix()
+        if self.guard.path_blocked(output_rel, operation="write"):
+            raise PermissionError("question output path is blocked")
+        write_json_atomic(output_file, answers)
         result = {
             "question_file": str(question_file),
             "output_file": str(output_file),
@@ -969,16 +1005,11 @@ class StonehengeWikiPlatform:
             return result
 
         client = self.llm_clients.get(requested) or LLMClient(agent_config)
-        api_key_present = bool(client.api_key())
-        checks = {"enabled": bool(agent_config.enabled)}
-        if agent_config.runtime_mode == "opencode":
-            checks["runtime_command"] = bool(agent_config.runtime_command)
-        else:
-            checks["provider"] = bool(agent_config.provider)
-            checks["model"] = bool(agent_config.model)
-            checks["base_url"] = bool(agent_config.base_url)
-            checks["api_key_env"] = bool(agent_config.api_key_env)
-            checks["api_key_present"] = api_key_present
+        checks = {
+            "enabled": bool(agent_config.enabled),
+            "runtime_mode": agent_config.runtime_mode == "opencode",
+            "runtime_command": bool(agent_config.runtime_command),
+        }
         missing = [key for key, passed in checks.items() if not passed]
         ready = bool(client.ready)
         result: dict[str, Any] = {
@@ -989,9 +1020,6 @@ class StonehengeWikiPlatform:
             "ready": ready,
             "provider": agent_config.provider,
             "model": agent_config.model,
-            "base_url": agent_config.base_url,
-            "api_key_env": agent_config.api_key_env,
-            "env_file": str(agent_config.env_file) if agent_config.env_file else "",
             "checks": checks,
             "missing": missing,
         }
@@ -1032,116 +1060,55 @@ class StonehengeWikiPlatform:
         if not isinstance(payload, dict):
             return {"status": "error", "error": "invalid_payload"}
 
+        requested_mode = str(payload.get("runtime_mode", "opencode") or "opencode").strip().lower()
+        if requested_mode != "opencode":
+            return {"status": "error", "error": "opencode_runtime_required"}
+        agents = payload.get("agents", {})
+        if not isinstance(agents, dict):
+            return {"status": "error", "error": "invalid_agents"}
+        for agent_body in agents.values():
+            if not isinstance(agent_body, dict):
+                continue
+            mode = str(agent_body.get("runtime_mode", "opencode") or "opencode").strip().lower()
+            if mode != "opencode":
+                return {"status": "error", "error": "opencode_runtime_required"}
+
         enabled = bool(payload.get("enabled", self.config.llm.enabled))
-        default_agent = str(payload.get("default_agent", self.config.llm_default_agent) or self.config.llm_default_agent)
+        source_profile = agents.get("opencode") if isinstance(agents.get("opencode"), dict) else {}
         category_agents = payload.get("category_agents", self.config.llm_category_agents)
-        global_runtime_mode = self._coerce_runtime_mode(payload.get("runtime_mode"), self.config.llm.runtime_mode)
-        global_runtime_command = self._coerce_runtime_command(payload.get("runtime_command"), self.config.llm.runtime_command)
-        if global_runtime_mode == "opencode" and not global_runtime_command:
-            return {"status": "error", "error": "runtime_command_required_for_opencode"}
         if not isinstance(category_agents, dict):
             return {"status": "error", "error": "invalid_category_agents"}
-
-        normalized_category_agents: dict[str, str] = {}
-        for raw_category, raw_agent in category_agents.items():
-            if not isinstance(raw_category, str) or not isinstance(raw_agent, str):
-                continue
-            category = raw_category.strip()
-            agent = raw_agent.strip()
-            if not category or not agent:
-                continue
-            normalized_category_agents[category] = agent
-
-        agents = payload.get("agents")
-        if not isinstance(agents, dict) or not agents:
-            return {"status": "error", "error": "invalid_agents"}
-        serialized_agents: dict[str, dict[str, Any]] = {}
-        for agent_name, agent_body in agents.items():
-            if not isinstance(agent_name, str) or not isinstance(agent_body, dict):
-                continue
-            runtime_mode = self._coerce_runtime_mode(
-                agent_body.get("runtime_mode", global_runtime_mode),
-                global_runtime_mode,
-            )
-            runtime_command = self._coerce_runtime_command(
-                agent_body.get("runtime_command", global_runtime_command),
-                global_runtime_command,
-            )
-            if runtime_mode == "opencode" and not runtime_command:
-                return {"status": "error", "error": f"runtime_command_required_for_agent:{agent_name}"}
-            raw_enabled = bool(agent_body.get("enabled", enabled))
-            raw_env_file = agent_body.get("env_file", "")
-            serialized = llm_config_to_dict(
-                agent_name,
-                LLMConfig(
-                    enabled=raw_enabled,
-                    provider=str(agent_body.get("provider", "")),
-                    model=str(agent_body.get("model", "")),
-                    base_url=str(agent_body.get("base_url", "")),
-                    api_key_env=str(agent_body.get("api_key_env", "")),
-                    env_file=Path(str(raw_env_file)).expanduser() if raw_env_file else None,
-                    timeout_seconds=self._coerce_int(agent_body.get("timeout_seconds", 60), 60),
-                    max_context_chars=self._coerce_int(agent_body.get("max_context_chars", 12000), 12000),
-                    max_tokens=self._coerce_int(agent_body.get("max_tokens", 800), 800),
-                    temperature=self._coerce_float(agent_body.get("temperature", 0.1), 0.1),
-                    runtime_mode=runtime_mode,
-                    runtime_command=runtime_command,
-                ),
-            )
-            serialized["enabled"] = bool(serialized.get("enabled"))
-            serialized["runtime_mode"] = runtime_mode
-            serialized["runtime_command"] = runtime_command
-            serialized_agents[agent_name] = serialized
-
-        if not serialized_agents:
-            return {"status": "error", "error": "invalid_agents"}
-
-        if default_agent not in serialized_agents:
-            if default_agent != "default" and "default" in serialized_agents:
-                default_agent = "default"
-            elif serialized_agents:
-                default_agent = next(iter(serialized_agents))
-            else:
-                return {"status": "error", "error": "no_valid_agents"}
-
         normalized_category_agents = {
-            category: agent for category, agent in normalized_category_agents.items() if agent in serialized_agents
+            str(category).strip(): "opencode"
+            for category in category_agents
+            if isinstance(category, str) and category.strip()
         }
-
+        persisted_llm = {
+            "enabled": enabled,
+            "timeout_seconds": self._coerce_int(
+                source_profile.get("timeout_seconds", self.config.llm.timeout_seconds),
+                self.config.llm.timeout_seconds,
+            ),
+            "max_context_chars": self._coerce_int(
+                source_profile.get("max_context_chars", self.config.llm.max_context_chars),
+                self.config.llm.max_context_chars,
+            ),
+            "max_tokens": self._coerce_int(
+                source_profile.get("max_tokens", self.config.llm.max_tokens),
+                self.config.llm.max_tokens,
+            ),
+            "category_agents": normalized_category_agents,
+        }
         config_path = self.wiki_root / "config.json"
         existing: dict[str, Any] = {}
         if config_path.exists():
-            existing = json.loads(config_path.read_text(encoding="utf-8"))
-        if not isinstance(existing, dict):
-            existing = {}
-        base = dict(existing.get("llm", {})) if isinstance(existing.get("llm", {}), dict) else {}
-        cleaned_agents = {}
-        for name, data in serialized_agents.items():
-            cleaned_agents[name] = {
-                key: value
-                for key, value in data.items()
-                if key != "agent_name"
-            }
-        default_client = cleaned_agents.get(default_agent, {})
-        base.update({
-            "enabled": enabled,
-            "runtime_mode": global_runtime_mode,
-            "runtime_command": global_runtime_command,
-            "agents": cleaned_agents,
-            "default_agent": default_agent,
-            "category_agents": normalized_category_agents,
-            "provider": default_client.get("provider", base.get("provider", "")),
-            "model": default_client.get("model", base.get("model", "")),
-            "base_url": default_client.get("base_url", base.get("base_url", "")),
-            "api_key_env": default_client.get("api_key_env", base.get("api_key_env", "")),
-            "env_file": default_client.get("env_file", base.get("env_file", "")),
-            "timeout_seconds": default_client.get("timeout_seconds", base.get("timeout_seconds", 60)),
-            "max_context_chars": default_client.get("max_context_chars", base.get("max_context_chars", 12000)),
-            "max_tokens": default_client.get("max_tokens", base.get("max_tokens", 800)),
-            "temperature": default_client.get("temperature", base.get("temperature", 0.1)),
-        })
-        existing["llm"] = base
-        config_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                loaded = json.loads(config_path.read_text(encoding="utf-8"))
+                existing = loaded if isinstance(loaded, dict) else {}
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                existing = {}
+        existing["llm"] = persisted_llm
+        write_json_atomic(config_path, existing)
 
         self.config = load_config(self.wiki_root)
         self.llm_default_agent = self.config.llm_default_agent

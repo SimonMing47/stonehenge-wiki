@@ -22,8 +22,9 @@ class SQLiteStore:
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
-        con = sqlite3.connect(self.database_path)
+        con = sqlite3.connect(self.database_path, timeout=30.0)
         con.row_factory = sqlite3.Row
+        con.execute("PRAGMA busy_timeout=30000")
         try:
             yield con
             con.commit()
@@ -565,8 +566,14 @@ class SQLiteStore:
         for record in index.records:
             seen.add(record.rel_path)
             previous = existing.get(record.rel_path, {})
-            size = safe_size(record.full_path)
-            sha256 = file_sha256(record.full_path) if size else ""
+            permission_denied = bool(
+                index.access_guard is not None
+                and index.access_guard.path_blocked(record.rel_path, operation="read")
+            )
+            # A file-deny rule forbids every content read, including background
+            # hashing for registry metadata. Keep only the already-known path.
+            size = 0 if permission_denied else safe_size(record.full_path)
+            sha256 = file_sha256(record.full_path) if size and not permission_denied else ""
             if sha256:
                 self._record_source_version(con, record.rel_path, sha256, size, indexed_at)
             imported_at = str(previous.get("imported_at") or indexed_at)

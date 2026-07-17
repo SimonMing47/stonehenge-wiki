@@ -443,6 +443,8 @@ class PlatformHandler(BaseHTTPRequestHandler):
             allow_root = (self.stonehenge_wiki_platform.wiki_root / "docs").resolve()
         else:
             return self.write_json({"error": "forbidden"}, HTTPStatus.FORBIDDEN)
+        if self.stonehenge_wiki_platform.guard.path_blocked(safe_rel, operation="read"):
+            return self.write_json({"error_msg": "高危命令，拒绝访问"}, HTTPStatus.FORBIDDEN)
         root = self.stonehenge_wiki_platform.wiki_root.resolve()
         target = (root / safe_rel).resolve()
         if allow_root not in target.parents:

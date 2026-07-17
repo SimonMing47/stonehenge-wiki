@@ -17,6 +17,21 @@ from .security import PermissionGuard
 MAX_IMPORT_BYTES = 20 * 1024 * 1024
 DEFAULT_CATEGORY = "00_inbox"
 ALLOWED_EXTENSIONS = SUPPORTED_EXTENSIONS | TEXT_EXTENSIONS
+NON_DOCUMENT_BINARY_EXTENSIONS = {
+    "a",
+    "bin",
+    "class",
+    "com",
+    "dll",
+    "dmg",
+    "exe",
+    "iso",
+    "msi",
+    "o",
+    "pyc",
+    "scr",
+    "so",
+}
 
 
 @dataclass(frozen=True)
@@ -54,12 +69,12 @@ def import_source(
         source_type = "file"
 
     ext = Path(filename).suffix.lower().lstrip(".")
-    if ext not in ALLOWED_EXTENSIONS:
+    if not valid_import_extension(ext):
         raise SourceImportError("unsupported_extension", f"unsupported extension: {ext or 'none'}")
 
     target_dir = wiki_root / "docs" / sanitize_category(category)
     target_name = safe_filename(title, fallback=filename)
-    if Path(target_name).suffix.lower().lstrip(".") not in ALLOWED_EXTENSIONS:
+    if Path(target_name).suffix.lower().lstrip(".") != ext:
         target_name = f"{Path(target_name).stem}.{ext}"
     target = unique_path(target_dir / target_name)
     rel_path = target.relative_to(wiki_root).as_posix()
@@ -173,6 +188,13 @@ def safe_filename(title: str, fallback: str) -> str:
     ext = fallback_path.suffix.lower()
     stem = slugify(title or fallback_path.stem) or "source"
     return f"{stem[:96]}{ext}"
+
+
+def valid_import_extension(ext: str) -> bool:
+    """Allow knowledge-bearing 'other' files while rejecting executable binaries."""
+    if ext in ALLOWED_EXTENSIONS:
+        return True
+    return bool(re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,15}", ext)) and ext not in NON_DOCUMENT_BINARY_EXTENSIONS
 
 
 def slugify(value: str) -> str:

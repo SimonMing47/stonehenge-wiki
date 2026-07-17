@@ -1,4 +1,0 @@
-interface:
-  display_name: "Stonehenge Wiki"
-  short_description: "Run the Stonehenge Wiki CLI safely"
-  default_prompt: "Use $stonehenge-wiki to answer or repair a stonehenge-wiki question group."

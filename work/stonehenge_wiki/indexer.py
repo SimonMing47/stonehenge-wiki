@@ -33,31 +33,55 @@ STOPWORDS = {
 
 
 class WikiIndex:
-    def __init__(self, wiki_root: Path):
+    def __init__(self, wiki_root: Path, access_guard: object | None = None):
         self.wiki_root = wiki_root
         self.docs_dir = wiki_root / "docs"
+        self.access_guard = access_guard
         self.records: list[DocumentRecord] = []
         self.by_path: dict[str, DocumentRecord] = {}
 
     def build(self) -> "WikiIndex":
         self.records = []
         self.by_path = {}
-        if not self.docs_dir.exists():
+        if self.docs_dir.is_symlink() or not self.docs_dir.exists():
+            return self
+        docs_root = self.docs_dir.resolve()
+        wiki_root = self.wiki_root.resolve()
+        if docs_root != wiki_root and wiki_root not in docs_root.parents:
             return self
         for path in sorted(self.docs_dir.rglob("*")):
-            if not path.is_file() or path.name.startswith("."):
+            if path.is_symlink() or not path.is_file() or path.name.startswith("."):
+                continue
+            try:
+                resolved = path.resolve()
+            except OSError:
+                continue
+            if resolved != docs_root and docs_root not in resolved.parents:
+                # Never follow a docs/ symlink into the host filesystem.
+                continue
+            rel_path = path.relative_to(self.wiki_root).as_posix()
+            if self.access_guard is not None and self.access_guard.path_blocked(rel_path, operation="read"):
+                # Preserve only suffix metadata so policy reporting and counts can
+                # reason about the path without ever opening a forbidden file.
+                record = DocumentRecord(
+                    path,
+                    rel_path,
+                    path.suffix.lower().lstrip("."),
+                    "[permission_denied]",
+                )
+                self.records.append(record)
+                self.by_path[record.rel_path] = record
                 continue
             try:
                 record = extract_document(path, self.wiki_root)
             except Exception as exc:
-                rel_path = path.relative_to(self.wiki_root).as_posix()
                 record = DocumentRecord(path, rel_path, path.suffix.lower().lstrip("."), f"[extract_error] {exc}")
             self.records.append(record)
             self.by_path[record.rel_path] = record
         return self
 
     def with_records(self, records: list[DocumentRecord]) -> "WikiIndex":
-        view = WikiIndex(self.wiki_root)
+        view = WikiIndex(self.wiki_root, access_guard=self.access_guard)
         view.records = list(records)
         view.by_path = {record.rel_path: record for record in view.records}
         return view

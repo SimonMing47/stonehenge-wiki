@@ -121,9 +121,6 @@ const I18N = {
     "agents.default_fallback": "fallback",
     "agents.provider": "模型服务",
     "agents.model": "模型",
-    "agents.base_url": "Base URL",
-    "agents.api_key_env": "API Key 环境变量",
-    "agents.env_file": "环境文件",
     "agents.timeout_seconds": "超时（秒）",
     "agents.max_context_chars": "上下文字符数",
     "agents.max_tokens": "Max Tokens",
@@ -136,7 +133,6 @@ const I18N = {
     "agents.agent": "代理",
     "agents.runtime_mode": "运行模式",
     "agents.runtime_command": "运行时命令",
-    "agents.runtime_api": "LLM API",
     "agents.runtime_opencode": "opencode",
     "studio.title": "工作台",
     "studio.topic_placeholder": "输入你的演讲主题",
@@ -335,9 +331,6 @@ const I18N = {
     "agents.default_fallback": "fallback",
     "agents.provider": "Provider",
     "agents.model": "Model",
-    "agents.base_url": "Base URL",
-    "agents.api_key_env": "API Key env",
-    "agents.env_file": "Env file",
     "agents.timeout_seconds": "Timeout (s)",
     "agents.max_context_chars": "Context chars",
     "agents.max_tokens": "Max tokens",
@@ -350,7 +343,6 @@ const I18N = {
     "agents.agent": "Agent",
     "agents.runtime_mode": "Runtime mode",
     "agents.runtime_command": "Runtime command",
-    "agents.runtime_api": "LLM API",
     "agents.runtime_opencode": "opencode",
     "studio.title": "Workbench",
     "studio.topic_placeholder": "Enter your speaking topic",
@@ -613,7 +605,7 @@ function renderLLMConfig() {
 
   el("llmEnabled").checked = Boolean(config.enabled);
   el("llmDefaultAgent").value = String(config.default_agent || "default");
-  el("llmRuntimeMode").value = String(config.runtime_mode || "api");
+  el("llmRuntimeMode").value = "opencode";
   el("llmRuntimeCommand").value = String(config.runtime_command || "");
 
   el("llmAgentsList").innerHTML = agentNames.length
@@ -642,14 +634,11 @@ function llmAgentRow(name, data) {
     enabled: true,
     provider: "",
     model: "",
-    base_url: "",
-    api_key_env: "",
-    env_file: "",
     timeout_seconds: 60,
     max_context_chars: 12000,
     max_tokens: 800,
     temperature: 0.1,
-    runtime_mode: "api",
+    runtime_mode: "opencode",
     runtime_command: "",
   };
   const cfg = { ...defaults, ...data };
@@ -680,27 +669,14 @@ function llmAgentRow(name, data) {
           <input type="text" value="${escapeHtml(cfg.model)}" data-agent-model="${escapeHtml(rowId)}" />
         </label>
         <label>
-          <span>${translate("agents.base_url")}</span>
-          <input type="text" value="${escapeHtml(cfg.base_url)}" data-agent-base-url="${escapeHtml(rowId)}" />
-        </label>
-        <label>
           <span>${translate("agents.runtime_mode")}</span>
           <select data-agent-runtime-mode="${escapeHtml(rowId)}">
-            <option value="api" ${cfg.runtime_mode === "api" ? "selected" : ""}>${translate("agents.runtime_api")}</option>
-            <option value="opencode" ${cfg.runtime_mode === "opencode" ? "selected" : ""}>${translate("agents.runtime_opencode")}</option>
+            <option value="opencode" selected>${translate("agents.runtime_opencode")}</option>
           </select>
         </label>
         <label>
           <span>${translate("agents.runtime_command")}</span>
           <input type="text" value="${escapeHtml(cfg.runtime_command)}" data-agent-runtime-command="${escapeHtml(rowId)}" />
-        </label>
-        <label>
-          <span>${translate("agents.api_key_env")}</span>
-          <input type="text" value="${escapeHtml(cfg.api_key_env)}" data-agent-api-key-env="${escapeHtml(rowId)}" />
-        </label>
-        <label>
-          <span>${translate("agents.env_file")}</span>
-          <input type="text" value="${escapeHtml(cfg.env_file)}" data-agent-env-file="${escapeHtml(rowId)}" />
         </label>
         <label>
           <span>${translate("agents.timeout_seconds")}</span>
@@ -756,9 +732,6 @@ function addAgentRow() {
       enabled: true,
       provider: "opencode-runtime",
       model: "",
-      base_url: "",
-      api_key_env: "",
-      env_file: "",
       runtime_mode: "opencode",
       runtime_command: "opencode run --pure --format json",
     })
@@ -856,9 +829,6 @@ function collectLLMConfigPayload() {
       const enabled = row.querySelector(`[data-agent-enabled="${CSS.escape(rowId)}"]`);
       const provider = row.querySelector(`[data-agent-provider="${CSS.escape(rowId)}"]`);
       const model = row.querySelector(`[data-agent-model="${CSS.escape(rowId)}"]`);
-      const baseUrl = row.querySelector(`[data-agent-base-url="${CSS.escape(rowId)}"]`);
-      const apiKeyEnv = row.querySelector(`[data-agent-api-key-env="${CSS.escape(rowId)}"]`);
-      const envFile = row.querySelector(`[data-agent-env-file="${CSS.escape(rowId)}"]`);
       const timeout = row.querySelector(`[data-agent-timeout="${CSS.escape(rowId)}"]`);
       const maxContext = row.querySelector(`[data-agent-context="${CSS.escape(rowId)}"]`);
       const maxTokens = row.querySelector(`[data-agent-tokens="${CSS.escape(rowId)}"]`);
@@ -872,14 +842,11 @@ function collectLLMConfigPayload() {
         enabled: Boolean(enabled && enabled.checked),
         provider: String(provider?.value || "").trim(),
         model: String(model?.value || "").trim(),
-        base_url: String(baseUrl?.value || "").trim(),
-        api_key_env: String(apiKeyEnv?.value || "").trim(),
-        env_file: String(envFile?.value || "").trim(),
         timeout_seconds: Number(timeout?.value || 60),
         max_context_chars: Number(maxContext?.value || 12000),
         max_tokens: Number(maxTokens?.value || 800),
         temperature: Number(temperature?.value || 0.1),
-        runtime_mode: String(runtimeMode?.value || "api").trim(),
+        runtime_mode: String(runtimeMode?.value || "opencode").trim(),
         runtime_command: String(runtimeCommand?.value || "").trim(),
       };
     });
@@ -898,7 +865,7 @@ function collectLLMConfigPayload() {
   return {
     enabled: Boolean(el("llmEnabled").checked),
     default_agent: String(el("llmDefaultAgent").value || "default").trim(),
-    runtime_mode: String(el("llmRuntimeMode")?.value || "api").trim(),
+    runtime_mode: "opencode",
     runtime_command: String(el("llmRuntimeCommand")?.value || "").trim(),
     agents: rawAgents,
     category_agents: categoryAgents,

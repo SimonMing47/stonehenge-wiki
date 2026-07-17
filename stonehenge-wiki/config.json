@@ -1,8 +1,4 @@
 {
-  "state_dir": ".state",
-  "database_path": ".state/wiki.sqlite",
-  "audit_enabled": true,
-  "persist_index": true,
   "snippet_limit": 8,
   "api": {
     "host": "127.0.0.1",
@@ -12,48 +8,9 @@
   },
   "llm": {
     "enabled": true,
-    "provider": "opencode-runtime",
-    "model": "",
-    "base_url": "",
-    "api_key_env": "",
-    "env_file": "",
     "timeout_seconds": 120,
     "max_context_chars": 16000,
     "max_tokens": 900,
-    "temperature": 0.1,
-    "runtime_mode": "opencode",
-    "runtime_command": "opencode run --pure --format json",
-    "default_agent": "opencode",
-    "agents": {
-      "default": {
-        "enabled": true,
-        "provider": "opencode-runtime",
-        "model": "",
-        "base_url": "",
-        "api_key_env": "",
-        "env_file": "",
-        "timeout_seconds": 120,
-        "max_context_chars": 16000,
-        "max_tokens": 900,
-        "temperature": 0.1,
-        "runtime_mode": "opencode",
-        "runtime_command": "opencode run --pure --format json"
-      },
-      "opencode": {
-        "enabled": true,
-        "provider": "opencode-runtime",
-        "model": "",
-        "base_url": "",
-        "api_key_env": "",
-        "env_file": "",
-        "timeout_seconds": 120,
-        "max_context_chars": 16000,
-        "max_tokens": 900,
-        "temperature": 0.1,
-        "runtime_mode": "opencode",
-        "runtime_command": "opencode run --pure --format json"
-      }
-    },
     "category_agents": {
       "00_业务总结": "opencode",
       "01_技术总结": "opencode",

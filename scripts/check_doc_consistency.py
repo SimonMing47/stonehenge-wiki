@@ -27,9 +27,16 @@ IGNORE_TOOLING_FLAGS = {
     "--bin",
     "--check",
     "--format",
+    "--force",
     "--manifest-path",
+    "--no-install-recommends",
+    "--output-dir",
     "--pure",
     "--release",
+    "--source-root",
+    "--team-name",
+    "--track-id",
+    "--verify",
 }
 
 

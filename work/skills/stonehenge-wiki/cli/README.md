@@ -1,23 +1,18 @@
-# Stonehenge Wiki Skill Wrapper CLI
+# LLM Wiki REST wrapper
 
-This skill uses a **shell wrapper CLI** as the primary call path:
+The competition runtime uses the shell wrapper as its public API client:
 
 ```bash
 ./work/skills/stonehenge-wiki/scripts/llm-wiki
 ```
 
-## Usage
-
-The API service must already be running. The wrapper defaults to `http://127.0.0.1:8765`.
+Start the service first, then configure OpenCode, compile and ask:
 
 ```bash
+./work/scripts/server.sh start
 ./work/skills/stonehenge-wiki/scripts/llm-wiki configure-opencode
-./work/skills/stonehenge-wiki/scripts/llm-wiki compile --wiki-root /path/to/stonehenge-wiki
-./work/skills/stonehenge-wiki/scripts/llm-wiki ask --wiki-root /path/to/stonehenge-wiki "统计 docx 文件数量"
-./work/skills/stonehenge-wiki/scripts/llm-wiki quick-start --wiki-root /path/to/stonehenge-wiki --question-id api-1 --level 简单 "统计 docx 文件数量"
-./work/skills/stonehenge-wiki/scripts/llm-wiki health
+./work/skills/stonehenge-wiki/scripts/llm-wiki compile
+./work/skills/stonehenge-wiki/scripts/llm-wiki ask '统计 docx 文件数量'
 ```
 
-### Notes
-
-- This wrapper does not require Rust/Cargo at runtime and does not start services.
+The wrapper auto-discovers the `llm-wiki/` directory next to `work/`. Use `LLM_WIKI_ROOT` or `--wiki-root` to override it. Rust/Cargo is not required at evaluation runtime.

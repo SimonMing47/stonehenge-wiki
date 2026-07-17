@@ -460,23 +460,20 @@ class PlatformSmokeTest(unittest.TestCase):
                         base + "/llm/config",
                         {
                             "enabled": False,
-                            "default_agent": "default",
+                            "default_agent": "opencode",
                             "category_agents": {},
-                            "runtime_mode": "api",
-                            "runtime_command": "",
+                            "runtime_mode": "opencode",
+                            "runtime_command": "opencode run --pure --format json",
                             "agents": {
-                                "default": {
+                                "opencode": {
                                     "enabled": False,
-                                    "provider": "",
-                                    "model": "",
-                                    "base_url": "",
-                                    "api_key_env": "",
+                                    "runtime_mode": "opencode",
                                 }
                             },
                         },
                     )
                 )
-                llm_test = json.loads(http_post(base + "/llm/test", {"agent_name": "default"}))
+                llm_test = json.loads(http_post(base + "/llm/test", {"agent_name": "opencode"}))
             finally:
                 httpd.shutdown()
                 httpd.server_close()
@@ -666,7 +663,7 @@ class PlatformSmokeTest(unittest.TestCase):
             self.assertIn("summary", admin_readiness["report"])
             self.assertEqual(admin_evaluation["report"]["summary"]["total_questions"], 1)
 
-    def test_wiki_env_file_enables_api_auth_readiness(self) -> None:
+    def test_process_environment_enables_api_auth_without_loading_wiki_env(self) -> None:
         env_keys = ["STONEHENGE_WIKI_ENV_TEST_ADMIN_TOKEN", "STONEHENGE_WIKI_ENV_TEST_READ_TOKEN"]
         old_values = {key: os.environ.get(key) for key in env_keys}
         for key in env_keys:
@@ -705,7 +702,7 @@ class PlatformSmokeTest(unittest.TestCase):
                     encoding="utf-8",
                 )
                 (wiki / ".env").write_text(
-                    f"{env_keys[0]}=env-admin-secret\n{env_keys[1]}=env-read-secret\n",
+                    f"{env_keys[0]}=must-not-load\n{env_keys[1]}=must-not-load\n",
                     encoding="utf-8",
                 )
                 (docs / "sqlite.md").write_text("SQLite SELECT 命令用于查询表数据。\n", encoding="utf-8")
@@ -715,6 +712,8 @@ class PlatformSmokeTest(unittest.TestCase):
                 ]
                 (wiki / "question" / "group-ready.md").write_text(json.dumps(questions, ensure_ascii=False), encoding="utf-8")
 
+                os.environ[env_keys[0]] = "trusted-process-admin"
+                os.environ[env_keys[1]] = "trusted-process-read"
                 platform = StonehengeWikiPlatform.from_wiki_root(wiki)
                 platform.compile_wiki()
                 health = platform.health()
@@ -1367,9 +1366,9 @@ class PlatformSmokeTest(unittest.TestCase):
             normal = answerer.answer(Question("q1", "如何在控制台连接高斯数据库", "中等"))
             secret = answerer.answer(Question("q2", "数据库密码是什么", "困难"))
 
-            self.assertIn("llm:fake/fake-model", normal["answer"]["datas"])
+            self.assertEqual(normal["answer"]["datas"], ["LLM synthesized answer"])
             self.assertEqual(llm.calls, ["如何在控制台连接高斯数据库"])
-            self.assertIn("数据库密码: env-secret", "\n".join(secret["answer"]["datas"]))
+            self.assertEqual(secret["answer"]["datas"], ["env-secret"])
 
     def test_llm_context_redacts_secret_values(self) -> None:
         with tempfile.TemporaryDirectory(prefix="stonehenge-wiki-redact-test-") as tmp:
@@ -1423,14 +1422,12 @@ class PlatformSmokeTest(unittest.TestCase):
                     {
                         "llm": {
                             "enabled": True,
-                            "default_agent": "default",
+                            "default_agent": "opencode",
                             "agents": {
-                                "default": {
+                                "opencode": {
                                     "enabled": True,
-                                    "provider": "fake-openai-compatible",
-                                    "model": "fake-model",
-                                    "base_url": "https://example.invalid/v1",
-                                    "api_key_env": "STONEHENGE_TEST_LLM_KEY",
+                                    "runtime_mode": "opencode",
+                                    "runtime_command": "opencode run --pure --format json",
                                     "timeout_seconds": 5,
                                 }
                             },
@@ -1443,9 +1440,9 @@ class PlatformSmokeTest(unittest.TestCase):
 
             with temporary_env({"STONEHENGE_TEST_LLM_KEY": "fake-test-secret-value"}):
                 platform = StonehengeWikiPlatform.from_wiki_root(wiki)
-                dry_run = platform.test_llm_agent("default", live=False)
-                platform.llm_clients["default"] = ProbeLLMClient(platform.config.llm_agents["default"])
-                live = platform.test_llm_agent("default", live=True)
+                dry_run = platform.test_llm_agent("opencode", live=False)
+                platform.llm_clients["opencode"] = ProbeLLMClient(platform.config.llm_agents["opencode"])
+                live = platform.test_llm_agent("opencode", live=True)
                 missing = platform.test_llm_agent("missing", live=False)
 
                 httpd = build_server(platform, "127.0.0.1", 0)
@@ -1453,7 +1450,7 @@ class PlatformSmokeTest(unittest.TestCase):
                 thread.start()
                 try:
                     base = f"http://127.0.0.1:{httpd.server_address[1]}"
-                    api_live = json.loads(http_post(base + "/llm/test", {"agent_name": "default", "live": True}))
+                    api_live = json.loads(http_post(base + "/llm/test", {"agent_name": "opencode", "live": True}))
                     events = json.loads(http_get(base + "/audit?limit=5"))["events"]
                 finally:
                     httpd.shutdown()
@@ -1461,7 +1458,8 @@ class PlatformSmokeTest(unittest.TestCase):
                     thread.join(timeout=5)
 
             self.assertEqual(dry_run["status"], "ok")
-            self.assertTrue(dry_run["checks"]["api_key_present"])
+            self.assertTrue(dry_run["checks"]["runtime_mode"])
+            self.assertTrue(dry_run["checks"]["runtime_command"])
             self.assertNotIn("fake-test-secret-value", json.dumps(dry_run, ensure_ascii=False))
             self.assertEqual(live["reply_preview"], "OK")
             self.assertEqual(api_live["reply_preview"], "OK")
@@ -1710,10 +1708,8 @@ class FakeLLMClient:
 
 
 class ProbeLLMClient(LLMClient):
-    def post_json(self, endpoint: str, payload: dict) -> dict:
-        self.endpoint = endpoint
-        self.payload = payload
-        return {"choices": [{"message": {"content": "OK"}}]}
+    def test_completion(self) -> str:
+        return "OK"
 
 
 class FailingLLMClient:

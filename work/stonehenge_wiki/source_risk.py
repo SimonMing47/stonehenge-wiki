@@ -8,14 +8,25 @@ from typing import Any
 
 from .indexer import WikiIndex
 from .models import CommentRecord, DocumentRecord
-from .security import SYSTEM_SECRET_RE, PermissionGuard
+from .security import SYSTEM_SECRET_RE, PermissionGuard, normalize_security_text
 
 SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 MANDATORY_QUARANTINE_CODES = {"permission_file_deny"}
-SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)(\b[\w.-]*(?:password|passwd|secret|token|credential|api[_-]?key)[\w.-]*\b)\s*[:=]\s*([^,\s;<>]+)"
+SECRET_KEY = (
+    r"(?:[\w.-]*(?:password|passwd|pwd|secret|token|credential|api[_-]?key|"
+    r"access[_-]?key|private[_-]?key)[\w.-]*|密码|密钥|秘钥|口令|凭据|令牌)"
 )
-CN_SECRET_ASSIGNMENT_RE = re.compile(r"(密码|密钥|秘钥|口令)\s*[:：=]\s*([^,\s;<>]+)")
+SECRET_ASSIGNMENT_RE = re.compile(
+    rf"(?P<prefix>['\"]?{SECRET_KEY}['\"]?\s*[:：=]\s*)"
+    r"(?P<value>\"(?:\\.|[^\"\r\n])*\"|'(?:\\.|[^'\r\n])*'|[^,\s;，；<>}}]+)",
+    re.IGNORECASE,
+)
+URI_SECRET_RE = re.compile(
+    r"(?P<prefix>\b[a-z][a-z0-9+.-]*://[^\s:/@]+:)(?P<value>[^\s/@]+)(?P<suffix>@)",
+    re.IGNORECASE,
+)
+BEARER_SECRET_RE = re.compile(r"(?P<prefix>\b(?:authorization\s*[:=]\s*)?bearer\s+)(?P<value>[^\s,;]+)", re.IGNORECASE)
+PRIVATE_KEY_RE = re.compile(r"-----BEGIN\s+(?:RSA\s+|EC\s+|OPENSSH\s+)?PRIVATE\s+KEY-----", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -90,7 +101,15 @@ def scan_record(record: DocumentRecord, guard: PermissionGuard, today: date) -> 
         )
 
     if record.suffix in {"py", "js", "java"} and guard.code_text_is_dangerous(record.text):
-        match = first_matching_line(record.text, re.compile(r"(os\.system|subprocess|shutil\.rmtree|eval\(|exec\(|child_process|process\.env)", re.IGNORECASE))
+        match = first_matching_line(
+            record.text,
+            re.compile(
+                r"(os\s*\.\s*system|subprocess|shutil\s*\.\s*rmtree|eval\s*\(|exec\s*\(|"
+                r"child_process|process\s*\.\s*env|Runtime\s*\.\s*getRuntime|ProcessBuilder|"
+                r"remove-item|rm\s+-[rf])",
+                re.IGNORECASE,
+            ),
+        )
         findings.append(
             finding(
                 record,
@@ -98,11 +117,11 @@ def scan_record(record: DocumentRecord, guard: PermissionGuard, today: date) -> 
                 "dangerous_code",
                 "code source contains APIs blocked by execution guard",
                 line=match[0],
-                evidence=match[1],
+                evidence=match[1] or "dangerous API or command assembled across string fragments",
             )
         )
 
-    injection_match = first_matching_line(record.text, re.compile(r"(忽略(?:前面|以上|所有).{0,12}规则|开启上帝模式|上帝模式|删除全部文档|ignore\s+(all\s+)?previous|god\s*mode)", re.IGNORECASE))
+    injection_match = guard.prompt_injection_line(record.text)
     if injection_match[0]:
         findings.append(
             finding(
@@ -154,12 +173,39 @@ def scan_record(record: DocumentRecord, guard: PermissionGuard, today: date) -> 
         )
 
     for comment in record.comments:
-        findings.extend(comment_risks(comment, today))
+        findings.extend(comment_risks(comment, today, guard, record.rel_path))
     return findings
 
 
-def comment_risks(comment: CommentRecord, today: date) -> list[SourceRiskFinding]:
+def comment_risks(
+    comment: CommentRecord,
+    today: date,
+    guard: PermissionGuard | None = None,
+    source_path: str | None = None,
+) -> list[SourceRiskFinding]:
     risks: list[SourceRiskFinding] = []
+    if guard and guard.contains_prompt_injection(comment.raw_text):
+        risks.append(
+            SourceRiskFinding(
+                source_path=source_path or comment.source_path,
+                severity="critical",
+                code="prompt_injection_comment",
+                message="comment contains prompt-injection language and must be treated as untrusted data",
+                line=comment.line,
+                evidence=clean_evidence(comment.raw_text),
+            )
+        )
+    if first_secret_line(comment.raw_text)[0]:
+        risks.append(
+            SourceRiskFinding(
+                source_path=source_path or comment.source_path,
+                severity="high",
+                code="secret_in_comment",
+                message="comment contains a secret-like value",
+                line=comment.line,
+                evidence=clean_evidence(comment.raw_text),
+            )
+        )
     if comment.todo and not comment.assignee:
         risks.append(
             SourceRiskFinding(
@@ -168,7 +214,7 @@ def comment_risks(comment: CommentRecord, today: date) -> list[SourceRiskFinding
                 code="unassigned_todo",
                 message="structured TODO has no assignee",
                 line=comment.line,
-                evidence=comment.summary(),
+                evidence=clean_evidence(comment.summary()),
             )
         )
     due = parse_yyyymmdd(comment.end_date)
@@ -180,7 +226,7 @@ def comment_risks(comment: CommentRecord, today: date) -> list[SourceRiskFinding
                 code="overdue_todo",
                 message="structured TODO is past due",
                 line=comment.line,
-                evidence=comment.summary(),
+                evidence=clean_evidence(comment.summary()),
             )
         )
     return risks
@@ -225,14 +271,22 @@ def finding(
 
 def first_matching_line(text: str, pattern: re.Pattern[str]) -> tuple[int | None, str]:
     for line_no, line in enumerate(text.splitlines(), start=1):
-        if pattern.search(line):
+        if pattern.search(normalize_security_text(line)):
             return line_no, line
     return None, ""
 
 
 def redact_secret_line(line: str) -> str:
-    redacted = SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}: [REDACTED]", line)
-    return CN_SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}: [REDACTED]", redacted)
+    normalized = normalize_security_text(str(line or ""))
+    redacted = SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group('prefix')}[REDACTED]", normalized)
+    redacted = URI_SECRET_RE.sub(
+        lambda match: f"{match.group('prefix')}[REDACTED]{match.group('suffix')}",
+        redacted,
+    )
+    redacted = BEARER_SECRET_RE.sub(lambda match: f"{match.group('prefix')}[REDACTED]", redacted)
+    if PRIVATE_KEY_RE.search(redacted):
+        return "[REDACTED PRIVATE KEY]"
+    return redacted
 
 
 def clean_evidence(text: str) -> str:
@@ -241,7 +295,13 @@ def clean_evidence(text: str) -> str:
 
 def first_secret_line(text: str) -> tuple[int | None, str]:
     for line_no, line in enumerate(text.splitlines(), start=1):
-        if SECRET_ASSIGNMENT_RE.search(line) or CN_SECRET_ASSIGNMENT_RE.search(line):
+        normalized = normalize_security_text(line)
+        if (
+            SECRET_ASSIGNMENT_RE.search(normalized)
+            or URI_SECRET_RE.search(normalized)
+            or BEARER_SECRET_RE.search(normalized)
+            or PRIVATE_KEY_RE.search(normalized)
+        ):
             return line_no, line
     return None, ""
 
